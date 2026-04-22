@@ -1,0 +1,43 @@
+Build a full lifestyle web app called ROSA — tagline: "An app made for women, by women."
+INTRO SCREEN: When the app opens show a warm, smooth, aesthetic intro animation — the word ROSA fades in beautifully with the tagline "Ever wondered having all this together?" — keep it under 3 seconds, people hate long intros. Then smoothly transition to the sign in page.
+SIGN IN PAGE: Users can sign in via email or phone number (any country, with country code selector), or continue as Guest to explore. After signing in they select their gender — options include Male, Female, Non-binary, and all LGBTQ+ identities. Save accounts so users don't have to sign in every time.
+DAILY WELCOME: After login show a warm personalised daily quote based on the user's mood and personality preferences. Users can set a daily motivational reminder notification. Each day when they open the app they get a fresh quote.
+MOOD TRACKER: Users log their mood daily from a beautiful mood selector. App uses this to predict what kind of day to expect, suggest activities, workouts, food, and give gentle advice.
+PERIOD TRACKER (free, like Flo but better): Full period tracking — cycle prediction, ovulation window, PMS symptoms, pregnancy probability, mood by cycle phase, suggestions for what to do on period days like comfort food, gentle workouts, self care. Partner can be optionally synced — if user allows it, partner gets gentle reminders like "she might need extra love today 💕". Partner can or cannot see period details based on user's privacy settings.
+PARTNER SHARING: Users can connect with a partner using a unique code. Partners can: - See or hide period tracker based on user permission - Plan secret surprise trips or events without revealing details — app gives outfit suggestions to user based on weather at the destination WITHOUT revealing where they're going - Add wishlists with product links or nearby store suggestions based on location - Take a 3 question quiz if confused what to buy — quiz results shared with partner as a gift guide - Get reminders for her birthday, anniversary, period, and mood
+WISHLIST: Users add items they want — with links to online stores OR nearby physical stores based on location. Partner can view wishlist and buy directly. If wishlist is empty or overwhelming, partner gets a 3 question quiz to find the perfect gift.
+COUNTDOWN MILESTONES: Count down to anything — Christmas, anniversary, birthday, vacation. Track days since anything — first date, sobriety, a big achievement. Beautiful shareable cards for Instagram and WhatsApp.
+TRAVEL & PLACES:
+·       Add places you want to travel to someday
+·       Get suggestions of things to do and places to visit based on current location
+·       When something is suggested, show WHERE exactly to do it with maps link
+·       Weekend plan suggestions based on season and location
+OUTFIT PLANNER & CALENDAR: Users can plan outfits for specific days on a calendar. Suggest outfits based on weather, mood, occasion. Link to buy similar outfits from online stores. If partner plans a surprise trip, suggest outfits based on destination weather without revealing location.
+REMINDERS CALENDAR: A full calendar where users can select any day and add multiple reminders at once — bills, assignments, payments, anniversaries, birthdays, subscriptions, anything. Clean and beautiful calendar UI.
+HEALTH & FITNESS: Users enter height, weight, fitness goal — app calculates BMI and suggests:
+·       Home workouts
+·       Yoga routines
+·       Meditation sessions
+·       Gym workouts All free, no paywall.
+MOTIVATIONAL QUOTES: Daily quote on home screen based on personality and preferences. Users can turn on daily reminder notification for quotes. Quotes match their mood and cycle phase.
+SUPPORT: A dedicated support section where users can contact the developer via email: aiswarysaji2601@gmail.com. Simple contact form that sends directly to this email.
+DESIGN STYLE: Warm, aesthetic, soft feminine energy — think deep rose, blush pink, warm cream, gold accents. Smooth animations everywhere. Feels luxurious but approachable. Not too pink and childish — elevated and modern. Beautiful typography. Every screen should feel like opening a luxury magazine.
+WISHLIST: Users add items they want — with links to online stores OR nearby physical stores based on location. Partner can view wishlist and buy directly. If wishlist is empty or overwhelming, partner gets a 3 question quiz to find the perfect gift.
+COUNTDOWN MILESTONES: Count down to anything — Christmas, anniversary, birthday, vacation. Track days since anything — first date, sobriety, a big achievement. Beautiful shareable cards for Instagram and WhatsApp.
+TRAVEL & PLACES:
+·       Add places you want to travel to someday
+·       Get suggestions of things to do and places to visit based on current location
+·       When something is suggested, show WHERE exactly to do it with maps link
+·       Weekend plan suggestions based on season and location
+OUTFIT PLANNER & CALENDAR: Users can plan outfits for specific days on a calendar. Suggest outfits based on weather, mood, occasion. Link to buy similar outfits from online stores. If partner plans a surprise trip, suggest outfits based on destination weather without revealing location.
+REMINDERS CALENDAR: A full calendar where users can select any day and add multiple reminders at once — bills, assignments, payments, anniversaries, birthdays, subscriptions, anything. Clean and beautiful calendar UI.
+HEALTH & FITNESS: Users enter height, weight, fitness goal — app calculates BMI and suggests:
+·       Home workouts
+·       Yoga routines
+·       Meditation sessions
+·       Gym workouts All free, no paywall.
+·       MOTIVATIONAL QUOTES: Daily quote on home screen based on personality and preferences. Users can turn on daily reminder notification for quotes. Quotes match their mood and cycle phase.
+·       SUPPORT: A dedicated support section where users can contact the developer via email: aiswarysaji2601@gmail.com. Simple contact form that sends directly to this email.
+·       DESIGN STYLE: Warm, aesthetic, soft feminine energy — think deep rose, blush pink, warm cream, gold accents. Smooth animations everywhere. Feels luxurious but approachable. Not too pink and childish — elevated and modern. Beautiful typography. Every screen should feel like opening a luxury magazine.
+·       Make it fully responsive for mobile and desktop. Use React. Make it feel smooth, fast, and beautiful.
+ 

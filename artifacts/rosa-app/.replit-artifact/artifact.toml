@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "ROSA"
+version = "1.0.0"
+id = "artifacts/rosa-app"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22091
+
+[services.development]
+run = "pnpm --filter @workspace/rosa-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/rosa-app", "run", "build" ]
+publicDir = "artifacts/rosa-app/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22091"
+BASE_PATH = "/"
