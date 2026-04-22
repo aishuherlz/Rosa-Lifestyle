@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trash2, Clock, Calendar, Share2, Timer } from "lucide-react";
+import { Plus, Trash2, Clock, Calendar, Share2, Timer, Camera, Image, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { differenceInDays, parseISO, format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscription } from "@/lib/subscription-context";
+import { useLocation } from "wouter";
 
 type Milestone = {
   id: string;
@@ -18,6 +20,8 @@ type Milestone = {
   targetDate: string;
   emoji: string;
   color: string;
+  photo?: string;
+  note?: string;
 };
 
 const EMOJIS = ["🎄", "🎂", "✈️", "💍", "🌸", "🎓", "❤️", "🌟", "🏆", "💪", "🌈", "🎉"];
@@ -31,16 +35,38 @@ const COLORS = [
 ];
 
 export default function MilestonesPage() {
+  const { isPremium } = useSubscription();
+  const [, setLocation] = useLocation();
   const [milestones, setMilestones] = useLocalStorage<Milestone[]>("rosa_milestones", []);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", type: "countdown" as "countdown" | "since", targetDate: "", emoji: "🌟", color: "0" });
+  const [form, setForm] = useState({ title: "", type: "countdown" as "countdown" | "since", targetDate: "", emoji: "🌟", color: "0", note: "" });
+  const [formPhoto, setFormPhoto] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setFormPhoto(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
   const handleAdd = () => {
-    const item: Milestone = { id: Date.now().toString(), ...form };
+    const item: Milestone = {
+      id: Date.now().toString(),
+      title: form.title,
+      type: form.type,
+      targetDate: form.targetDate,
+      emoji: form.emoji,
+      color: form.color,
+      note: form.note || undefined,
+      photo: formPhoto || undefined,
+    };
     setMilestones([...milestones, item]);
     setOpen(false);
-    setForm({ title: "", type: "countdown", targetDate: "", emoji: "🌟", color: "0" });
+    setForm({ title: "", type: "countdown", targetDate: "", emoji: "🌟", color: "0", note: "" });
+    setFormPhoto(null);
   };
 
   const getDays = (m: Milestone) => {
@@ -59,47 +85,84 @@ export default function MilestonesPage() {
     );
   };
 
-  const countdowns = milestones.filter(m => m.type === "countdown");
-  const sinces = milestones.filter(m => m.type === "since");
+  const updatePhoto = (id: string, photo: string) => {
+    setMilestones(milestones.map((m) => m.id === id ? { ...m, photo } : m));
+  };
 
-  const MilestoneCard = ({ m }: { m: Milestone }) => {
+  const countdowns = milestones.filter((m) => m.type === "countdown");
+  const sinces = milestones.filter((m) => m.type === "since");
+
+  function MilestoneCard({ m }: { m: Milestone }) {
     const days = getDays(m);
     const colorIndex = parseInt(m.color) % COLORS.length;
     const color = COLORS[colorIndex];
     const absDays = Math.abs(days);
     const displayDays = m.type === "countdown" ? (days > 0 ? days : 0) : absDays;
     const label = m.type === "countdown" ? (days > 0 ? "days to go" : "arrived!") : "days";
+    const photoRef = useRef<HTMLInputElement>(null);
+
+    const handlePhotoUpdate = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!isPremium) { setLocation("/subscription"); return; }
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => updatePhoto(m.id, ev.target?.result as string);
+      reader.readAsDataURL(file);
+    };
 
     return (
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-        <Card className={`border-2 ${color.card} shadow-sm hover:shadow-md transition-all`} data-testid={`card-milestone-${m.id}`}>
-          <CardContent className="pt-5">
+        <Card className={`border-2 ${color.card} shadow-sm hover:shadow-md transition-all overflow-hidden`}>
+          {m.photo ? (
+            <div className="relative h-40 w-full overflow-hidden">
+              <img src={m.photo} alt={m.title} className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+              <button
+                onClick={() => photoRef.current?.click()}
+                className="absolute bottom-2 right-2 p-1.5 bg-white/90 rounded-full text-foreground hover:bg-white"
+              >
+                <Camera className="w-3.5 h-3.5" />
+              </button>
+              <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpdate} />
+            </div>
+          ) : (
+            <button
+              onClick={() => { if (!isPremium) { setLocation("/subscription"); return; } photoRef.current?.click(); }}
+              className="w-full h-24 flex flex-col items-center justify-center bg-muted/20 hover:bg-muted/40 transition-colors border-b border-dashed border-border/50 gap-1"
+            >
+              <Image className="w-5 h-5 text-muted-foreground/50" />
+              <span className="text-xs text-muted-foreground/70">{isPremium ? "Add photo" : "Premium: Add photo"}</span>
+            </button>
+          )}
+          {!m.photo && <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpdate} />}
+          <CardContent className="pt-4">
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-3">
-                <span className="text-3xl">{m.emoji}</span>
+                <span className="text-2xl">{m.emoji}</span>
                 <div>
-                  <p className="font-semibold">{m.title}</p>
+                  <p className="font-semibold text-sm">{m.title}</p>
                   <p className="text-xs text-muted-foreground">{format(parseISO(m.targetDate), "MMMM d, yyyy")}</p>
+                  {m.note && <p className="text-xs text-muted-foreground italic mt-0.5">{m.note}</p>}
                 </div>
               </div>
               <div className="flex gap-1">
-                <button onClick={() => handleShare(m)} className="text-muted-foreground hover:text-primary p-1 transition-colors" data-testid={`button-share-${m.id}`}>
-                  <Share2 className="w-4 h-4" />
+                <button onClick={() => handleShare(m)} className="text-muted-foreground hover:text-primary p-1 transition-colors">
+                  <Share2 className="w-3.5 h-3.5" />
                 </button>
-                <button onClick={() => setMilestones(milestones.filter(x => x.id !== m.id))} className="text-muted-foreground hover:text-destructive p-1 transition-colors" data-testid={`button-delete-${m.id}`}>
-                  <Trash2 className="w-4 h-4" />
+                <button onClick={() => setMilestones(milestones.filter((x) => x.id !== m.id))} className="text-muted-foreground hover:text-destructive p-1 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
-            <div className={`mt-4 p-3 rounded-xl bg-gradient-to-r ${color.bg} text-white text-center`}>
-              <div className="text-4xl font-bold font-serif">{displayDays}</div>
+            <div className={`mt-3 p-3 rounded-xl bg-gradient-to-r ${color.bg} text-white text-center`}>
+              <div className="text-3xl font-bold font-serif">{displayDays}</div>
               <div className="text-sm opacity-90">{label}</div>
             </div>
           </CardContent>
         </Card>
       </motion.div>
     );
-  };
+  }
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6">
@@ -111,14 +174,14 @@ export default function MilestonesPage() {
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90" data-testid="button-add-milestone">
+              <Button className="bg-primary hover:bg-primary/90">
                 <Plus className="w-4 h-4 mr-1" /> Add
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader><DialogTitle className="font-serif text-xl">New Milestone</DialogTitle></DialogHeader>
               <div className="space-y-4">
-                <Tabs value={form.type} onValueChange={(v: any) => setForm(f => ({ ...f, type: v }))}>
+                <Tabs value={form.type} onValueChange={(v: any) => setForm((f) => ({ ...f, type: v }))}>
                   <TabsList className="w-full">
                     <TabsTrigger value="countdown" className="flex-1"><Clock className="w-4 h-4 mr-1" /> Countdown</TabsTrigger>
                     <TabsTrigger value="since" className="flex-1"><Timer className="w-4 h-4 mr-1" /> Days Since</TabsTrigger>
@@ -126,17 +189,40 @@ export default function MilestonesPage() {
                 </Tabs>
                 <div>
                   <Label>Title</Label>
-                  <Input placeholder={form.type === "countdown" ? "e.g. My Birthday" : "e.g. First Date"} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} data-testid="input-milestone-title" />
+                  <Input placeholder={form.type === "countdown" ? "e.g. My Birthday" : "e.g. First Date"} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
                 </div>
                 <div>
                   <Label>{form.type === "countdown" ? "Target Date" : "Date It Happened"}</Label>
-                  <Input type="date" value={form.targetDate} onChange={e => setForm(f => ({ ...f, targetDate: e.target.value }))} data-testid="input-milestone-date" />
+                  <Input type="date" value={form.targetDate} onChange={(e) => setForm((f) => ({ ...f, targetDate: e.target.value }))} />
                 </div>
+                <div>
+                  <Label>Note (optional)</Label>
+                  <Input placeholder="A short memory or note..." value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} />
+                </div>
+                {isPremium && (
+                  <div>
+                    <Label>Photo (optional)</Label>
+                    <div
+                      onClick={() => fileRef.current?.click()}
+                      className="mt-1 h-28 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/20 transition-colors overflow-hidden"
+                    >
+                      {formPhoto ? (
+                        <img src={formPhoto} alt="preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <>
+                          <Camera className="w-6 h-6 text-muted-foreground mb-1" />
+                          <span className="text-xs text-muted-foreground">Tap to add a photo</span>
+                        </>
+                      )}
+                    </div>
+                    <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
+                  </div>
+                )}
                 <div>
                   <Label>Emoji</Label>
                   <div className="flex flex-wrap gap-2 mt-1">
-                    {EMOJIS.map(e => (
-                      <button key={e} onClick={() => setForm(f => ({ ...f, emoji: e }))} className={`text-xl p-1.5 rounded-lg border-2 transition-all ${form.emoji === e ? "border-primary bg-primary/10" : "border-transparent hover:border-border"}`}>
+                    {EMOJIS.map((e) => (
+                      <button key={e} onClick={() => setForm((f) => ({ ...f, emoji: e }))} className={`text-xl p-1.5 rounded-lg border-2 transition-all ${form.emoji === e ? "border-primary bg-primary/10" : "border-transparent hover:border-border"}`}>
                         {e}
                       </button>
                     ))}
@@ -146,11 +232,11 @@ export default function MilestonesPage() {
                   <Label>Color</Label>
                   <div className="flex gap-2 mt-1">
                     {COLORS.map((c, i) => (
-                      <button key={i} onClick={() => setForm(f => ({ ...f, color: String(i) }))} className={`w-8 h-8 rounded-full bg-gradient-to-r ${c.bg} border-2 transition-all ${form.color === String(i) ? "border-foreground scale-110" : "border-transparent"}`} />
+                      <button key={i} onClick={() => setForm((f) => ({ ...f, color: String(i) }))} className={`w-8 h-8 rounded-full bg-gradient-to-r ${c.bg} border-2 transition-all ${form.color === String(i) ? "border-foreground scale-110" : "border-transparent"}`} />
                     ))}
                   </div>
                 </div>
-                <Button onClick={handleAdd} disabled={!form.title || !form.targetDate} className="w-full bg-primary" data-testid="button-save-milestone">Save Milestone</Button>
+                <Button onClick={handleAdd} disabled={!form.title || !form.targetDate} className="w-full bg-primary">Save Milestone</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -170,16 +256,16 @@ export default function MilestonesPage() {
           {countdowns.length > 0 && (
             <div>
               <h2 className="text-xl font-serif mb-3 flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> Countdowns</h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <AnimatePresence>{countdowns.map(m => <MilestoneCard key={m.id} m={m} />)}</AnimatePresence>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <AnimatePresence>{countdowns.map((m) => <MilestoneCard key={m.id} m={m} />)}</AnimatePresence>
               </div>
             </div>
           )}
           {sinces.length > 0 && (
             <div>
               <h2 className="text-xl font-serif mb-3 flex items-center gap-2"><Timer className="w-5 h-5 text-primary" /> Days Since</h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <AnimatePresence>{sinces.map(m => <MilestoneCard key={m.id} m={m} />)}</AnimatePresence>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <AnimatePresence>{sinces.map((m) => <MilestoneCard key={m.id} m={m} />)}</AnimatePresence>
               </div>
             </div>
           )}

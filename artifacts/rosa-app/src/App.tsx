@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider, useUser } from "@/lib/user-context";
+import { SubscriptionProvider } from "@/lib/subscription-context";
 import { AppLayout } from "@/components/layout/app-layout";
 import NotFound from "@/pages/not-found";
 
@@ -21,6 +22,9 @@ import HealthPage from "@/pages/health";
 import QuotesPage from "@/pages/quotes";
 import SupportPage from "@/pages/support";
 import SettingsPage from "@/pages/settings";
+import SubscriptionPage from "@/pages/subscription";
+import FoodPlannerPage from "@/pages/food-planner";
+import SurveysPage from "@/pages/surveys";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +70,9 @@ function Router() {
       <Route path="/quotes">{() => <ProtectedRoute component={QuotesPage} />}</Route>
       <Route path="/support">{() => <ProtectedRoute component={SupportPage} />}</Route>
       <Route path="/settings">{() => <ProtectedRoute component={SettingsPage} />}</Route>
+      <Route path="/subscription">{() => <ProtectedRoute component={SubscriptionPage} />}</Route>
+      <Route path="/food">{() => <ProtectedRoute component={FoodPlannerPage} />}</Route>
+      <Route path="/surveys">{() => <ProtectedRoute component={SurveysPage} />}</Route>
 
       <Route>
         {user ? (
@@ -85,10 +92,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <UserProvider>
-          <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
+          <SubscriptionProvider>
+            <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+          </SubscriptionProvider>
         </UserProvider>
       </TooltipProvider>
     </QueryClientProvider>

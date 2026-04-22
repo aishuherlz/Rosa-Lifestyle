@@ -15,38 +15,62 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **AI**: Replit AI Integrations (OpenAI gpt-5.4, no key needed)
 
 ## Artifacts
 
 ### ROSA (`artifacts/rosa-app`) — preview at `/`
-A full lifestyle web app for women. Frontend-only React + Vite app, all data stored in localStorage.
+A luxurious full-featured lifestyle web app for women. "An app made for women, by women" — founded by Aiswarya Saji.
 
-**Features:**
-- Intro animation with ROSA wordmark + tagline
-- Sign In (email/phone/guest) + Gender selection
-- Home dashboard with weather (OpenMeteo API), daily quotes, mood quick-log
-- Mood Tracker — log daily mood, get activity/food/workout suggestions
-- Period Tracker — cycle logging, ovulation prediction, calendar view, PMS suggestions
-- Partner Sharing — connect via code, privacy settings, surprise trip planner
+**Pages / Features:**
+- Intro animation — ROSA wordmark, founder tagline ("Built by Aiswarya Saji — a woman who struggled just like you")
+- Sign In — email/phone/guest + gender identity selection
+- Home — weather (OpenMeteo), daily quote, quick-access grid (12 sections), trial/subscription banners, founder note
+- Mood Tracker — daily mood logging, activity/food/workout suggestions
+- Period Tracker — cycle logging, ovulation, calendar, PMS suggestions
+- Partner Sharing — connect via code, privacy settings (granular, per-feature control)
 - Wishlist — items with links, priority, gift quiz
-- Milestones — countdowns & "days since" trackers with shareable cards
-- Travel & Places — bucket list destinations, seasonal weekend suggestions, Maps links
-- Outfit Planner — calendar-based outfit planning with weather advice
-- Reminders Calendar — full calendar with typed reminders (bills, birthdays, etc.)
-- Health & Fitness — BMI calculator, home workouts, yoga, meditation, gym workout library
-- Quotes — daily quote by personality tags, notification support
-- Support — mailto-based contact form to developer
-- Settings — profile, gender, personality tag preferences
+- Milestones — countdowns & "days since" with photo support (Premium), emoji, notes, shareable cards
+- Travel & Places — bucket list, seasonal weekend suggestions, Maps links
+- Outfit Planner — calendar-based outfit planning with weather
+- Food Planner (Premium) — diet plan selector, calorie tracker (manual entry, quick-add), water tracking, history log
+- Reminders Calendar — full calendar with typed reminders
+- Health & Fitness — BMI, home/yoga/gym/meditation workouts with step-by-step guides + YouTube video links, gym scheduling (Premium), weight journey tracker (Premium), health conditions/disabilities input
+- Quotes — daily quote by personality, notification support
+- Surveys — 4 reflective surveys (wellness, body image, relationships, goals)
+- Subscription — 31-day free trial, $5/mo or $50/yr simulated subscription, premium gating
+- Support — mailto contact form
+- Settings — profile, gender, personality tags, partner privacy (per-feature toggles), timezone detection, 24h time toggle, subscription status card
+
+**AI Chatbot (Premium):**
+- Floating chat button (bottom-right)
+- Streaming SSE responses from backend → OpenAI gpt-5.4
+- ROSA persona — warm, empathetic mental/emotional support companion
+- Persists conversation history in PostgreSQL
+- Non-premium: tapping the button routes to subscription page
+
+**Subscription System:**
+- 31-day free trial from account creation
+- Simulated $5/month or $50/year plans (stored in localStorage)
+- Premium gates: AI chatbot, food planner, gym scheduling, weight journey, outfit suggestions, photo milestones, things-to-do/travel
+- Trial countdown shown in sidebar and home banner
 
 **Tech:**
 - React + Vite + TailwindCSS + shadcn/ui
 - Framer Motion for animations
 - Playfair Display (serif) + Inter (sans) fonts
 - Deep rose / blush / cream / gold palette
-- All state persisted via localStorage
+- Most state: localStorage; chatbot history: PostgreSQL
 
 ### API Server (`artifacts/api-server`) — preview at `/api`
-Express 5 backend. Currently minimal (health check only).
+Express 5 backend with AI chatbot endpoints.
+
+**Routes:**
+- `GET /api/healthz` — health check
+- `GET/POST /api/openai/conversations` — manage chat conversations
+- `GET/DELETE /api/openai/conversations/:id` — get/delete conversation
+- `GET /api/openai/conversations/:id/messages` — list messages
+- `POST /api/openai/conversations/:id/messages` — send message (SSE streaming response)
 
 ## Key Commands
 
@@ -55,5 +79,16 @@ Express 5 backend. Currently minimal (health check only).
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
+
+## DB Schema
+
+- `conversations` — chat conversation metadata (id, title, created_at)
+- `messages` — chat messages (id, conversation_id, role, content, created_at)
+
+## Environment Variables
+
+- `DATABASE_URL` — PostgreSQL connection
+- `AI_INTEGRATIONS_OPENAI_BASE_URL` — Replit AI proxy URL (auto-set)
+- `AI_INTEGRATIONS_OPENAI_API_KEY` — Replit AI proxy key (auto-set)
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.

@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Settings, LogOut, User, Bell, Palette, Tag } from "lucide-react";
+import { Settings, LogOut, User, Bell, Tag, Shield, Crown, Globe, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { useUser } from "@/lib/user-context";
+import { useSubscription } from "@/lib/subscription-context";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 
 const PERSONALITY_TAGS = ["feminist", "spiritual", "adventurous", "gentle", "bold", "self-love", "strength", "growth"];
 
@@ -18,8 +21,24 @@ const GENDER_OPTIONS = [
   "Transgender woman", "Transgender man", "Two-spirit", "Prefer not to say",
 ];
 
+type PrivacySettings = {
+  shareMoodWithPartner: boolean;
+  sharePeriodWithPartner: boolean;
+  shareRemindersWithPartner: boolean;
+  shareWishlistWithPartner: boolean;
+  shareMilestonesWithPartner: boolean;
+  shareWeightWithPartner: boolean;
+  allowPartnerViewFood: boolean;
+};
+
+type TimezoneSettings = {
+  timezone: string;
+  use24h: boolean;
+};
+
 export default function SettingsPage() {
   const { user, setUser } = useUser();
+  const { plan, daysLeftInTrial } = useSubscription();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [form, setForm] = useState({
@@ -27,12 +46,25 @@ export default function SettingsPage() {
     gender: user?.gender || "",
     personalityTags: user?.personalityTags || [] as string[],
   });
+  const [privacy, setPrivacy] = useLocalStorage<PrivacySettings>("rosa_privacy", {
+    shareMoodWithPartner: true,
+    sharePeriodWithPartner: false,
+    shareRemindersWithPartner: true,
+    shareWishlistWithPartner: true,
+    shareMilestonesWithPartner: true,
+    shareWeightWithPartner: false,
+    allowPartnerViewFood: false,
+  });
+  const [tz, setTz] = useLocalStorage<TimezoneSettings>("rosa_timezone", {
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    use24h: false,
+  });
 
   const toggleTag = (tag: string) => {
-    setForm(f => ({
+    setForm((f) => ({
       ...f,
       personalityTags: f.personalityTags.includes(tag)
-        ? f.personalityTags.filter(t => t !== tag)
+        ? f.personalityTags.filter((t) => t !== tag)
         : [...f.personalityTags, tag],
     }));
   };
@@ -50,12 +82,47 @@ export default function SettingsPage() {
     setLocation("/sign-in");
   };
 
+  const privacyItems: { key: keyof PrivacySettings; label: string; desc: string }[] = [
+    { key: "shareMoodWithPartner", label: "Mood check-ins", desc: "Let your partner see your daily mood" },
+    { key: "sharePeriodWithPartner", label: "Period & cycle", desc: "Share cycle dates and symptoms" },
+    { key: "shareRemindersWithPartner", label: "Reminders", desc: "Shared reminders visible to partner" },
+    { key: "shareWishlistWithPartner", label: "Wishlist", desc: "Partner can view your wishlist" },
+    { key: "shareMilestonesWithPartner", label: "Milestones", desc: "Share countdowns and memories" },
+    { key: "shareWeightWithPartner", label: "Weight journey", desc: "Share weight progress with partner" },
+    { key: "allowPartnerViewFood", label: "Food log", desc: "Partner can see your daily food log" },
+  ];
+
   return (
-    <div className="min-h-full p-4 md:p-8 space-y-6 max-w-2xl">
+    <div className="min-h-full p-4 md:p-8 space-y-6 max-w-2xl pb-24">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-serif text-foreground">Settings</h1>
         <p className="text-muted-foreground mt-1">Make ROSA your own.</p>
       </motion.div>
+
+      {/* Subscription Status */}
+      <Card
+        className={`cursor-pointer hover:shadow-md transition-all ${plan === "trial" ? "border-amber-200 bg-amber-50/50" : plan === "monthly" || plan === "yearly" ? "border-rose-200 bg-rose-50/40" : "border-gray-200"}`}
+        onClick={() => setLocation("/subscription")}
+      >
+        <CardContent className="pt-4 pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Crown className={`w-5 h-5 ${plan === "trial" ? "text-amber-500" : plan === "expired" ? "text-muted-foreground" : "text-rose-500"}`} />
+              <div>
+                <p className="font-medium text-sm capitalize">
+                  {plan === "trial" ? "Free Trial" : plan === "expired" ? "Trial Expired" : `${plan} plan`}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {plan === "trial" ? `${daysLeftInTrial} days remaining` : plan === "expired" ? "Subscribe to unlock premium" : "Premium active"}
+                </p>
+              </div>
+            </div>
+            <Badge className={`text-xs ${plan === "trial" ? "bg-amber-100 text-amber-800" : plan === "expired" ? "bg-gray-100 text-gray-600" : "bg-rose-100 text-rose-700"}`}>
+              {plan === "trial" ? "Trial" : plan === "expired" ? "Expired" : "Premium"}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Profile */}
       <Card className="border-border/50 shadow-sm">
@@ -67,27 +134,27 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div>
             <Label>Name</Label>
-            <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Your name" data-testid="input-settings-name" />
+            <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Your name" />
           </div>
           <div>
             <Label>Gender Identity</Label>
-            <Select value={form.gender} onValueChange={v => setForm(f => ({ ...f, gender: v }))}>
-              <SelectTrigger data-testid="select-settings-gender">
+            <Select value={form.gender} onValueChange={(v) => setForm((f) => ({ ...f, gender: v }))}>
+              <SelectTrigger>
                 <SelectValue placeholder="Select gender" />
               </SelectTrigger>
               <SelectContent>
-                {GENDER_OPTIONS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                {GENDER_OPTIONS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label>Account Type</Label>
+            <Label>Account</Label>
             <p className="text-sm text-muted-foreground mt-1">{user?.guestMode ? "Guest Mode" : `Signed in as ${user?.emailOrPhone}`}</p>
           </div>
         </CardContent>
       </Card>
 
-      {/* Personality */}
+      {/* Quote Personality */}
       <Card className="border-border/50 shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="font-serif text-lg flex items-center gap-2">
@@ -95,13 +162,12 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground mb-3">Choose what resonates with you — your daily quotes will match your style.</p>
+          <p className="text-sm text-muted-foreground mb-3">Your daily quotes will match your style.</p>
           <div className="flex flex-wrap gap-2">
-            {PERSONALITY_TAGS.map(tag => (
+            {PERSONALITY_TAGS.map((tag) => (
               <button
                 key={tag}
                 onClick={() => toggleTag(tag)}
-                data-testid={`settings-tag-${tag}`}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all capitalize ${
                   form.personalityTags.includes(tag)
                     ? "bg-primary text-primary-foreground border-primary"
@@ -115,7 +181,57 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Button onClick={handleSave} className="w-full bg-primary hover:bg-primary/90" data-testid="button-save-settings">
+      {/* Privacy Controls */}
+      <Card className="border-border/50 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="font-serif text-lg flex items-center gap-2">
+            <Shield className="w-5 h-5 text-primary" /> Partner Privacy
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">Choose what your partner can see in shared mode.</p>
+          {privacyItems.map((item) => (
+            <div key={item.key} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
+              <div>
+                <p className="text-sm font-medium text-foreground">{item.label}</p>
+                <p className="text-xs text-muted-foreground">{item.desc}</p>
+              </div>
+              <Switch
+                checked={privacy[item.key]}
+                onCheckedChange={(val) => setPrivacy({ ...privacy, [item.key]: val })}
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Timezone */}
+      <Card className="border-border/50 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="font-serif text-lg flex items-center gap-2">
+            <Clock className="w-5 h-5 text-primary" /> Time & Location
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Your Timezone</Label>
+            <p className="text-sm text-muted-foreground mt-1 bg-muted px-3 py-2 rounded-lg">
+              <Globe className="w-3.5 h-3.5 inline mr-1.5" />
+              {tz.timezone}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Auto-detected from your device. Used for timezone-aware reminders.</p>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">24-hour time</p>
+              <p className="text-xs text-muted-foreground">Use 14:00 instead of 2:00 PM</p>
+            </div>
+            <Switch checked={tz.use24h} onCheckedChange={(v) => setTz({ ...tz, use24h: v })} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Button onClick={handleSave} className="w-full bg-primary hover:bg-primary/90">
         Save Changes
       </Button>
 
@@ -127,7 +243,7 @@ export default function SettingsPage() {
               <p className="font-medium text-sm">Sign Out</p>
               <p className="text-xs text-muted-foreground mt-0.5">You'll need to sign in again on your next visit.</p>
             </div>
-            <Button variant="outline" className="border-destructive/30 text-destructive hover:bg-destructive/5" onClick={handleLogout} data-testid="button-logout">
+            <Button variant="outline" className="border-destructive/30 text-destructive hover:bg-destructive/5" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-1" /> Sign Out
             </Button>
           </div>
