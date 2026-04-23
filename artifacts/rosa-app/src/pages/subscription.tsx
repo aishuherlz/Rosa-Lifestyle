@@ -61,17 +61,14 @@ export default function Subscription() {
     setLoading(true);
     setCheckoutError("");
     try {
+      const emailOrPhone = localStorage.getItem("rosa_email") || localStorage.getItem("rosa_phone") || "guest@rosa.app";
       const name = localStorage.getItem("rosa_name") || "ROSA User";
-      const token = localStorage.getItem("rosa_auth_token");
-      if (!token) {
-        setCheckoutError("Please sign in with your verified email first to subscribe.");
-        setLoading(false);
-        return;
-      }
+      const priceId = selectedPlan === "monthly" ? prices?.monthly.id : prices?.yearly.id;
+
       const resp = await fetch("/api/stripe/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ name, planType: selectedPlan }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailOrPhone, name, priceId, planType: selectedPlan }),
       });
 
       if (!resp.ok) throw new Error("Could not create checkout session");
@@ -96,12 +93,11 @@ export default function Subscription() {
   const handlePortal = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("rosa_auth_token");
-      if (!token) { setCheckoutError("Sign in first to manage billing."); setLoading(false); return; }
+      const emailOrPhone = localStorage.getItem("rosa_email") || localStorage.getItem("rosa_phone") || "guest@rosa.app";
       const resp = await fetch("/api/stripe/portal", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({}),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailOrPhone }),
       });
       const { url } = await resp.json();
       if (url) window.open(url, "_blank");
@@ -127,24 +123,11 @@ export default function Subscription() {
         </motion.div>
 
         {/* Founding member banner */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-3 p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-rose-50 border border-amber-200 text-center">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-5 p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-rose-50 border border-amber-200 text-center">
           <p className="text-amber-800 text-xs font-medium flex items-center justify-center gap-1">
             <Gift className="w-3.5 h-3.5" />
             First 100 users get <strong>6 months free</strong> · First 500 get <strong>3 months free</strong>
           </p>
-        </motion.div>
-
-        {/* Partner pricing — invite a partner */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-5 p-3.5 rounded-2xl bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-200">
-          <div className="flex items-start gap-2.5">
-            <span className="text-xl">💝</span>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-rose-800">Bring your partner along</p>
-              <p className="text-xs text-rose-700/80 mt-0.5">
-                Invite your partner from the <span className="font-medium">Partner</span> page — they get <strong>3 months free</strong>, then <strong>50% off forever</strong> while your account stays active.
-              </p>
-            </div>
-          </div>
         </motion.div>
 
         {plan === "trial" && (

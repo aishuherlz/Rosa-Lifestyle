@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, ExternalLink, Trash2, Gift, Star, ShoppingBag, HelpCircle, Calendar, Cake } from "lucide-react";
+import { Plus, ExternalLink, Trash2, Gift, Star, ShoppingBag, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { differenceInDays, parseISO } from "date-fns";
-
-type LinkedMilestone = { id: string; title: string; targetDate: string; emoji: string; daysAway: number };
 
 type WishlistItem = {
   id: string;
@@ -40,19 +37,6 @@ const PRIORITY_COLORS = { low: "bg-slate-100 text-slate-700", medium: "bg-amber-
 
 export default function WishlistPage() {
   const [items, setItems] = useLocalStorage<WishlistItem[]>("rosa_wishlist", []);
-  const [milestones] = useLocalStorage<any[]>("rosa_milestones", []);
-  const upcomingGiftMilestones: LinkedMilestone[] = milestones
-    .filter((m) => m.type === "countdown" && /birthday|anniversary|christmas|valentine|wedding/i.test(m.title))
-    .map((m) => {
-      try {
-        const days = differenceInDays(parseISO(m.targetDate), new Date());
-        return days >= 0 && days <= 90
-          ? { id: m.id, title: m.title, targetDate: m.targetDate, emoji: m.emoji || "🎁", daysAway: days }
-          : null;
-      } catch { return null; }
-    })
-    .filter((m): m is LinkedMilestone => !!m)
-    .sort((a, b) => a.daysAway - b.daysAway);
   const [open, setOpen] = useState(false);
   const [quizOpen, setQuizOpen] = useState(false);
   const [quizStep, setQuizStep] = useState(0);
@@ -84,32 +68,6 @@ export default function WishlistPage() {
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6">
-      {upcomingGiftMilestones.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
-          <Card className="border-rose-200 bg-gradient-to-br from-rose-50 via-pink-50 to-amber-50 shadow-sm">
-            <CardContent className="pt-4">
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-white rounded-full shadow-sm"><Cake className="w-5 h-5 text-rose-500" /></div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-foreground">Coming up on your gift radar</p>
-                  <div className="mt-2 space-y-1">
-                    {upcomingGiftMilestones.slice(0, 3).map((m) => (
-                      <div key={m.id} className="flex items-center gap-2 text-sm">
-                        <span>{m.emoji}</span>
-                        <span className="text-foreground">{m.title}</span>
-                        <Badge variant="outline" className="ml-auto text-xs text-rose-700 border-rose-200">
-                          {m.daysAway === 0 ? "Today!" : `in ${m.daysAway}d`}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground italic mt-2">Tag wishlist items so loved ones know what to gift you ✨</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center justify-between">
           <div>

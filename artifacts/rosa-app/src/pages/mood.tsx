@@ -1,28 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Smile, Frown, Meh, Zap, Cloud, Heart, Plus, ChevronRight, Mic, MicOff, Phone, LifeBuoy, Sparkles } from "lucide-react";
+import { Smile, Frown, Meh, Zap, Cloud, Heart, Plus, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { useUser } from "@/lib/user-context";
-
-const CRISIS_HELPLINES: Record<string, { name: string; number: string; url?: string }[]> = {
-  US: [{ name: "988 Suicide & Crisis Lifeline", number: "988", url: "https://988lifeline.org" }],
-  CA: [{ name: "Talk Suicide Canada", number: "1-833-456-4566", url: "https://talksuicide.ca" }],
-  GB: [{ name: "Samaritans", number: "116 123", url: "https://samaritans.org" }],
-  IN: [{ name: "iCall (Mon-Sat)", number: "9152987821", url: "https://icallhelpline.org" }, { name: "Vandrevala Foundation", number: "1860-2662-345" }],
-  AU: [{ name: "Lifeline Australia", number: "13 11 14", url: "https://lifeline.org.au" }],
-  NZ: [{ name: "Lifeline NZ", number: "0800 543 354" }],
-  DE: [{ name: "Telefonseelsorge", number: "0800 111 0 111" }],
-  FR: [{ name: "Suicide Écoute", number: "01 45 39 40 00" }],
-  AE: [{ name: "Estijaba", number: "8001717" }],
-  ZA: [{ name: "SADAG", number: "0800 567 567" }],
-  DEFAULT: [{ name: "International Association for Suicide Prevention", number: "Find local: iasp.info/resources/Crisis_Centres", url: "https://www.iasp.info/resources/Crisis_Centres/" }],
-};
-
-type SpeechRecognitionLike = { start: () => void; stop: () => void; onresult: (e: any) => void; onend: () => void; onerror: (e: any) => void; continuous: boolean; interimResults: boolean; lang: string; };
 
 type MoodEntry = {
   id: string;
@@ -74,75 +57,14 @@ const SUGGESTIONS: Record<string, { activities: string[]; food: string[]; workou
   },
 };
 
-// Spotify search links per mood — opens curated playlists in any music app
-const MOOD_PLAYLISTS: Record<string, { label: string; spotify: string; apple: string; youtube: string }> = {
-  amazing: { label: "Feel-Good Anthems", spotify: "https://open.spotify.com/search/feel%20good%20anthems/playlists", apple: "https://music.apple.com/search?term=feel%20good", youtube: "https://music.youtube.com/search?q=feel+good+playlist" },
-  good:    { label: "Sunny Day Vibes",   spotify: "https://open.spotify.com/search/sunny%20day%20vibes/playlists", apple: "https://music.apple.com/search?term=happy%20vibes", youtube: "https://music.youtube.com/search?q=sunny+day+playlist" },
-  okay:    { label: "Soft & Easy",       spotify: "https://open.spotify.com/search/soft%20pop%20chill/playlists", apple: "https://music.apple.com/search?term=chill%20acoustic", youtube: "https://music.youtube.com/search?q=chill+acoustic+playlist" },
-  low:     { label: "Gentle Comfort",    spotify: "https://open.spotify.com/search/gentle%20comfort%20healing/playlists", apple: "https://music.apple.com/search?term=healing%20music", youtube: "https://music.youtube.com/search?q=healing+gentle+playlist" },
-  sad:     { label: "Soft Cry & Heal",   spotify: "https://open.spotify.com/search/sad%20songs%20cry%20heal/playlists", apple: "https://music.apple.com/search?term=sad%20heal", youtube: "https://music.youtube.com/search?q=sad+songs+to+cry+to" },
-  anxious: { label: "Calm & Ground",     spotify: "https://open.spotify.com/search/calm%20anxiety%20relief/playlists", apple: "https://music.apple.com/search?term=calm%20anxiety", youtube: "https://music.youtube.com/search?q=anxiety+relief+calm+playlist" },
-};
-
 const today = new Date().toISOString().split("T")[0];
 
 export default function MoodPage() {
-  const { locale } = useUser();
   const [moodLogs, setMoodLogs] = useLocalStorage<MoodEntry[]>("rosa_mood_logs", []);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [step, setStep] = useState<"select" | "notes" | "done">("select");
   const [showHistory, setShowHistory] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [voiceUnsupported, setVoiceUnsupported] = useState(false);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-
-  // Crisis detection: 2+ consecutive *calendar* days (today or yesterday → backwards) with mood score <= 2
-  const lowStreak = (() => {
-    const byDate = new Map<string, MoodEntry>();
-    for (const l of moodLogs) byDate.set(l.date, l);
-    const todayD = new Date();
-    let cursor = new Date(todayD.getFullYear(), todayD.getMonth(), todayD.getDate());
-    let streak = 0;
-    let started = false;
-    for (let i = 0; i < 14; i++) {
-      const key = cursor.toISOString().split("T")[0];
-      const entry = byDate.get(key);
-      if (entry && entry.moodScore <= 2) { streak++; started = true; }
-      else if (started) break;
-      else if (entry && entry.moodScore > 2) break;
-      // if no entry on day 0 (today), keep walking back to yesterday before bailing
-      cursor.setDate(cursor.getDate() - 1);
-    }
-    return streak;
-  })();
-  const inCrisis = lowStreak >= 2;
-  const helplines = CRISIS_HELPLINES[locale.countryCode] || CRISIS_HELPLINES.DEFAULT;
-
-  function toggleVoice() {
-    const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { setVoiceUnsupported(true); return; }
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      return;
-    }
-    const r: SpeechRecognitionLike = new SR();
-    r.continuous = false;
-    r.interimResults = false;
-    r.lang = locale.language === "en" ? "en-US" : `${locale.language}-${locale.countryCode}`;
-    r.onresult = (e: any) => {
-      const transcript = Array.from(e.results).map((res: any) => res[0].transcript).join(" ");
-      setNotes((prev) => (prev ? prev + " " : "") + transcript);
-    };
-    r.onend = () => setIsListening(false);
-    r.onerror = () => setIsListening(false);
-    recognitionRef.current = r;
-    r.start();
-    setIsListening(true);
-  }
-
-  useEffect(() => () => { try { recognitionRef.current?.stop(); } catch {} }, []);
 
   const todayLog = moodLogs.find((l) => l.date === today);
   const currentMoodData = MOODS.find((m) => m.id === (todayLog?.mood || selectedMood));
@@ -169,38 +91,6 @@ export default function MoodPage() {
         <h1 className="text-3xl font-serif text-foreground">How are you feeling?</h1>
         <p className="text-muted-foreground mt-1">Check in with yourself today.</p>
       </motion.div>
-
-      {inCrisis && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
-          <Card className="border-2 border-rose-300 bg-gradient-to-br from-rose-50 to-pink-50 shadow-md">
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-white rounded-full shadow-sm">
-                  <LifeBuoy className="w-5 h-5 text-rose-500" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-serif text-lg text-foreground">I'm here with you 🌹</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    You've been feeling low for {lowStreak} days. You're not alone — and you don't have to carry this by yourself. Talking to someone who's trained to listen can help so much.
-                  </p>
-                  <div className="mt-3 space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Free, confidential support</p>
-                    {helplines.map((h) => (
-                      <a key={h.name} href={h.url || `tel:${h.number}`} target={h.url ? "_blank" : undefined} rel="noreferrer"
-                        className="flex items-center gap-2 p-2 rounded-xl bg-white/70 hover:bg-white transition-colors text-sm">
-                        <Phone className="w-4 h-4 text-rose-500 flex-shrink-0" />
-                        <span className="font-medium text-foreground">{h.name}</span>
-                        <span className="ml-auto text-rose-600 font-semibold">{h.number}</span>
-                      </a>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground italic mt-3">If you're in immediate danger, please call your local emergency number.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
 
       <AnimatePresence mode="wait">
         {(step === "select" && !todayLog) && (
@@ -232,22 +122,13 @@ export default function MoodPage() {
                   <div className="text-5xl mb-2">{currentMoodData?.icon}</div>
                   <p className="text-muted-foreground">Feeling <span className={`font-semibold ${currentMoodData?.textColor}`}>{currentMoodData?.label}</span></p>
                 </div>
-                <div className="relative">
-                  <Textarea
-                    placeholder="Want to add any thoughts? Use the mic to speak."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="resize-none min-h-[100px] pr-12"
-                    data-testid="mood-notes-input"
-                  />
-                  <button type="button" onClick={toggleVoice}
-                    className={`absolute bottom-2 right-2 p-2 rounded-full transition-all ${isListening ? "bg-rose-500 text-white animate-pulse" : "bg-rose-50 text-rose-500 hover:bg-rose-100"}`}
-                    aria-label={isListening ? "Stop listening" : "Start voice input"}>
-                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                  </button>
-                </div>
-                {voiceUnsupported && <p className="text-xs text-muted-foreground">Voice input isn't supported in this browser. Try Chrome.</p>}
-                {isListening && <p className="text-xs text-rose-500 italic">Listening… speak naturally.</p>}
+                <Textarea
+                  placeholder="Want to add any thoughts? (optional)"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="resize-none min-h-[100px]"
+                  data-testid="mood-notes-input"
+                />
                 <div className="flex gap-3">
                   <Button variant="outline" onClick={() => setStep("select")} className="flex-1">Back</Button>
                   <Button onClick={handleSave} className="flex-1 bg-primary hover:bg-primary/90" data-testid="button-save-mood">Save Mood</Button>
@@ -272,27 +153,6 @@ export default function MoodPage() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Mood Music — Spotify/Apple/YouTube playlist links */}
-            {displayMood && MOOD_PLAYLISTS[displayMood.mood] && (
-              <Card className="border-border/50 shadow-sm bg-gradient-to-r from-rose-50 to-pink-50">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <span className="text-2xl">🎵</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{MOOD_PLAYLISTS[displayMood.mood].label}</p>
-                    <p className="text-xs text-muted-foreground">A playlist for how you feel right now</p>
-                  </div>
-                  <div className="flex gap-1.5 flex-shrink-0">
-                    <a href={MOOD_PLAYLISTS[displayMood.mood].spotify} target="_blank" rel="noopener noreferrer"
-                       className="text-xs px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700">Spotify</a>
-                    <a href={MOOD_PLAYLISTS[displayMood.mood].apple} target="_blank" rel="noopener noreferrer"
-                       className="text-xs px-2.5 py-1.5 rounded-lg bg-foreground text-background font-medium hover:opacity-90">Apple</a>
-                    <a href={MOOD_PLAYLISTS[displayMood.mood].youtube} target="_blank" rel="noopener noreferrer"
-                       className="text-xs px-2.5 py-1.5 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700">YT</a>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
             <div className="grid gap-4 sm:grid-cols-3">
               {[

@@ -1,4 +1,4 @@
-modules = ["nodejs-24", "postgresql-16"]
+modules = ["nodejs-24"]
 
 [deployment]
 router = "application"
@@ -14,7 +14,6 @@ runButton = "Project"
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
-integrations = ["stripe:1.0.0"]
 
 [postMerge]
 path = "scripts/post-merge.sh"
@@ -34,12 +33,3 @@ externalPort = 3000
 
 [nix]
 packages = ["zip"]
-channel = "stable-25_05"
-
-[userenv]
-
-[userenv.shared]
-STRIPE_MONTHLY_PRICE_ID = "price_1TP7r59cgCjafeHPVPfO8Byd"
-STRIPE_YEARLY_PRICE_ID = "price_1TP7sQ9cgCjafeHPRtJu9CwO"
-BETA_WINDOW_END = "2026-07-22T03:51:32.795Z"
-FOUNDERS_ADMIN_TOKEN = "NXBY_bRNE4OghFl_VZGBZxOunfmeUt2z"

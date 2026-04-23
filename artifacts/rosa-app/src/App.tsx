@@ -32,9 +32,6 @@ import GoalsPage from "@/pages/goals";
 import ChallengesPage from "@/pages/challenges";
 import SkinPage from "@/pages/skin";
 import LettersPage from "@/pages/letters";
-import ReportPage from "@/pages/report";
-import CirclesPage from "@/pages/circles";
-import HealthSyncPage from "@/pages/health-sync";
 
 const queryClient = new QueryClient();
 
@@ -88,9 +85,6 @@ function Router() {
       <Route path="/challenges">{() => <ProtectedRoute component={ChallengesPage} />}</Route>
       <Route path="/skin">{() => <ProtectedRoute component={SkinPage} />}</Route>
       <Route path="/letters">{() => <ProtectedRoute component={LettersPage} />}</Route>
-      <Route path="/report">{() => <ProtectedRoute component={ReportPage} />}</Route>
-      <Route path="/circles">{() => <ProtectedRoute component={CirclesPage} />}</Route>
-      <Route path="/health-sync">{() => <ProtectedRoute component={HealthSyncPage} />}</Route>
 
       <Route>
         {user ? (
