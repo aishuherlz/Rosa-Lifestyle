@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Shirt, Cloud, Sun, Snowflake, Umbrella, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Shirt, Cloud, Sun, Snowflake, Umbrella, ChevronLeft, ChevronRight, Camera, Sparkles, ShoppingBag, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,30 @@ import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+
+const AFFILIATE_STORES = [
+  { name: "ASOS", url: "https://www.asos.com/search/?q=", color: "bg-black text-white" },
+  { name: "Zara", url: "https://www.zara.com/search?searchTerm=", color: "bg-stone-900 text-white" },
+  { name: "H&M", url: "https://www2.hm.com/en_us/search-results.html?q=", color: "bg-rose-500 text-white" },
+  { name: "Amazon", url: "https://www.amazon.com/s?k=", color: "bg-amber-400 text-stone-900" },
+];
+
+type OutfitSuggestion = { name: string; pieces: string[]; vibe: string; styleTip: string };
+
+async function compressImage(file: File, maxDim = 1200, quality = 0.82): Promise<string> {
+  const dataUrl = await new Promise<string>((res, rej) => {
+    const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = dataUrl;
+  });
+  const ratio = Math.min(maxDim / img.width, maxDim / img.height, 1);
+  const w = Math.round(img.width * ratio), h = Math.round(img.height * ratio);
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.getContext("2d")!.drawImage(img, 0, 0, w, h);
+  return c.toDataURL("image/jpeg", quality);
+}
 
 type OutfitPlan = {
   id: string;
@@ -48,6 +72,46 @@ export default function OutfitPage() {
   const [form, setForm] = useState({ description: "", occasion: "casual", mood: "happy" });
   const [partner] = useLocalStorage<PartnerData | null>("rosa_partner", null);
   const [weather, setWeather] = useState<{ temp: number; code: number } | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiResult, setAiResult] = useState<{ items: string[]; outfits: OutfitSuggestion[]; missingPiece: string } | null>(null);
+  const [aiOccasion, setAiOccasion] = useState("casual");
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"].includes(file.type)) {
+      toast({ title: "Unsupported file type", description: "Please upload a JPG, PNG, or WEBP photo.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast({ title: "Photo too large", description: "Please choose a photo under 8MB.", variant: "destructive" });
+      return;
+    }
+    try {
+      setAnalyzing(true);
+      setAiResult(null);
+      const compressed = await compressImage(file);
+      setPhotoPreview(compressed);
+      const weatherLabel = weather ? `${Math.round(weather.temp)}°C` : "";
+      const res = await fetch(`${import.meta.env.BASE_URL}api/openai/outfit-vision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: compressed, occasion: aiOccasion, weather: weatherLabel }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to analyze");
+      setAiResult(data);
+    } catch (err: any) {
+      toast({ title: "Couldn't analyze photo", description: err.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setAnalyzing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(async pos => {
@@ -89,6 +153,120 @@ export default function OutfitPage() {
         <h1 className="text-3xl font-serif text-foreground">Outfit Planner</h1>
         <p className="text-muted-foreground mt-1">Dress with intention, every day.</p>
       </motion.div>
+
+      {/* AI Outfit Camera */}
+      <Card className="border-rose-200 bg-gradient-to-br from-rose-50 via-pink-50 to-amber-50 shadow-sm">
+        <CardContent className="pt-5 pb-5">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-white rounded-full shadow-sm"><Sparkles className="w-5 h-5 text-rose-500" /></div>
+            <div className="flex-1">
+              <p className="font-serif text-lg text-foreground">AI Outfit Stylist 📸</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Snap your wardrobe — I'll style 3 looks just for you.</p>
+              <Dialog open={cameraOpen} onOpenChange={(v) => { setCameraOpen(v); if (!v) { setAiResult(null); setPhotoPreview(null); } }}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="mt-3 bg-rose-500 hover:bg-rose-600" data-testid="button-open-outfit-camera">
+                    <Camera className="w-4 h-4 mr-1" /> Style Me
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+                  <DialogHeader><DialogTitle className="font-serif text-xl">AI Outfit Stylist</DialogTitle></DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Occasion</Label>
+                      <Select value={aiOccasion} onValueChange={setAiOccasion}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="casual">Casual</SelectItem>
+                          <SelectItem value="formal">Formal</SelectItem>
+                          <SelectItem value="date">Date Night</SelectItem>
+                          <SelectItem value="workout">Workout</SelectItem>
+                          <SelectItem value="work">Work</SelectItem>
+                          <SelectItem value="cozy">Cozy</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {!photoPreview && !analyzing && (
+                      <button onClick={() => fileInputRef.current?.click()}
+                        className="w-full py-10 border-2 border-dashed border-rose-300 rounded-2xl text-center hover:bg-rose-50 transition-colors"
+                        data-testid="outfit-photo-dropzone">
+                        <Camera className="w-8 h-8 text-rose-400 mx-auto" />
+                        <p className="text-sm font-medium text-rose-700 mt-2">Tap to take or upload a photo</p>
+                        <p className="text-xs text-muted-foreground mt-1">Your wardrobe, an outfit, or pieces you want to mix</p>
+                      </button>
+                    )}
+                    <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} data-testid="outfit-photo-input" />
+                    {photoPreview && (
+                      <div className="relative rounded-2xl overflow-hidden">
+                        <img src={photoPreview} alt="Wardrobe preview" className="w-full max-h-64 object-cover" />
+                        <button onClick={() => { setPhotoPreview(null); setAiResult(null); }} className="absolute top-2 right-2 p-1 bg-white/90 rounded-full shadow">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    {analyzing && (
+                      <div className="flex items-center justify-center gap-2 py-6 text-rose-600">
+                        <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Styling your look…</span>
+                      </div>
+                    )}
+                    {aiResult && (
+                      <div className="space-y-3">
+                        {aiResult.items.length > 0 && (
+                          <div>
+                            <p className="text-xs uppercase font-semibold text-muted-foreground mb-1">I see</p>
+                            <div className="flex flex-wrap gap-1">
+                              {aiResult.items.map((it) => <Badge key={it} variant="outline" className="text-xs">{it}</Badge>)}
+                            </div>
+                          </div>
+                        )}
+                        {aiResult.outfits.map((o, i) => (
+                          <Card key={i} className="border-rose-200 bg-white">
+                            <CardContent className="pt-4 pb-4">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="font-serif font-medium text-foreground">{o.name}</p>
+                                <Badge className="bg-rose-100 text-rose-700 border-0 text-xs">{o.vibe}</Badge>
+                              </div>
+                              <ul className="mt-2 space-y-0.5 text-sm">
+                                {o.pieces.map((p, j) => (
+                                  <li key={j} className="flex items-start gap-1.5"><span className="text-rose-400">•</span><span>{p}</span></li>
+                                ))}
+                              </ul>
+                              {o.styleTip && <p className="text-xs italic text-muted-foreground mt-2">💡 {o.styleTip}</p>}
+                            </CardContent>
+                          </Card>
+                        ))}
+                        {aiResult.missingPiece && (
+                          <Card className="border-amber-200 bg-amber-50">
+                            <CardContent className="pt-4 pb-4">
+                              <div className="flex items-start gap-2">
+                                <ShoppingBag className="w-4 h-4 text-amber-600 mt-0.5" />
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-amber-800">Wishlist piece</p>
+                                  <p className="text-sm text-foreground mt-0.5">{aiResult.missingPiece}</p>
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                    {AFFILIATE_STORES.map((s) => (
+                                      <a key={s.name} href={`${s.url}${encodeURIComponent(aiResult.missingPiece)}`} target="_blank" rel="noreferrer"
+                                        className={`text-xs px-3 py-1 rounded-full ${s.color} hover:opacity-90 transition-opacity`}>
+                                        Shop on {s.name}
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+                        <Button variant="outline" className="w-full" onClick={() => { setPhotoPreview(null); setAiResult(null); }}>
+                          Try Another Photo
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {weatherAdvice && (
         <Card className="border-sky-200 bg-sky-50 shadow-sm">
