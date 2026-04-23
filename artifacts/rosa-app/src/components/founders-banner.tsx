@@ -3,11 +3,13 @@ import { motion } from "framer-motion";
 import { Crown } from "lucide-react";
 import { useUser } from "@/lib/user-context";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useBetaOptIn } from "@/lib/use-beta-optin";
 
 type FounderClaim = { number: number; tier: "first_100" | "first_500" | "regular" | "lifetime"; freeMonths: number; beta?: boolean; raffleWinner?: boolean };
 
 export function FoundersBanner() {
   const { user } = useUser();
+  const betaOptIn = useBetaOptIn();
   const [stored, setStored] = useLocalStorage<FounderClaim | null>("rosa_founder", null);
   const [status, setStatus] = useState<{ total: number; spotsLeftFirst100: number; spotsLeftFirst500: number; betaActive?: boolean; betaDaysLeft?: number } | null>(null);
 
@@ -16,7 +18,7 @@ export function FoundersBanner() {
   }, []);
 
   useEffect(() => {
-    if (stored || !user || user.guestMode || !user.emailOrPhone) return;
+    if (stored || !user || user.guestMode || !user.emailOrPhone || !betaOptIn) return;
     let token: string | null = null;
     try { token = localStorage.getItem("rosa_auth_token"); } catch {}
     if (!token) return; // Without a verified-email token the server will (correctly) reject the claim.
@@ -27,7 +29,9 @@ export function FoundersBanner() {
     }).then(r => r.json()).then(d => {
       if (d.ok && d.tier) setStored({ number: d.number, tier: d.tier, freeMonths: d.freeMonths || 0, beta: d.beta, raffleWinner: d.raffleWinner });
     }).catch(() => {});
-  }, [user, stored, setStored]);
+  }, [user, stored, setStored, betaOptIn]);
+
+  if (!betaOptIn) return null;
 
   // Personal welcome banner for claimed founders / beta members
   if (stored) {

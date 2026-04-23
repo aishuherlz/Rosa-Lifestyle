@@ -246,7 +246,13 @@ export default function SettingsPage() {
             </div>
             <Switch
               checked={betaOptIn}
-              onCheckedChange={(v) => { setBetaOptIn(v); if (!v) { setBetaUpdates(false); setBetaSurveys(false); } toast({ title: v ? "Welcome to the beta 🌹" : "You've opted out", description: v ? "Thank you for shaping ROSA with us." : "You can re-join anytime." }); }}
+              onCheckedChange={(v) => {
+                setBetaOptIn(v);
+                if (!v) { setBetaUpdates(false); setBetaSurveys(false); }
+                else { setBetaUpdates(true); setBetaSurveys(true); }
+                try { window.dispatchEvent(new Event("rosa-beta-optin-changed")); } catch {}
+                toast({ title: v ? "Welcome to the beta 🌹" : "You've opted out", description: v ? "You're entered into the Lucky 10 raffle and will see beta features." : "Beta banners and surveys are hidden. You can re-join anytime." });
+              }}
               data-testid="switch-beta-optin"
             />
           </div>

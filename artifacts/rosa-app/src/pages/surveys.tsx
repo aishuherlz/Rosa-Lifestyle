@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useBetaOptIn } from "@/lib/use-beta-optin";
+import { Link } from "wouter";
 
 type SurveyQuestion = {
   id: string;
@@ -78,7 +80,26 @@ type SurveyResult = {
   completedAt: string;
 };
 
+function BetaOptedOutNotice() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
+      <ClipboardList className="w-12 h-12 text-rose-400 mb-4" />
+      <h1 className="font-serif text-2xl text-foreground mb-2">Surveys are paused</h1>
+      <p className="text-muted-foreground text-sm max-w-sm mb-6">
+        Surveys are part of our beta program — re-join the founders circle in Settings to share your voice and help shape ROSA 🌹
+      </p>
+      <Link href="/settings"><Button className="bg-rose-500 hover:bg-rose-600 text-white">Open Settings</Button></Link>
+    </div>
+  );
+}
+
 export default function Surveys() {
+  const betaOptIn = useBetaOptIn();
+  if (!betaOptIn) return <BetaOptedOutNotice />;
+  return <SurveysInner />;
+}
+
+function SurveysInner() {
   const [results, setResults] = useLocalStorage<SurveyResult[]>("rosa_survey_results", []);
   const [activeSurvey, setActiveSurvey] = useState<Survey | null>(null);
   const [currentQ, setCurrentQ] = useState(0);
