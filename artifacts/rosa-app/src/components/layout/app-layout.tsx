@@ -35,6 +35,7 @@ const NAV_ITEMS = [
   { href: "/circles", label: "Circles", icon: Globe },
   { href: "/health-sync", label: "Health Sync", icon: Activity },
   { href: "/report", label: "ROSA Report", icon: FileText },
+  { href: "/sanctuary", label: "Sanctuary", icon: Moon },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
