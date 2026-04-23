@@ -17,6 +17,145 @@ import confetti from "canvas-confetti";
 import { useToast } from "@/hooks/use-toast";
 
 type PeriodData = { lastPeriodDate?: string; cycleLength?: number };
+type CycleLog = { periodStart?: string; periodEnd?: string; cycleLength?: number };
+type Milestone = { id: string; title: string; emoji?: string; type?: string; targetDate?: string };
+type Destination = { id: string; name: string; type?: string; startDate?: string; endDate?: string; visited?: boolean };
+
+// Predict next period window from cycle logs (preferred) or rosa_period (fallback)
+function predictNextPeriod(): { start: Date; end: Date } | null {
+  try {
+    const logs: CycleLog[] = JSON.parse(localStorage.getItem("rosa_cycle_logs") || "[]");
+    let lastStart: Date | null = null;
+    let cycleLen = 28;
+    let periodLen = 5;
+    if (logs.length) {
+      const sorted = [...logs].sort((a, b) => (b.periodStart || "").localeCompare(a.periodStart || ""));
+      const latest = sorted[0];
+      if (latest?.periodStart) {
+        lastStart = new Date(latest.periodStart);
+        cycleLen = Number(latest.cycleLength) || 28;
+        if (latest.periodEnd) {
+          const d = Math.floor((new Date(latest.periodEnd).getTime() - lastStart.getTime()) / 86400000);
+          if (d >= 0 && d <= 10) periodLen = d + 1;
+        }
+      }
+    }
+    if (!lastStart) {
+      const pd: PeriodData = JSON.parse(localStorage.getItem("rosa_period") || "{}");
+      if (pd?.lastPeriodDate) { lastStart = new Date(pd.lastPeriodDate); cycleLen = pd.cycleLength || 28; }
+    }
+    if (!lastStart) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    let next = new Date(lastStart);
+    while (next < today) next.setDate(next.getDate() + cycleLen);
+    const end = new Date(next); end.setDate(end.getDate() + periodLen - 1);
+    return { start: next, end };
+  } catch { return null; }
+}
+
+function SyncHub() {
+  const [milestones] = useLocalStorage<Milestone[]>("rosa_milestones", []);
+  const [destinations] = useLocalStorage<Destination[]>("rosa_destinations", []);
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+
+  const nextPeriod = predictNextPeriod();
+  const periodAlerts: { kind: "period" | "trip-clash"; title: string; sub: string; href: string; emoji: string }[] = [];
+
+  if (nextPeriod) {
+    const daysToPeriod = Math.floor((nextPeriod.start.getTime() - today0.getTime()) / 86400000);
+    if (daysToPeriod >= 0 && daysToPeriod <= 5) {
+      periodAlerts.push({
+        kind: "period",
+        title: daysToPeriod === 0 ? "Your period may start today 🩸" : `Period predicted in ${daysToPeriod} day${daysToPeriod === 1 ? "" : "s"}`,
+        sub: `${format(nextPeriod.start, "MMM d")}${nextPeriod.start.getTime() !== nextPeriod.end.getTime() ? ` – ${format(nextPeriod.end, "MMM d")}` : ""} · stock essentials & rest`,
+        href: "/period",
+        emoji: "🌹",
+      });
+    }
+    // Check trip clashes
+    for (const d of destinations) {
+      if (d.visited || d.type !== "planned" || !d.startDate) continue;
+      const ts = new Date(d.startDate);
+      const te = d.endDate ? new Date(d.endDate) : ts;
+      if (ts <= nextPeriod.end && te >= nextPeriod.start) {
+        periodAlerts.push({
+          kind: "trip-clash",
+          title: `${d.name} trip overlaps your period`,
+          sub: `Pack period essentials, painkillers & a heating patch 💝`,
+          href: "/travel",
+          emoji: "✈️",
+        });
+        break;
+      }
+    }
+  }
+
+  // Upcoming gift milestones (next 60 days, countdown type)
+  const giftMilestones = milestones
+    .filter((m) => m.type === "countdown" && m.targetDate)
+    .map((m) => ({ ...m, _days: Math.floor((new Date(m.targetDate!).getTime() - today0.getTime()) / 86400000) }))
+    .filter((m) => m._days >= 0 && m._days <= 60)
+    .sort((a, b) => a._days - b._days)
+    .slice(0, 2);
+
+  // Upcoming trips (next 30 days)
+  const upcomingTrips = destinations
+    .filter((d) => d.type === "planned" && !d.visited && d.startDate)
+    .map((d) => ({ ...d, _days: Math.floor((new Date(d.startDate!).getTime() - today0.getTime()) / 86400000) }))
+    .filter((d) => d._days >= 0 && d._days <= 30)
+    .sort((a, b) => a._days - b._days)
+    .slice(0, 2);
+
+  if (!periodAlerts.length && !giftMilestones.length && !upcomingTrips.length) return null;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+      className="rounded-3xl border border-rose-100 bg-gradient-to-br from-rose-50/60 via-pink-50/40 to-amber-50/40 p-4 space-y-2">
+      <div className="flex items-center gap-2 mb-1">
+        <Sparkles className="w-4 h-4 text-rose-500" />
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-rose-700">Today's Sync</h3>
+      </div>
+      <div className="space-y-2">
+        {periodAlerts.map((a, i) => (
+          <Link key={`p-${i}`} href={a.href}>
+            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/70 border border-rose-100 hover:bg-white cursor-pointer">
+              <span className="text-xl">{a.emoji}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{a.title}</p>
+                <p className="text-xs text-muted-foreground truncate">{a.sub}</p>
+              </div>
+              <span className="text-xs text-rose-500">→</span>
+            </div>
+          </Link>
+        ))}
+        {giftMilestones.map((m) => (
+          <Link key={m.id} href="/wishlist">
+            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/70 border border-rose-100 hover:bg-white cursor-pointer">
+              <span className="text-xl">{m.emoji || "🎁"}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{m.title}</p>
+                <p className="text-xs text-muted-foreground">In {m._days} day{m._days === 1 ? "" : "s"} · check your wishlist</p>
+              </div>
+              <span className="text-xs text-rose-500">→</span>
+            </div>
+          </Link>
+        ))}
+        {upcomingTrips.map((d) => (
+          <Link key={d.id} href="/travel">
+            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/70 border border-rose-100 hover:bg-white cursor-pointer">
+              <span className="text-xl">✈️</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{d.name} trip</p>
+                <p className="text-xs text-muted-foreground">In {d._days} day{d._days === 1 ? "" : "s"} · view itinerary & outfits</p>
+              </div>
+              <span className="text-xs text-rose-500">→</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
 
 function getCyclePhase(periodData: PeriodData): { phase: string; title: string; day: number } {
   if (!periodData.lastPeriodDate) return { phase: "unknown", title: "Your sanctuary awaits 🌹", day: 0 };
@@ -171,6 +310,8 @@ export default function Home() {
           </div>
         </Link>
       )}
+
+      <SyncHub />
 
       {/* ROSA Garden + Wellness Score Row */}
       <div className="grid grid-cols-2 gap-4">

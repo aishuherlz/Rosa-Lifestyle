@@ -101,6 +101,50 @@ function getCyclePhase(): string {
   } catch { return "follicular"; }
 }
 
+// Predict the next 6 period windows from latest cycle log
+function predictPeriods(): { start: Date; end: Date; cycleNumber: number }[] {
+  try {
+    const logs = JSON.parse(localStorage.getItem("rosa_cycle_logs") || "[]");
+    if (!logs.length) return [];
+    const sorted = [...logs].sort((a: any, b: any) => (b.periodStart || "").localeCompare(a.periodStart || ""));
+    const latest = sorted[0];
+    if (!latest?.periodStart) return [];
+    const lastStart = parseISO(latest.periodStart);
+    const cycleLen = Number(latest.cycleLength) || 28;
+    let periodLen = 5;
+    if (latest.periodEnd) {
+      const d = differenceInDays(parseISO(latest.periodEnd), lastStart);
+      if (d >= 1 && d <= 10) periodLen = d + 1;
+    }
+    const out: { start: Date; end: Date; cycleNumber: number }[] = [];
+    for (let i = 0; i <= 6; i++) {
+      const start = new Date(lastStart);
+      start.setDate(start.getDate() + i * cycleLen);
+      const end = new Date(start);
+      end.setDate(end.getDate() + periodLen - 1);
+      if (end >= new Date(new Date().getFullYear() - 1, 0, 1)) out.push({ start, end, cycleNumber: i });
+    }
+    return out;
+  } catch { return []; }
+}
+
+function getTripPeriodOverlap(tripStart?: string, tripEnd?: string) {
+  if (!tripStart) return null;
+  try {
+    const ts = parseISO(tripStart);
+    const te = tripEnd ? parseISO(tripEnd) : ts;
+    const periods = predictPeriods();
+    for (const p of periods) {
+      if (ts <= p.end && te >= p.start) {
+        const overlapStart = ts > p.start ? ts : p.start;
+        const overlapEnd = te < p.end ? te : p.end;
+        return { start: overlapStart, end: overlapEnd, predicted: p.cycleNumber > 0 };
+      }
+    }
+    return null;
+  } catch { return null; }
+}
+
 const DESTINATION_GRADIENTS = [
   "from-rose-400 to-orange-300", "from-violet-400 to-blue-300",
   "from-emerald-400 to-teal-300", "from-amber-400 to-rose-300",
@@ -298,6 +342,7 @@ export default function TravelPage() {
                 {planned.map((dest, i) => {
                   const isExpanded = expandedId === dest.id;
                   const daysUntil = dest.startDate ? differenceInDays(parseISO(dest.startDate), new Date()) : null;
+                  const periodOverlap = getTripPeriodOverlap(dest.startDate, dest.endDate);
                   return (
                     <motion.div key={dest.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
                       <Card className={cn("border-border/50 shadow-sm overflow-hidden", dest.visited && "opacity-60")}>
@@ -319,6 +364,18 @@ export default function TravelPage() {
                               <Calendar className="w-3.5 h-3.5" />
                               {format(parseISO(dest.startDate), "MMM d")}
                               {dest.endDate && ` – ${format(parseISO(dest.endDate), "MMM d, yyyy")}`}
+                            </div>
+                          )}
+                          {periodOverlap && !dest.visited && (
+                            <div className="mb-3 p-2.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2">
+                              <span className="text-lg">🩸</span>
+                              <div className="flex-1">
+                                <p className="text-xs font-semibold text-rose-700">Heads up — your period may arrive on this trip</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  Predicted: {format(periodOverlap.start, "MMM d")}{periodOverlap.start.getTime() !== periodOverlap.end.getTime() && ` – ${format(periodOverlap.end, "MMM d")}`}.
+                                  Pack period essentials, painkillers, and a heating patch. 💝
+                                </p>
+                              </div>
                             </div>
                           )}
                           {dest.notes && <p className="text-sm text-muted-foreground mb-2 italic">"{dest.notes}"</p>}

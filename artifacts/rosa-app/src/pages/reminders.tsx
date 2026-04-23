@@ -9,8 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, parseISO, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Sparkles } from "lucide-react";
 
 type Reminder = {
   id: string;
@@ -42,6 +43,8 @@ const TYPE_COLORS: Record<string, string> = {
 
 export default function RemindersPage() {
   const [reminders, setReminders] = useLocalStorage<Reminder[]>("rosa_reminders", []);
+  const [milestones] = useLocalStorage<any[]>("rosa_milestones", []);
+  const [destinations] = useLocalStorage<any[]>("rosa_destinations", []);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(format(new Date(), "yyyy-MM-dd"));
   const [open, setOpen] = useState(false);
@@ -60,10 +63,20 @@ export default function RemindersPage() {
 
   const handleDelete = (id: string) => setReminders(reminders.filter(r => r.id !== id));
 
-  const upcomingReminders = reminders
-    .filter(r => new Date(r.date) >= new Date())
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 5);
+  // Cross-sync: pull upcoming milestones + planned trips into one feed
+  type Synced = { id: string; title: string; date: string; type: string; source: "reminder" | "milestone" | "trip"; emoji?: string };
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+  const synced: Synced[] = [
+    ...reminders.map(r => ({ id: r.id, title: r.title, date: r.date, type: r.type, source: "reminder" as const })),
+    ...milestones.filter((m: any) => m.type === "countdown" && m.targetDate)
+      .map((m: any) => ({ id: `ms-${m.id}`, title: m.title, date: m.targetDate, type: "milestone", source: "milestone" as const, emoji: m.emoji })),
+    ...destinations.filter((d: any) => d.startDate && !d.visited && d.type === "planned")
+      .map((d: any) => ({ id: `tr-${d.id}`, title: `${d.name} trip`, date: d.startDate, type: "trip", source: "trip" as const, emoji: "✈️" })),
+  ];
+  const upcomingReminders = synced
+    .filter(s => { try { return parseISO(s.date) >= today0; } catch { return false; } })
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 8);
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6">
@@ -81,15 +94,21 @@ export default function RemindersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {upcomingReminders.map(r => (
+            {upcomingReminders.map(r => {
+              const days = (() => { try { return differenceInDays(parseISO(r.date), today0); } catch { return null; } })();
+              return (
               <div key={r.id} className="flex items-center gap-3 py-2 border-b border-border/30 last:border-0">
                 <Badge className={`text-xs ${TYPE_COLORS[r.type] || TYPE_COLORS.other}`}>
-                  {REMINDER_TYPES.find(t => t.value === r.type)?.label || r.type}
+                  {r.emoji ? <span className="mr-1">{r.emoji}</span> : null}
+                  {r.source === "milestone" ? "Milestone" : r.source === "trip" ? "Trip" : (REMINDER_TYPES.find(t => t.value === r.type)?.label || r.type)}
                 </Badge>
                 <span className="font-medium text-sm flex-1">{r.title}</span>
-                <span className="text-xs text-muted-foreground">{format(new Date(r.date + "T12:00:00"), "MMM d")}</span>
+                <span className="text-xs text-muted-foreground">
+                  {format(parseISO(r.date), "MMM d")}{days !== null && days >= 0 && days <= 7 ? ` · ${days === 0 ? "Today" : `${days}d`}` : ""}
+                </span>
               </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       )}

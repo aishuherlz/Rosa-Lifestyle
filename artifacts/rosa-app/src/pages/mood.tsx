@@ -74,6 +74,16 @@ const SUGGESTIONS: Record<string, { activities: string[]; food: string[]; workou
   },
 };
 
+// Spotify search links per mood — opens curated playlists in any music app
+const MOOD_PLAYLISTS: Record<string, { label: string; spotify: string; apple: string; youtube: string }> = {
+  amazing: { label: "Feel-Good Anthems", spotify: "https://open.spotify.com/search/feel%20good%20anthems/playlists", apple: "https://music.apple.com/search?term=feel%20good", youtube: "https://music.youtube.com/search?q=feel+good+playlist" },
+  good:    { label: "Sunny Day Vibes",   spotify: "https://open.spotify.com/search/sunny%20day%20vibes/playlists", apple: "https://music.apple.com/search?term=happy%20vibes", youtube: "https://music.youtube.com/search?q=sunny+day+playlist" },
+  okay:    { label: "Soft & Easy",       spotify: "https://open.spotify.com/search/soft%20pop%20chill/playlists", apple: "https://music.apple.com/search?term=chill%20acoustic", youtube: "https://music.youtube.com/search?q=chill+acoustic+playlist" },
+  low:     { label: "Gentle Comfort",    spotify: "https://open.spotify.com/search/gentle%20comfort%20healing/playlists", apple: "https://music.apple.com/search?term=healing%20music", youtube: "https://music.youtube.com/search?q=healing+gentle+playlist" },
+  sad:     { label: "Soft Cry & Heal",   spotify: "https://open.spotify.com/search/sad%20songs%20cry%20heal/playlists", apple: "https://music.apple.com/search?term=sad%20heal", youtube: "https://music.youtube.com/search?q=sad+songs+to+cry+to" },
+  anxious: { label: "Calm & Ground",     spotify: "https://open.spotify.com/search/calm%20anxiety%20relief/playlists", apple: "https://music.apple.com/search?term=calm%20anxiety", youtube: "https://music.youtube.com/search?q=anxiety+relief+calm+playlist" },
+};
+
 const today = new Date().toISOString().split("T")[0];
 
 export default function MoodPage() {
@@ -262,6 +272,27 @@ export default function MoodPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Mood Music — Spotify/Apple/YouTube playlist links */}
+            {displayMood && MOOD_PLAYLISTS[displayMood.mood] && (
+              <Card className="border-border/50 shadow-sm bg-gradient-to-r from-rose-50 to-pink-50">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <span className="text-2xl">🎵</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">{MOOD_PLAYLISTS[displayMood.mood].label}</p>
+                    <p className="text-xs text-muted-foreground">A playlist for how you feel right now</p>
+                  </div>
+                  <div className="flex gap-1.5 flex-shrink-0">
+                    <a href={MOOD_PLAYLISTS[displayMood.mood].spotify} target="_blank" rel="noopener noreferrer"
+                       className="text-xs px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700">Spotify</a>
+                    <a href={MOOD_PLAYLISTS[displayMood.mood].apple} target="_blank" rel="noopener noreferrer"
+                       className="text-xs px-2.5 py-1.5 rounded-lg bg-foreground text-background font-medium hover:opacity-90">Apple</a>
+                    <a href={MOOD_PLAYLISTS[displayMood.mood].youtube} target="_blank" rel="noopener noreferrer"
+                       className="text-xs px-2.5 py-1.5 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700">YT</a>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-3">
               {[

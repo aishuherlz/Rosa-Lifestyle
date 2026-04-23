@@ -123,11 +123,24 @@ export default function Subscription() {
         </motion.div>
 
         {/* Founding member banner */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-5 p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-rose-50 border border-amber-200 text-center">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-3 p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-rose-50 border border-amber-200 text-center">
           <p className="text-amber-800 text-xs font-medium flex items-center justify-center gap-1">
             <Gift className="w-3.5 h-3.5" />
             First 100 users get <strong>6 months free</strong> · First 500 get <strong>3 months free</strong>
           </p>
+        </motion.div>
+
+        {/* Partner pricing — invite a partner */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-5 p-3.5 rounded-2xl bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-200">
+          <div className="flex items-start gap-2.5">
+            <span className="text-xl">💝</span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-rose-800">Bring your partner along</p>
+              <p className="text-xs text-rose-700/80 mt-0.5">
+                Invite your partner from the <span className="font-medium">Partner</span> page — they get <strong>3 months free</strong>, then <strong>50% off forever</strong> while your account stays active.
+              </p>
+            </div>
+          </div>
         </motion.div>
 
         {plan === "trial" && (
