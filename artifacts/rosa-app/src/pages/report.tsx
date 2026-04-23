@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Heart, Flame, Trophy, BookHeart, Target, Utensils, Calendar, Share2, Download } from "lucide-react";
+import { Sparkles, Heart, Flame, Trophy, BookHeart, Target, Utensils, Calendar, Download } from "lucide-react";
+import { ShareButton } from "@/components/share-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -78,20 +79,13 @@ export default function ReportPage() {
     return "Soft & Steady 🌷";
   }, [stats, garden]);
 
-  async function handleShare() {
-    const text = `My ROSA ${view === "month" ? "Monthly Report" : "Wrapped"} for ${range.label}:\n\n` +
-      `🌹 Title: ${goddessTitle}\n` +
-      `${stats.topMood ? `${MOOD_EMOJI[stats.topMood.mood]} Mood vibe: ${stats.topMood.mood} (${stats.topMood.count}x)\n` : ""}` +
-      `📖 Journal entries: ${stats.journalCount}\n` +
-      `🎯 Goals completed: ${stats.goalsCompleted}\n` +
-      `🔥 Challenges: ${stats.challengesDone}\n` +
-      `🌸 Garden: ${garden.flowers} flowers, ${garden.streak}d streak\n\n` +
-      `Made with ROSA 💖`;
-    try {
-      if (navigator.share) await navigator.share({ title: "My ROSA Report", text });
-      else { await navigator.clipboard.writeText(text); toast({ title: "Copied to clipboard ✨", description: "Share your ROSA story anywhere." }); }
-    } catch {}
-  }
+  const shareText = `My ROSA ${view === "month" ? "Monthly Report" : "Wrapped"} — ${range.label}\n\n` +
+    `🌹 ${goddessTitle}\n` +
+    `${stats.topMood ? `${MOOD_EMOJI[stats.topMood.mood]} Mood: ${stats.topMood.mood} (${stats.topMood.count}x)\n` : ""}` +
+    `📖 Journal: ${stats.journalCount}\n` +
+    `🎯 Goals: ${stats.goalsCompleted}\n` +
+    `🔥 Challenges: ${stats.challengesDone}\n` +
+    `🌸 Garden: ${garden.flowers} flowers · ${garden.streak}d streak\n\nMade with ROSA 💖`;
 
   const cards = [
     { icon: <Heart className="w-5 h-5 text-rose-500" />, label: "Mood check-ins", value: stats.moodCount, sub: stats.topMood ? `Most: ${MOOD_EMOJI[stats.topMood.mood]} ${stats.topMood.mood}` : "—" },
@@ -110,9 +104,7 @@ export default function ReportPage() {
             <h1 className="text-3xl font-serif text-foreground">ROSA {view === "month" ? "Report" : "Wrapped"}</h1>
             <p className="text-muted-foreground mt-1">Your story, beautifully told.</p>
           </div>
-          <Button onClick={handleShare} size="sm" variant="outline" data-testid="button-share-report">
-            <Share2 className="w-4 h-4 mr-1" /> Share
-          </Button>
+          <ShareButton title={`My ROSA ${view === "month" ? "Report" : "Wrapped"} 💖`} text={shareText} />
         </div>
       </motion.div>
 

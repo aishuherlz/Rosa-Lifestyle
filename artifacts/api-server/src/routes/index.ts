@@ -6,6 +6,7 @@ import foodVisionRouter from "./food-vision";
 import outfitVisionRouter from "./outfit-vision";
 import communityRouter from "./community";
 import authRouter from "./auth";
+import circlesRouter from "./circles";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use("/openai", foodVisionRouter);
 router.use("/openai", outfitVisionRouter);
 router.use(communityRouter);
 router.use(authRouter);
+router.use(circlesRouter);
 
 export default router;

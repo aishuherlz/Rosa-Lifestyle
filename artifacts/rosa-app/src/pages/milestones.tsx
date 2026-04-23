@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trash2, Clock, Calendar, Share2, Timer, Camera, Image, Lock } from "lucide-react";
+import { Plus, Trash2, Clock, Calendar, Timer, Camera, Image, Lock } from "lucide-react";
+import { ShareButton } from "@/components/share-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -75,14 +76,11 @@ export default function MilestonesPage() {
     return differenceInDays(target, today);
   };
 
-  const handleShare = (m: Milestone) => {
+  const milestoneShareText = (m: Milestone) => {
     const days = getDays(m);
-    const text = m.type === "countdown"
-      ? `${Math.abs(days)} days until ${m.title}! ${m.emoji} #ROSA`
-      : `${Math.abs(days)} days since ${m.title} ${m.emoji} #ROSA`;
-    navigator.clipboard.writeText(text).then(() =>
-      toast({ title: "Copied!", description: "Share text copied to clipboard." })
-    );
+    return m.type === "countdown"
+      ? `${Math.abs(days)} days until ${m.title}! ${m.emoji}`
+      : `${Math.abs(days)} days since ${m.title} ${m.emoji}`;
   };
 
   const updatePhoto = (id: string, photo: string) => {
@@ -145,10 +143,8 @@ export default function MilestonesPage() {
                   {m.note && <p className="text-xs text-muted-foreground italic mt-0.5">{m.note}</p>}
                 </div>
               </div>
-              <div className="flex gap-1">
-                <button onClick={() => handleShare(m)} className="text-muted-foreground hover:text-primary p-1 transition-colors">
-                  <Share2 className="w-3.5 h-3.5" />
-                </button>
+              <div className="flex gap-1 items-center">
+                <ShareButton title={`My ROSA milestone — ${m.title}`} text={milestoneShareText(m)} variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-primary" />
                 <button onClick={() => setMilestones(milestones.filter((x) => x.id !== m.id))} className="text-muted-foreground hover:text-destructive p-1 transition-colors">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

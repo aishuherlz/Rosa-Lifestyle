@@ -3,12 +3,18 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/lib/user-context";
 
+// Curated to celebrate women across cultures, ethnicities, gender expressions, LGBTQ+ and sisterhood.
 const UNSPLASH_IMAGES = [
-  "https://images.unsplash.com/photo-1552053831-71594a27632d?w=1200&q=80",
-  "https://images.unsplash.com/photo-1515377905703-c4788e51af15?w=1200&q=80",
-  "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1200&q=80",
-  "https://images.unsplash.com/photo-1600334129128-685c5582fd35?w=1200&q=80",
-  "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=1200&q=80",
+  "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=1200&q=80", // Black woman portrait
+  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=1200&q=80", // woman smiling
+  "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1200&q=80", // woman lifestyle
+  "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=1200&q=80", // Latina woman
+  "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=1200&q=80", // woman portrait
+  "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=1200&q=80", // woman in field
+  "https://images.unsplash.com/photo-1554151228-14d9def656e4?w=1200&q=80", // woman of color
+  "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=1200&q=80", // diverse woman
+  "https://images.unsplash.com/photo-1520975916090-3105956dac38?w=1200&q=80", // women friends sisterhood
+  "https://images.unsplash.com/photo-1521119989659-a83eee488004?w=1200&q=80", // women laughing together
 ];
 
 export default function Intro() {
@@ -44,7 +50,10 @@ export default function Intro() {
               alt=""
               className="w-full h-full object-cover"
               style={{ filter: "brightness(0.6) saturate(1.1)" }}
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
             />
+            {/* Fallback gradient always behind the image — graceful if image 404s */}
+            <div className="absolute inset-0 -z-10 bg-gradient-to-br from-[#8b2252] via-[#c14b7c] to-[#e8a4a4]" />
           </motion.div>
         )}
       </AnimatePresence>

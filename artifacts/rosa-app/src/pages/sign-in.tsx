@@ -7,70 +7,36 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { OnboardingQuiz } from "@/components/onboarding/onboarding-quiz";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Phone, Loader2, ShieldCheck } from "lucide-react";
-
-const COUNTRY_CODES: { code: string; name: string; dial: string; flag: string }[] = [
-  { code: "US", name: "United States", dial: "+1", flag: "🇺🇸" },
-  { code: "CA", name: "Canada", dial: "+1", flag: "🇨🇦" },
-  { code: "GB", name: "United Kingdom", dial: "+44", flag: "🇬🇧" },
-  { code: "IN", name: "India", dial: "+91", flag: "🇮🇳" },
-  { code: "AU", name: "Australia", dial: "+61", flag: "🇦🇺" },
-  { code: "DE", name: "Germany", dial: "+49", flag: "🇩🇪" },
-  { code: "FR", name: "France", dial: "+33", flag: "🇫🇷" },
-  { code: "IT", name: "Italy", dial: "+39", flag: "🇮🇹" },
-  { code: "ES", name: "Spain", dial: "+34", flag: "🇪🇸" },
-  { code: "JP", name: "Japan", dial: "+81", flag: "🇯🇵" },
-  { code: "CN", name: "China", dial: "+86", flag: "🇨🇳" },
-  { code: "KR", name: "South Korea", dial: "+82", flag: "🇰🇷" },
-  { code: "AE", name: "UAE", dial: "+971", flag: "🇦🇪" },
-  { code: "SA", name: "Saudi Arabia", dial: "+966", flag: "🇸🇦" },
-  { code: "ZA", name: "South Africa", dial: "+27", flag: "🇿🇦" },
-  { code: "NG", name: "Nigeria", dial: "+234", flag: "🇳🇬" },
-  { code: "KE", name: "Kenya", dial: "+254", flag: "🇰🇪" },
-  { code: "BR", name: "Brazil", dial: "+55", flag: "🇧🇷" },
-  { code: "MX", name: "Mexico", dial: "+52", flag: "🇲🇽" },
-  { code: "SG", name: "Singapore", dial: "+65", flag: "🇸🇬" },
-  { code: "ID", name: "Indonesia", dial: "+62", flag: "🇮🇩" },
-  { code: "PH", name: "Philippines", dial: "+63", flag: "🇵🇭" },
-  { code: "TH", name: "Thailand", dial: "+66", flag: "🇹🇭" },
-  { code: "PK", name: "Pakistan", dial: "+92", flag: "🇵🇰" },
-];
+import { Loader2, ShieldCheck, Mail } from "lucide-react";
 
 type Step = "auth" | "verify" | "gender" | "onboarding";
-type Mode = "email" | "phone";
 
 export default function SignIn() {
   const [, setLocation] = useLocation();
-  const { setUser, locale } = useUser();
+  const { setUser } = useUser();
   const { toast } = useToast();
   const [step, setStep] = useState<Step>("auth");
-  const [mode, setMode] = useState<Mode>("email");
   const [email, setEmail] = useState("");
-  const [dialCode, setDialCode] = useState(() => COUNTRY_CODES.find(c => c.code === locale.countryCode)?.dial || "+1");
-  const [phoneLocal, setPhoneLocal] = useState("");
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [devCode, setDevCode] = useState<string | null>(null);
 
-  const destination = mode === "email" ? email.trim() : `${dialCode}${phoneLocal.replace(/\D/g, "")}`;
-
   const sendCode = async () => {
     if (!name.trim()) { toast({ title: "Name needed", description: "Tell us what to call you 💝" }); return; }
-    if (mode === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destination)) { toast({ title: "Email looks off", description: "Please enter a valid email." }); return; }
-    if (mode === "phone" && phoneLocal.replace(/\D/g, "").length < 6) { toast({ title: "Phone looks short", description: "Please enter your full mobile number." }); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast({ title: "Email looks off", description: "Please enter a valid email." }); return; }
     setBusy(true); setDevCode(null);
     try {
       const r = await fetch("/api/auth/send-code", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ destination, name }),
+        body: JSON.stringify({ destination: email.trim(), name }),
       });
       const d = await r.json();
       if (!d.ok) { toast({ title: "Couldn't send code", description: d.error || "Please try again." }); return; }
       if (d.devCode) setDevCode(d.devCode);
-      toast({ title: d.sent ? "Code sent ✨" : "Verification code ready", description: d.message || (mode === "email" ? `Check your inbox at ${destination}` : "Enter the 6-digit code below") });
+      toast({ title: d.sent ? "Code sent ✨" : "Verification code ready", description: d.message || `Check your inbox at ${email}` });
       setStep("verify");
-    } catch (e: any) {
+    } catch {
       toast({ title: "Network error", description: "Please check your connection." });
     } finally { setBusy(false); }
   };
@@ -81,7 +47,7 @@ export default function SignIn() {
     try {
       const r = await fetch("/api/auth/verify-code", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ destination, code: code.replace(/\D/g, "") }),
+        body: JSON.stringify({ destination: email.trim().toLowerCase(), code: code.replace(/\D/g, "") }),
       });
       const d = await r.json();
       if (!d.ok) { toast({ title: "Verification failed", description: d.error || "Try again." }); return; }
@@ -98,7 +64,7 @@ export default function SignIn() {
   };
 
   const handleSelectGender = (gender: string) => {
-    setUser({ name, emailOrPhone: destination, gender, guestMode: false, joinedAt: new Date().toISOString(), personalityTags: [] });
+    setUser({ name, emailOrPhone: email.trim().toLowerCase(), gender, guestMode: false, joinedAt: new Date().toISOString(), personalityTags: [] });
     setStep("onboarding");
   };
 
@@ -126,39 +92,11 @@ export default function SignIn() {
                   <Label htmlFor="name">How should we call you?</Label>
                   <Input id="name" placeholder="Your beautiful name" value={name} onChange={(e) => setName(e.target.value)} />
                 </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setMode("email")}
-                    className={`py-2 rounded-xl text-sm font-medium border-2 transition-all flex items-center justify-center gap-2 ${mode === "email" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}>
-                    <Mail className="w-4 h-4" /> Email
-                  </button>
-                  <button type="button" onClick={() => setMode("phone")}
-                    className={`py-2 rounded-xl text-sm font-medium border-2 transition-all flex items-center justify-center gap-2 ${mode === "phone" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}>
-                    <Phone className="w-4 h-4" /> Phone
-                  </button>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Email address</Label>
+                  <Input id="email" type="email" placeholder="hello@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                  <p className="text-[11px] text-muted-foreground">We'll send a 6-digit code. Phone sign-in coming soon 💗</p>
                 </div>
-
-                {mode === "email" ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email address</Label>
-                    <Input id="email" type="email" placeholder="hello@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone number</Label>
-                    <div className="flex gap-2">
-                      <select value={dialCode} onChange={(e) => setDialCode(e.target.value)}
-                        className="rounded-md border border-input bg-background px-2 text-sm h-10 max-w-[110px]">
-                        {COUNTRY_CODES.map(c => (
-                          <option key={c.code} value={c.dial}>{c.flag} {c.dial}</option>
-                        ))}
-                      </select>
-                      <Input id="phone" inputMode="tel" placeholder="555 1234" value={phoneLocal} onChange={(e) => setPhoneLocal(e.target.value)} className="flex-1" />
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">SMS coming soon — for instant access, use email.</p>
-                  </div>
-                )}
-
                 <Button onClick={sendCode} disabled={busy} className="w-full bg-primary hover:bg-primary/90 text-white rounded-full py-6 text-lg">
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send verification code"}
                 </Button>
@@ -179,10 +117,9 @@ export default function SignIn() {
                 <div className="mx-auto w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
                   <ShieldCheck className="w-7 h-7 text-primary" />
                 </div>
-                <h2 className="text-3xl font-serif text-primary">Check your {mode === "email" ? "inbox" : "messages"}</h2>
-                <p className="text-muted-foreground text-sm">We sent a 6-digit code to<br /><span className="font-medium text-foreground">{destination}</span></p>
+                <h2 className="text-3xl font-serif text-primary">Check your inbox</h2>
+                <p className="text-muted-foreground text-sm">We sent a 6-digit code to<br /><span className="font-medium text-foreground">{email}</span></p>
               </div>
-
               <div className="space-y-5 bg-card p-7 rounded-2xl shadow-sm border border-border/50">
                 {devCode && (
                   <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 text-center">
@@ -202,7 +139,7 @@ export default function SignIn() {
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Verify & continue"}
                 </Button>
                 <div className="flex justify-between text-xs">
-                  <button onClick={() => { setStep("auth"); setCode(""); setDevCode(null); }} className="text-muted-foreground hover:text-foreground">← Change details</button>
+                  <button onClick={() => { setStep("auth"); setCode(""); setDevCode(null); }} className="text-muted-foreground hover:text-foreground">← Change email</button>
                   <button onClick={sendCode} disabled={busy} className="text-primary hover:underline">Resend code</button>
                 </div>
               </div>
