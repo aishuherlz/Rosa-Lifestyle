@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { getPartnerOccasions } from "@/lib/sync";
 
 type WishlistItem = {
   id: string;
@@ -65,6 +66,8 @@ export default function WishlistPage() {
   };
 
   const resetQuiz = () => { setQuizStep(0); setQuizAnswers([]); setQuizResult(""); };
+
+  const partnerOccasions = getPartnerOccasions(60);
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6">
@@ -152,6 +155,26 @@ export default function WishlistPage() {
           </div>
         </div>
       </motion.div>
+
+      {partnerOccasions.length > 0 && (
+        <div className="space-y-2">
+          {partnerOccasions.map(o => (
+            <motion.div key={o.kind + o.date} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+              className="rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50 p-4 flex items-center gap-3" data-testid={`banner-occasion-${o.kind}`}>
+              <Gift className="w-6 h-6 text-rose-500" />
+              <div className="flex-1">
+                <p className="text-xs uppercase tracking-widest text-rose-600">
+                  {o.kind === "birthday" ? `${o.partnerName}'s birthday` : "Your anniversary"} · in {o.daysAway === 0 ? "today" : o.daysAway === 1 ? "1 day" : `${o.daysAway} days`}
+                </p>
+                <p className="font-serif text-sm text-rose-900 mt-0.5">
+                  {o.kind === "birthday" ? `Time to spoil ${o.partnerName} 🎁` : "Plan something romantic 💐"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Try the Gift Quiz above for ideas tailored to her vibe.</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       {items.length === 0 ? (
         <Card className="border-dashed border-2 border-border text-center py-16">

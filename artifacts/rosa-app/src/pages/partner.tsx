@@ -15,6 +15,8 @@ type PartnerData = {
   partnerCode: string;
   linkedAt: string;
   partnerName: string;
+  birthday?: string;
+  anniversary?: string;
   permissions: {
     seePeriod: boolean;
     seeDetails: boolean;
@@ -47,6 +49,8 @@ export default function PartnerPage() {
       partnerCode: inputCode.toUpperCase(),
       linkedAt: new Date().toISOString(),
       partnerName: partnerName || "Your Partner",
+      birthday: undefined,
+      anniversary: undefined,
       permissions: { seePeriod: false, seeDetails: false, periodReminders: true },
       surpriseTrip: null,
     };
@@ -209,6 +213,25 @@ export default function PartnerPage() {
                   <Button onClick={saveTrip} disabled={!tripForm.destination} className="w-full" data-testid="button-save-trip">Save Surprise Trip</Button>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="font-serif text-lg flex items-center gap-2">
+                <Gift className="w-5 h-5 text-rose-500" /> Special Dates
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">Add their birthday and your anniversary — Wishlist & Reminders will surface them automatically 🌹</p>
+              <div>
+                <Label className="text-xs">{partner.partnerName}'s birthday</Label>
+                <Input type="date" value={partner.birthday || ""} onChange={e => setPartner({ ...partner, birthday: e.target.value || undefined })} data-testid="input-partner-birthday" />
+              </div>
+              <div>
+                <Label className="text-xs">Your anniversary</Label>
+                <Input type="date" value={partner.anniversary || ""} onChange={e => setPartner({ ...partner, anniversary: e.target.value || undefined })} data-testid="input-partner-anniversary" />
+              </div>
             </CardContent>
           </Card>
 

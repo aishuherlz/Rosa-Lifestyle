@@ -63,6 +63,34 @@ export function getNextPlannedTrip(): Destination | null {
   } catch { return null; }
 }
 
+export type PartnerOccasion = { kind: "birthday" | "anniversary"; date: string; daysAway: number; partnerName: string };
+
+export function getPartnerOccasions(withinDays = 60): PartnerOccasion[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("rosa_partner");
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    if (!p) return [];
+    const out: PartnerOccasion[] = [];
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const checkDate = (iso: string | undefined, kind: "birthday" | "anniversary") => {
+      if (!iso) return;
+      const d = parseISO(iso);
+      const next = new Date(today.getFullYear(), d.getMonth(), d.getDate());
+      if (next < today) next.setFullYear(today.getFullYear() + 1);
+      const diff = differenceInCalendarDays(next, today);
+      if (diff >= 0 && diff <= withinDays) {
+        out.push({ kind, date: next.toISOString().slice(0, 10), daysAway: diff, partnerName: p.partnerName || "your partner" });
+      }
+    };
+    checkDate(p.birthday, "birthday");
+    checkDate(p.anniversary, "anniversary");
+    return out.sort((a, b) => a.daysAway - b.daysAway);
+  } catch { return []; }
+}
+
 export type Milestone = { id: string; title: string; date: string };
 
 export function getUpcomingMilestones(withinDays = 60): Milestone[] {

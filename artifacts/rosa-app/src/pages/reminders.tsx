@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { getPartnerOccasions, getUpcomingMilestones } from "@/lib/sync";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -60,10 +61,31 @@ export default function RemindersPage() {
 
   const handleDelete = (id: string) => setReminders(reminders.filter(r => r.id !== id));
 
-  const upcomingReminders = reminders
+  const partnerOccasions = getPartnerOccasions(90).map(o => ({
+    id: `partner-${o.kind}-${o.date}`,
+    date: o.date,
+    title: o.kind === "birthday" ? `${o.partnerName}'s Birthday 🎂` : `Anniversary with ${o.partnerName} 💐`,
+    type: o.kind,
+    time: "",
+    isAuto: true as const,
+  }));
+  const milestoneReminders = getUpcomingMilestones(60).map(m => ({
+    id: `milestone-${m.id}`,
+    date: m.date,
+    title: `🏆 ${m.title}`,
+    type: "other",
+    time: "",
+    isAuto: true as const,
+  }));
+  const allUpcoming = [
+    ...reminders.map(r => ({ ...r, isAuto: false as const })),
+    ...partnerOccasions,
+    ...milestoneReminders,
+  ];
+  const upcomingReminders = allUpcoming
     .filter(r => new Date(r.date) >= new Date())
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 5);
+    .slice(0, 8);
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6">
