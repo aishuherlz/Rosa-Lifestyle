@@ -2,6 +2,15 @@ import Stripe from 'stripe';
 
 // Replit Stripe integration — connection:conn_stripe_01KPVZ7M4Q2165VVCDF6ME4PZC
 async function getCredentials(): Promise<{ publishableKey: string; secretKey: string }> {
+  // PREFER explicit env-var keys when present (lets the user pin to live mode
+  // without waiting for the Replit Stripe connection to be switched).
+  if (process.env.STRIPE_SECRET_KEY) {
+    return {
+      secretKey: process.env.STRIPE_SECRET_KEY,
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
+    };
+  }
+
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? 'repl ' + process.env.REPL_IDENTITY

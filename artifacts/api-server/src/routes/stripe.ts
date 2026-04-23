@@ -63,6 +63,16 @@ router.post('/stripe/checkout', async (req: any, res) => {
     }
 
     let customerId = user.stripeCustomerId;
+    if (customerId) {
+      // Validate the stored ID against the *current* Stripe mode (test vs live).
+      // If switching modes left a stale ID behind, recreate transparently.
+      try {
+        const c: any = await stripe.customers.retrieve(customerId);
+        if (c?.deleted) throw new Error('deleted');
+      } catch {
+        customerId = null as any;
+      }
+    }
     if (!customerId) {
       const customer = await stripe.customers.create({ email: emailOrPhone, name: user.name });
       await db.update(rosaUsers).set({ stripeCustomerId: customer.id }).where(eq(rosaUsers.id, user.id));
