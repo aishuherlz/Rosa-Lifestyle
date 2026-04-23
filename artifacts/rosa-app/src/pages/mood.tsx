@@ -6,6 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { readCyclePhase, PHASE_MOOD } from "@/lib/sync";
+import { Link } from "wouter";
 
 type MoodEntry = {
   id: string;
@@ -84,6 +86,8 @@ export default function MoodPage() {
 
   const displayMood = todayLog || (step === "done" ? { mood: selectedMood! } : null);
   const suggestions = displayMood ? SUGGESTIONS[displayMood.mood] : null;
+  const cyc = readCyclePhase();
+  const cycMood = cyc.phase !== "unknown" ? PHASE_MOOD[cyc.phase] : null;
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6">
@@ -91,6 +95,20 @@ export default function MoodPage() {
         <h1 className="text-3xl font-serif text-foreground">How are you feeling?</h1>
         <p className="text-muted-foreground mt-1">Check in with yourself today.</p>
       </motion.div>
+
+      {cycMood && (
+        <Link href="/period">
+          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+            className="cursor-pointer rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 via-pink-50 to-amber-50 p-4 flex items-center gap-3 hover:shadow-md transition" data-testid="banner-cycle-mood">
+            <div className="text-3xl">{cycMood.emoji}</div>
+            <div className="flex-1">
+              <p className="text-xs uppercase tracking-widest text-rose-600">Day {cyc.day} · {cyc.phase}</p>
+              <p className="font-serif text-sm text-rose-900 mt-0.5">{cycMood.title}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{cycMood.tip}</p>
+            </div>
+          </motion.div>
+        </Link>
+      )}
 
       <AnimatePresence mode="wait">
         {(step === "select" && !todayLog) && (

@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useSubscription } from "@/lib/subscription-context";
 import { useLocation } from "wouter";
+import { readCyclePhase, PHASE_FOOD, getNextPlannedTrip } from "@/lib/sync";
 
 type FoodEntry = {
   id: string;
@@ -163,6 +164,9 @@ export default function FoodPlanner() {
   }
 
   const mealGroups = ["breakfast", "lunch", "dinner", "snack"] as const;
+  const cyc = readCyclePhase();
+  const cycFood = cyc.phase !== "unknown" ? PHASE_FOOD[cyc.phase] : null;
+  const nextTrip = getNextPlannedTrip();
 
   return (
     <div className="min-h-screen pb-24">
@@ -171,6 +175,24 @@ export default function FoodPlanner() {
           <h1 className="font-serif text-2xl font-medium text-foreground">Food Planner</h1>
           <p className="text-muted-foreground text-sm mt-1">Nourish your body with intention</p>
         </motion.div>
+
+        {cycFood && (
+          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+            className="mb-4 rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50 p-4" data-testid="banner-cycle-food">
+            <p className="text-xs uppercase tracking-widest text-rose-600">Day {cyc.day} · {cyc.phase} phase</p>
+            <p className="font-serif text-sm text-rose-900 mt-1">{cycFood.title}</p>
+            <p className="text-xs text-muted-foreground mt-1">{cycFood.foods}</p>
+          </motion.div>
+        )}
+
+        {nextTrip && (
+          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+            className="mb-4 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50 p-4" data-testid="banner-trip-food">
+            <p className="text-xs uppercase tracking-widest text-amber-700">Trip coming up ✈️</p>
+            <p className="font-serif text-sm text-amber-900 mt-1">{nextTrip.name}, {nextTrip.country}</p>
+            <p className="text-xs text-muted-foreground mt-1">Stock travel snacks · hydrate extra · pre-pack supplements</p>
+          </motion.div>
+        )}
 
         <div className="flex gap-2 mb-6">
           {(["today", "plan", "history"] as const).map((t) => (

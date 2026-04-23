@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { getNextPlannedTrip } from "@/lib/sync";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -195,6 +196,24 @@ export default function OutfitPage() {
           </CardContent>
         </Card>
       )}
+
+      {(() => {
+        const trip = getNextPlannedTrip();
+        if (!trip) return null;
+        return (
+          <Card className="border-amber-200 bg-amber-50 shadow-sm" data-testid="card-trip-outfit">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-3">
+                <Shirt className="w-5 h-5 text-amber-500 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-700">Upcoming trip · {trip.name}, {trip.country}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Pack 2-3 versatile outfits, 1 dressy option, comfy shoes for walking, and a layering piece. Snap your closet above to plan looks 📸</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {partner?.surpriseTrip && (
         <Card className="border-amber-200 bg-amber-50 shadow-sm">
