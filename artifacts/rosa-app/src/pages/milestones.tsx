@@ -12,6 +12,7 @@ import { differenceInDays, parseISO, format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/lib/subscription-context";
 import { useLocation } from "wouter";
+import { ShareableCard } from "@/components/shareable-card";
 
 type Milestone = {
   id: string;
@@ -43,6 +44,7 @@ export default function MilestonesPage() {
   const [formPhoto, setFormPhoto] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const [shareItem, setShareItem] = useState<Milestone | null>(null);
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,15 +77,7 @@ export default function MilestonesPage() {
     return differenceInDays(target, today);
   };
 
-  const handleShare = (m: Milestone) => {
-    const days = getDays(m);
-    const text = m.type === "countdown"
-      ? `${Math.abs(days)} days until ${m.title}! ${m.emoji} #ROSA`
-      : `${Math.abs(days)} days since ${m.title} ${m.emoji} #ROSA`;
-    navigator.clipboard.writeText(text).then(() =>
-      toast({ title: "Copied!", description: "Share text copied to clipboard." })
-    );
-  };
+  const handleShare = (m: Milestone) => setShareItem(m);
 
   const updatePhoto = (id: string, photo: string) => {
     setMilestones(milestones.map((m) => m.id === id ? { ...m, photo } : m));
@@ -271,6 +265,17 @@ export default function MilestonesPage() {
           )}
         </div>
       )}
+
+      <ShareableCard
+        open={!!shareItem}
+        onOpenChange={(o) => { if (!o) setShareItem(null); }}
+        title={shareItem?.title || ""}
+        subtitle={shareItem?.type === "countdown" ? "Counting down to" : "Days since"}
+        bigText={shareItem ? String(shareItem.type === "countdown" ? Math.max(0, getDays(shareItem)) : Math.abs(getDays(shareItem))) : ""}
+        smallText={shareItem?.type === "countdown" ? (getDays(shareItem) > 0 ? "days to go" : "arrived!") : "days"}
+        emoji={shareItem?.emoji || "🌟"}
+        variant={shareItem ? (["rose","violet","amber","emerald","rose","rose"][parseInt(shareItem.color) % 6] as any) : "rose"}
+      />
     </div>
   );
 }

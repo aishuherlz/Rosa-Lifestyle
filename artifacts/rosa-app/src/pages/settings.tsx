@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Settings, LogOut, User, Bell, Tag, Shield, Crown, Globe, Clock } from "lucide-react";
+import { Settings, LogOut, User, Bell, Tag, Shield, Crown, Globe, Clock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -60,6 +60,9 @@ export default function SettingsPage() {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     use24h: false,
   });
+  const [betaOptIn, setBetaOptIn] = useLocalStorage<boolean>("rosa_beta_optin", false);
+  const [betaUpdates, setBetaUpdates] = useLocalStorage<boolean>("rosa_beta_updates", false);
+  const [betaSurveys, setBetaSurveys] = useLocalStorage<boolean>("rosa_beta_surveys", false);
 
   const toggleTag = (tag: string) => {
     setForm((f) => ({
@@ -222,6 +225,50 @@ export default function SettingsPage() {
               />
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      {/* Beta / Founders Program */}
+      <Card className="border-rose-200/60 bg-gradient-to-br from-rose-50/40 to-pink-50/40 dark:from-rose-950/20 dark:to-pink-950/20 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="font-serif text-lg flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-rose-600" /> Beta & Founders Program
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            ROSA is in our 3-month beta with our founding sisters. You can opt out anytime.
+          </p>
+          <div className="flex items-center justify-between py-2 border-b border-border/30">
+            <div>
+              <p className="text-sm font-medium">Join the beta program</p>
+              <p className="text-xs text-muted-foreground">Be one of our founding sisters & enter the Lucky 10 raffle</p>
+            </div>
+            <Switch
+              checked={betaOptIn}
+              onCheckedChange={(v) => { setBetaOptIn(v); if (!v) { setBetaUpdates(false); setBetaSurveys(false); } toast({ title: v ? "Welcome to the beta 🌹" : "You've opted out", description: v ? "Thank you for shaping ROSA with us." : "You can re-join anytime." }); }}
+              data-testid="switch-beta-optin"
+            />
+          </div>
+          <div className={`flex items-center justify-between py-2 border-b border-border/30 ${!betaOptIn ? "opacity-50 pointer-events-none" : ""}`}>
+            <div>
+              <p className="text-sm font-medium">Beta updates by email</p>
+              <p className="text-xs text-muted-foreground">Get monthly behind-the-scenes notes from Aiswarya</p>
+            </div>
+            <Switch checked={betaUpdates && betaOptIn} onCheckedChange={setBetaUpdates} disabled={!betaOptIn} />
+          </div>
+          <div className={`flex items-center justify-between py-2 ${!betaOptIn ? "opacity-50 pointer-events-none" : ""}`}>
+            <div>
+              <p className="text-sm font-medium">Feedback surveys</p>
+              <p className="text-xs text-muted-foreground">Occasional 1-minute surveys to shape the app</p>
+            </div>
+            <Switch checked={betaSurveys && betaOptIn} onCheckedChange={setBetaSurveys} disabled={!betaOptIn} />
+          </div>
+          {!betaOptIn && (
+            <p className="text-xs text-muted-foreground italic pt-1">
+              You'll still have full access to ROSA — you just won't receive beta-specific perks or be in the Lucky 10 raffle.
+            </p>
+          )}
         </CardContent>
       </Card>
 

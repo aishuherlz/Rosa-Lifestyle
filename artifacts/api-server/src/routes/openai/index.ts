@@ -130,18 +130,38 @@ Keep responses warm, conversational, and concise unless the user wants more dept
     res.setHeader("Connection", "keep-alive");
 
     let fullResponse = "";
-    const stream = await openai.chat.completions.create({
-      model: "gpt-5.4",
-      max_completion_tokens: 8192,
-      messages: chatMessages,
-      stream: true,
-    });
-
-    for await (const chunk of stream) {
-      const chunkContent = chunk.choices[0]?.delta?.content;
-      if (chunkContent) {
-        fullResponse += chunkContent;
-        res.write(`data: ${JSON.stringify({ content: chunkContent })}\n\n`);
+    let emittedAny = false;
+    try {
+      const stream = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        max_completion_tokens: 2048,
+        messages: chatMessages,
+        stream: true,
+      });
+      for await (const chunk of stream) {
+        const chunkContent = chunk.choices[0]?.delta?.content;
+        if (chunkContent) {
+          fullResponse += chunkContent;
+          emittedAny = true;
+          res.write(`data: ${JSON.stringify({ content: chunkContent })}\n\n`);
+        }
+      }
+    } catch (streamErr: any) {
+      console.error("Chatbot stream error:", streamErr?.message || streamErr);
+      if (emittedAny) {
+        // Don't append a second answer; tell the client we cut off and persist what we have.
+        const note = "\n\n(…my words got tangled, sister — please ask again 🌹)";
+        fullResponse += note;
+        res.write(`data: ${JSON.stringify({ content: note })}\n\n`);
+      } else {
+        // Safe to fall back to a fresh non-streaming response (nothing was sent yet).
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          max_tokens: 1024,
+          messages: chatMessages,
+        });
+        fullResponse = completion.choices[0]?.message?.content || "I'm having a moment, sister 🌹 — please try again.";
+        res.write(`data: ${JSON.stringify({ content: fullResponse })}\n\n`);
       }
     }
 
@@ -153,9 +173,9 @@ Keep responses warm, conversational, and concise unless the user wants more dept
 
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
     res.end();
-  } catch (err) {
-    console.error("Chatbot error:", err);
-    res.write(`data: ${JSON.stringify({ error: "Something went wrong" })}\n\n`);
+  } catch (err: any) {
+    console.error("Chatbot error:", err?.message || err, err?.stack);
+    try { res.write(`data: ${JSON.stringify({ content: "I'm having a moment, sister 🌹 — please try again in a bit." })}\n\n`); res.write(`data: ${JSON.stringify({ done: true })}\n\n`); } catch {}
     res.end();
   }
 });

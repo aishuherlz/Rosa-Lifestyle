@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ShareableCard } from "@/components/shareable-card";
 import { useUser } from "@/lib/user-context";
 import { useSubscription } from "@/lib/subscription-context";
 import { useGarden } from "@/lib/garden-context";
@@ -48,6 +49,7 @@ export default function Home() {
   const [periodData] = useLocalStorage<PeriodData>("rosa_period", {});
   const [checkedInToday, setCheckedInToday] = useState(false);
   const [showCelebration, setShowCelebration] = useState<string | null>(null);
+  const [shareAch, setShareAch] = useState<{ id: string; emoji: string; title: string; description?: string } | null>(null);
   const { toast } = useToast();
 
   const today = new Date();
@@ -259,13 +261,18 @@ export default function Home() {
       {/* Achievements Row */}
       {garden.achievements.length > 0 && (
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Your Badges</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Your Badges · tap to share</p>
           <div className="flex gap-2 flex-wrap">
             {garden.achievements.map((a) => (
-              <div key={a.id} className="flex items-center gap-1.5 bg-card border border-border/50 rounded-full px-3 py-1.5 text-sm">
+              <button
+                key={a.id}
+                onClick={() => setShareAch(a)}
+                className="flex items-center gap-1.5 bg-card border border-border/50 hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-full px-3 py-1.5 text-sm transition-colors"
+                data-testid={`share-ach-${a.id}`}
+              >
                 <span>{a.emoji}</span>
                 <span className="font-medium text-xs">{a.title}</span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -346,6 +353,18 @@ export default function Home() {
           ROSA was built by Aiswarya Saji — a woman who struggled just like you, and created this space so you never have to feel alone.
         </p>
       </motion.div>
+
+      <ShareableCard
+        open={!!shareAch}
+        onOpenChange={(o) => { if (!o) setShareAch(null); }}
+        title={shareAch?.title || ""}
+        subtitle="Achievement unlocked"
+        bigText={shareAch?.emoji || "🌹"}
+        smallText={shareAch?.description || "Earned in ROSA"}
+        emoji="🏆"
+        variant="amber"
+        authorName={user?.name}
+      />
     </motion.div>
   );
 }

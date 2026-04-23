@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Bell, BellOff, RefreshCw, Heart, Sparkles } from "lucide-react";
+import { Bell, BellOff, RefreshCw, Heart, Sparkles, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useToast } from "@/hooks/use-toast";
+import { ShareableCard } from "@/components/shareable-card";
 
 const ALL_QUOTES = [
   { text: "She remembered who she was and the game changed.", author: "Lalah Delia", tags: ["feminist", "empowerment"] },
@@ -53,6 +54,7 @@ export default function QuotesPage() {
   const [personalityTags, setPersonalityTags] = useLocalStorage<string[]>("rosa_personality_tags", []);
   const [notifEnabled, setNotifEnabled] = useLocalStorage<boolean>("rosa_quote_notif", false);
   const [quoteIndex, setQuoteIndex] = useState(0);
+  const [shareQuote, setShareQuote] = useState<{ text: string; author: string; tags: string[] } | null>(null);
   const { toast } = useToast();
 
   const dailyQuote = getDailyQuote(personalityTags);
@@ -109,6 +111,9 @@ export default function QuotesPage() {
                 <span key={t} className="px-2 py-0.5 rounded-full bg-white/20 text-xs">{t}</span>
               ))}
             </div>
+            <Button onClick={() => setShareQuote(dailyQuote)} size="sm" variant="secondary" className="mt-5 bg-white/95 hover:bg-white text-rose-700 font-medium">
+              <Share2 className="w-4 h-4 mr-1.5" /> Share this quote
+            </Button>
           </CardContent>
         </Card>
       </motion.div>
@@ -145,8 +150,11 @@ export default function QuotesPage() {
                   <p className="text-sm font-serif italic text-foreground/90 leading-relaxed mb-3">"{quote.text}"</p>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">— {quote.author}</span>
-                    <div className="flex gap-1">
+                    <div className="flex items-center gap-1">
                       {quote.tags.slice(0, 2).map(t => <Badge key={t} variant="outline" className="text-xs px-1.5">{t}</Badge>)}
+                      <button onClick={() => setShareQuote(quote)} className="ml-1 p-1.5 rounded-full hover:bg-rose-100 dark:hover:bg-rose-950 text-rose-600 transition-colors" data-testid={`share-quote-${i}`} aria-label="Share quote">
+                        <Share2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 </CardContent>
@@ -155,6 +163,17 @@ export default function QuotesPage() {
           ))}
         </div>
       </div>
+
+      <ShareableCard
+        open={!!shareQuote}
+        onOpenChange={(o) => { if (!o) setShareQuote(null); }}
+        title={shareQuote?.text || ""}
+        subtitle="Daily wisdom"
+        bigText="🌹"
+        smallText={shareQuote ? `— ${shareQuote.author}` : undefined}
+        emoji="✨"
+        variant="rose"
+      />
     </div>
   );
 }
