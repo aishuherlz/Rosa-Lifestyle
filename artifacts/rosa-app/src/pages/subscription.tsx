@@ -61,14 +61,17 @@ export default function Subscription() {
     setLoading(true);
     setCheckoutError("");
     try {
-      const emailOrPhone = localStorage.getItem("rosa_email") || localStorage.getItem("rosa_phone") || "guest@rosa.app";
       const name = localStorage.getItem("rosa_name") || "ROSA User";
-      const priceId = selectedPlan === "monthly" ? prices?.monthly.id : prices?.yearly.id;
-
+      const token = localStorage.getItem("rosa_auth_token");
+      if (!token) {
+        setCheckoutError("Please sign in with your verified email first to subscribe.");
+        setLoading(false);
+        return;
+      }
       const resp = await fetch("/api/stripe/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailOrPhone, name, priceId, planType: selectedPlan }),
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ name, planType: selectedPlan }),
       });
 
       if (!resp.ok) throw new Error("Could not create checkout session");
@@ -93,11 +96,12 @@ export default function Subscription() {
   const handlePortal = async () => {
     setLoading(true);
     try {
-      const emailOrPhone = localStorage.getItem("rosa_email") || localStorage.getItem("rosa_phone") || "guest@rosa.app";
+      const token = localStorage.getItem("rosa_auth_token");
+      if (!token) { setCheckoutError("Sign in first to manage billing."); setLoading(false); return; }
       const resp = await fetch("/api/stripe/portal", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailOrPhone }),
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({}),
       });
       const { url } = await resp.json();
       if (url) window.open(url, "_blank");

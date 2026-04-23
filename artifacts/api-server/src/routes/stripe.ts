@@ -4,16 +4,33 @@ import { rosaUsers } from '@workspace/db';
 import { eq, sql } from 'drizzle-orm';
 import { getUncachableStripeClient } from '../stripeClient';
 import { logger } from '../lib/logger';
+import { verifyEmailToken } from './auth';
 
 const router = Router();
+
+function bearer(req: any): string | null {
+  const h = req.headers["authorization"];
+  if (typeof h === "string" && h.startsWith("Bearer ")) return h.slice(7).trim();
+  return null;
+}
+// Server-side allowlist — only these prices are valid. Prevents price tampering.
+function allowedPriceFor(planType: string | undefined): string | null {
+  if (planType === 'monthly') return process.env.STRIPE_MONTHLY_PRICE_ID || null;
+  if (planType === 'yearly')  return process.env.STRIPE_YEARLY_PRICE_ID  || null;
+  return null;
+}
 
 // Create or get Stripe customer + checkout session
 router.post('/stripe/checkout', async (req: any, res) => {
   try {
-    const { emailOrPhone, name, priceId, planType } = req.body;
-    if (!emailOrPhone || !priceId) {
-      return res.status(400).json({ error: 'emailOrPhone and priceId are required' });
-    }
+    // AUTHN: must have completed email verification
+    const verifiedEmail = verifyEmailToken(String(bearer(req) || (req.body && req.body.token) || ''));
+    if (!verifiedEmail) return res.status(401).json({ error: 'Verified email token required. Sign in first.' });
+
+    const { name, planType } = req.body;
+    const emailOrPhone = verifiedEmail; // ALWAYS use the verified identity, never trust client-supplied
+    const priceId = allowedPriceFor(planType);
+    if (!priceId) return res.status(400).json({ error: "planType must be 'monthly' or 'yearly'" });
 
     const stripe = await getUncachableStripeClient();
 
@@ -70,11 +87,12 @@ router.post('/stripe/checkout', async (req: any, res) => {
   }
 });
 
-// Customer portal
+// Customer portal — AUTHENTICATED, identity from verified token
 router.post('/stripe/portal', async (req: any, res) => {
   try {
-    const { emailOrPhone } = req.body;
-    const [user] = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, emailOrPhone));
+    const verifiedEmail = verifyEmailToken(String(bearer(req) || (req.body && req.body.token) || ''));
+    if (!verifiedEmail) return res.status(401).json({ error: 'Verified email token required.' });
+    const [user] = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, verifiedEmail));
     if (!user?.stripeCustomerId) return res.status(404).json({ error: 'No billing account found' });
 
     const stripe = await getUncachableStripeClient();
@@ -89,10 +107,13 @@ router.post('/stripe/portal', async (req: any, res) => {
   }
 });
 
-// Get user subscription status
-router.get('/stripe/status/:emailOrPhone', async (req, res) => {
+// Get user subscription status — AUTHENTICATED, identity from verified token
+// (Removed the IDOR-prone path-param variant.)
+router.get('/stripe/status', async (req: any, res) => {
   try {
-    const [user] = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, req.params.emailOrPhone));
+    const verifiedEmail = verifyEmailToken(String(bearer(req) || ''));
+    if (!verifiedEmail) return res.status(401).json({ error: 'Verified email token required.' });
+    const [user] = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, verifiedEmail));
     if (!user) return res.json({ status: 'trial', isFoundingMember: false });
 
     const now = new Date();
