@@ -51,6 +51,7 @@ export default function SignIn() {
       });
       const d = await r.json();
       if (!d.ok) { toast({ title: "Verification failed", description: d.error || "Try again." }); return; }
+      if (d.token) { try { localStorage.setItem("rosa_auth_token", d.token); } catch {} }
       toast({ title: "Verified 💗", description: "Welcome to ROSA" });
       setStep("gender");
     } catch {

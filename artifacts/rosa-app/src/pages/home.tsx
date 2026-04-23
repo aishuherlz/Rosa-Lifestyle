@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import confetti from "canvas-confetti";
 import { useToast } from "@/hooks/use-toast";
+import { FoundersBanner } from "@/components/founders-banner";
 
 type PeriodData = { lastPeriodDate?: string; cycleLength?: number };
 type CycleLog = { periodStart?: string; periodEnd?: string; cycleLength?: number };
@@ -333,6 +334,9 @@ export default function Home() {
           )}
         </div>
       </header>
+
+      {/* Founding Members Banner */}
+      <FoundersBanner />
 
       {/* Trial / Subscription Banner */}
       {plan === "trial" && daysLeftInTrial <= 7 && (

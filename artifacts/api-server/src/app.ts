@@ -1,11 +1,16 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import helmet from "helmet";
+import compression from "compression";
+import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { WebhookHandlers } from "./webhookHandlers";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
+
+app.set("trust proxy", 1);
 
 // Register Stripe webhook BEFORE other middleware (needs raw Buffer)
 app.post(
@@ -40,7 +45,31 @@ app.use(pinoHttp({
     res(res) { return { statusCode: res.statusCode }; },
   },
 }));
+// Security headers — protects against XSS, clickjacking, MIME sniffing
+app.use(helmet({
+  contentSecurityPolicy: false,         // SPA needs flexible CSP — Replit proxy handles edge
+  crossOriginEmbedderPolicy: false,     // we embed via Replit iframe
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
+// Gzip — drastically reduces bandwidth and TTFB at scale
+app.use(compression());
 app.use(cors());
+// Global rate limit — 300 requests/min/IP. Prevents abuse without bothering normal users.
+app.use("/api", rateLimit({
+  windowMs: 60_000,
+  limit: 300,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { ok: false, error: "Too many requests — please slow down 🌹" },
+}));
+// Stricter limiter for auth endpoints
+app.use("/api/auth", rateLimit({
+  windowMs: 60_000,
+  limit: 12,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { ok: false, error: "Too many code requests — wait a minute, sister 💗" },
+}));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 

@@ -27,6 +27,26 @@ function genCode(): string {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
+const GAME_PROMPTS = [
+  "🌹 What's one tiny win you had today?",
+  "🌹 If your week had a soundtrack, what's the title track?",
+  "🌹 Drop one thing you'd tell your 16-year-old self.",
+  "🌹 What's lighting you up this week?",
+  "🌹 One soft girl ritual you swear by?",
+  "🌹 Describe today in three emojis.",
+  "🌹 What boundary are you proud of holding lately?",
+  "🌹 Compliment the sister who posts after you 💗",
+];
+const CONFIDENCE_CARDS = [
+  "✨ You are exactly where you're meant to be.",
+  "✨ Your softness is your strength.",
+  "✨ Today, choose yourself first.",
+  "✨ You don't have to earn your rest.",
+  "✨ The right rooms will open for you.",
+  "✨ Your worth isn't a negotiation.",
+  "✨ You're allowed to take up space.",
+  "✨ Slow is still moving forward, sister.",
+];
 const GAMES = [
   { id: "rose-roulette", name: "Rose Roulette 🌹", desc: "Daily prompt every sister answers — see today's at the top of each lounge." },
   { id: "two-truths", name: "Two Truths & a Rose 🥀", desc: "Post 3 things — 2 true, 1 false. Sisters guess which is the rose (lie)." },
@@ -310,6 +330,20 @@ export default function CirclesPage() {
                         Post as <span className="font-semibold text-rose-600">A Sister 🌹</span> (anonymous)
                       </label>
                     </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button size="sm" variant="outline" className="text-xs h-7 rounded-full"
+                        onClick={() => setPublicDraft(d => (d ? d + " " : "") + GAME_PROMPTS[Math.floor(Math.random() * GAME_PROMPTS.length)])}>
+                        🌹 Drop a prompt
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-xs h-7 rounded-full"
+                        onClick={() => setPublicDraft(d => (d ? d + " " : "") + CONFIDENCE_CARDS[Math.floor(Math.random() * CONFIDENCE_CARDS.length)])}>
+                        ✨ Pull a card
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-xs h-7 rounded-full"
+                        onClick={() => setPublicDraft("Two Truths & a Rose 🌹\n1. \n2. \n3. (the lie)")}>
+                        💝 Two Truths & a Rose
+                      </Button>
+                    </div>
                     <div className="flex gap-2">
                       <Input value={publicDraft} onChange={e => setPublicDraft(e.target.value)} placeholder="Share with the lounge..." onKeyDown={e => { if (e.key === "Enter") sendPublic(); }} />
                       <Button onClick={sendPublic} className="bg-rose-500 hover:bg-rose-600 text-white"><Send className="w-4 h-4" /></Button>
@@ -407,6 +441,20 @@ export default function CirclesPage() {
                           </div>
                         </div>
                       ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button size="sm" variant="outline" className="text-xs h-7 rounded-full"
+                        onClick={() => setDraft(d => (d ? d + " " : "") + GAME_PROMPTS[Math.floor(Math.random() * GAME_PROMPTS.length)])}>
+                        🌹 Drop a prompt
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-xs h-7 rounded-full"
+                        onClick={() => setDraft(d => (d ? d + " " : "") + CONFIDENCE_CARDS[Math.floor(Math.random() * CONFIDENCE_CARDS.length)])}>
+                        ✨ Pull a card
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-xs h-7 rounded-full"
+                        onClick={() => setDraft("Two Truths & a Rose 🌹\n1. \n2. \n3. (the lie)")}>
+                        💝 Two Truths & a Rose
+                      </Button>
                     </div>
                     <div className="flex gap-2">
                       <Input value={draft} onChange={e => setDraft(e.target.value)} placeholder="Share what's on your heart..." onKeyDown={e => { if (e.key === "Enter") send(); }} />

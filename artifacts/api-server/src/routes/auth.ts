@@ -1,7 +1,27 @@
 import { Router } from "express";
 import express from "express";
+import crypto from "crypto";
 
 const router = Router();
+
+const AUTH_SECRET = process.env.SESSION_SECRET || "rosa-dev-secret-change-me";
+export function signEmailToken(email: string): string {
+  const e = email.trim().toLowerCase();
+  const sig = crypto.createHmac("sha256", AUTH_SECRET).update(`v1:${e}`).digest("base64url");
+  return `v1.${Buffer.from(e).toString("base64url")}.${sig}`;
+}
+export function verifyEmailToken(token: string): string | null {
+  if (!token || typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length !== 3 || parts[0] !== "v1") return null;
+  try {
+    const email = Buffer.from(parts[1], "base64url").toString("utf-8");
+    const expected = crypto.createHmac("sha256", AUTH_SECRET).update(`v1:${email}`).digest("base64url");
+    if (parts[2].length !== expected.length) return null;
+    if (!crypto.timingSafeEqual(Buffer.from(parts[2]), Buffer.from(expected))) return null;
+    return email;
+  } catch { return null; }
+}
 router.use(express.json({ limit: "50kb" }));
 
 type CodeEntry = { code: string; expiresAt: number; attempts: number; sent: number; channel: "email" | "phone" };
@@ -131,7 +151,8 @@ router.post("/auth/verify-code", (req, res) => {
   entry.attempts++;
   if (String(code).trim() !== entry.code) return res.status(400).json({ ok: false, error: "Incorrect code. Please try again." });
   codes.delete(dest);
-  res.json({ ok: true, verified: true, channel: entry.channel });
+  const token = entry.channel === "email" ? signEmailToken(dest) : null;
+  res.json({ ok: true, verified: true, channel: entry.channel, token });
 });
 
 export default router;
