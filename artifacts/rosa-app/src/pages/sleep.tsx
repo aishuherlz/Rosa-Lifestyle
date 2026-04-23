@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useToast } from "@/hooks/use-toast";
+import { PartnerShareToggle } from "@/components/partner-share-toggle";
 
 type SoundId = "rain" | "ocean" | "white" | "pink" | "brown" | "fire" | "forest";
 const SOUNDS: { id: SoundId; label: string; emoji: string; type: "noise" | "synth"; tint: string }[] = [
@@ -304,6 +305,8 @@ export default function SleepPage() {
         </h1>
         <p className="text-muted-foreground mt-1">Soothing sounds, sleep monitoring, and the science of rest 🌙</p>
       </motion.div>
+
+      <PartnerShareToggle feature="sleep" />
 
       <Tabs defaultValue="sounds" className="w-full">
         <TabsList className="w-full grid grid-cols-2 md:grid-cols-5 h-auto">

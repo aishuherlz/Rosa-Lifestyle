@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { readCyclePhase, PHASE_MOOD } from "@/lib/sync";
 import { Link } from "wouter";
+import { PartnerShareToggle } from "@/components/partner-share-toggle";
 
 type MoodEntry = {
   id: string;
@@ -95,6 +96,8 @@ export default function MoodPage() {
         <h1 className="text-3xl font-serif text-foreground">How are you feeling?</h1>
         <p className="text-muted-foreground mt-1">Check in with yourself today.</p>
       </motion.div>
+
+      <PartnerShareToggle feature="mood" />
 
       {cycMood && (
         <Link href="/period">

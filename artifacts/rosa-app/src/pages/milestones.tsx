@@ -11,6 +11,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { differenceInDays, parseISO, format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/lib/subscription-context";
+import { PartnerShareToggle } from "@/components/partner-share-toggle";
 import { useLocation } from "wouter";
 import { ShareableCard } from "@/components/shareable-card";
 
@@ -165,6 +166,7 @@ export default function MilestonesPage() {
           <div>
             <h1 className="text-3xl font-serif text-foreground">Milestones</h1>
             <p className="text-muted-foreground mt-1">Count what matters.</p>
+            <div className="mt-2"><PartnerShareToggle feature="milestones" compact /></div>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { cn } from "@/lib/utils";
+import { PartnerShareToggle } from "@/components/partner-share-toggle";
 
 type CycleLog = {
   id: string;
@@ -193,6 +194,7 @@ export default function PeriodPage() {
           <div>
             <h1 className="text-3xl font-serif text-foreground">Cycle Tracker</h1>
             <p className="text-muted-foreground mt-1">Know your body, love yourself.</p>
+            <div className="mt-2"><PartnerShareToggle feature="cycle" compact /></div>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>

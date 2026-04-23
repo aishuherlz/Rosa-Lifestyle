@@ -9,6 +9,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import confetti from "canvas-confetti";
+import { PartnerShareToggle } from "@/components/partner-share-toggle";
 
 type Goal = {
   id: string;
@@ -83,6 +84,7 @@ export default function GoalsPage() {
               <Target className="w-7 h-7 text-primary" /> Monthly Goals
             </h1>
             <p className="text-muted-foreground mt-1">{currentMonth} — up to 5 intentions</p>
+            <div className="mt-2"><PartnerShareToggle feature="goals" compact /></div>
           </div>
           {canAdd && (
             <Button onClick={() => setAdding(true)} className="bg-primary hover:bg-primary/90 gap-2">
