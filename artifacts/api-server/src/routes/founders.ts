@@ -4,8 +4,20 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { verifyEmailToken } from "./auth";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 
 const router = Router();
+
+const RAFFLE_MIN_USERS = 500;
+const RAFFLE_MIN_SUBSCRIBERS = 50;
+
+async function getActiveSubscriberCount(): Promise<number> {
+  try {
+    const r: any = await db.execute(sql`SELECT COUNT(*)::int AS n FROM rosa_users WHERE subscription_status = 'active'`);
+    return Number((r.rows && r.rows[0] && (r.rows[0] as any).n) || 0);
+  } catch { return 0; }
+}
 router.use(express.json({ limit: "10kb" }));
 
 const FILE = path.join(process.cwd(), ".rosa-founders.json");
@@ -75,9 +87,11 @@ function freeMonthsFor(c: Claim): number {
 }
 
 // PUBLIC: aggregate scarcity info — no per-user data, no enumeration vector.
-router.get("/founders/status", (_req, res) => {
+router.get("/founders/status", async (_req, res) => {
   const now = Date.now();
   const betaActive = now < BETA_WINDOW_END;
+  const activeSubscribers = await getActiveSubscriberCount();
+  const raffleEligible = state.total >= RAFFLE_MIN_USERS && activeSubscribers >= RAFFLE_MIN_SUBSCRIBERS;
   res.json({
     ok: true,
     total: state.total,
@@ -88,6 +102,13 @@ router.get("/founders/status", (_req, res) => {
     betaWindowEnd: new Date(BETA_WINDOW_END).toISOString(),
     betaDaysLeft: Math.max(0, Math.ceil((BETA_WINDOW_END - now) / (24 * 60 * 60 * 1000))),
     raffleDone: !!state.raffleDone,
+    raffleEligible,
+    raffleProgress: {
+      members: state.total,
+      membersNeeded: RAFFLE_MIN_USERS,
+      subscribers: activeSubscribers,
+      subscribersNeeded: RAFFLE_MIN_SUBSCRIBERS,
+    },
   });
 });
 
@@ -131,6 +152,15 @@ router.post("/founders/raffle/pick", async (req, res) => {
   const provided = bearer(req) || (req.body && req.body.adminToken) || "";
   if (!ADMIN_TOKEN || !constantTimeEqual(String(provided), ADMIN_TOKEN)) {
     return res.status(401).json({ ok: false, error: "Admin token required." });
+  }
+  // Eligibility gate: 500+ founders signed up AND 50+ active paying subscribers.
+  const activeSubscribers = await getActiveSubscriberCount();
+  if (state.total < RAFFLE_MIN_USERS || activeSubscribers < RAFFLE_MIN_SUBSCRIBERS) {
+    return res.status(412).json({
+      ok: false,
+      error: `Raffle locked until ${RAFFLE_MIN_USERS}+ founders AND ${RAFFLE_MIN_SUBSCRIBERS}+ active subscribers.`,
+      progress: { members: state.total, membersNeeded: RAFFLE_MIN_USERS, subscribers: activeSubscribers, subscribersNeeded: RAFFLE_MIN_SUBSCRIBERS },
+    });
   }
   const result = await withLock(() => {
     if (state.raffleDone) return { conflict: true as const, at: state.raffleAt };
