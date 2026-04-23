@@ -1,0 +1,262 @@
+Apply the following design system and colour palette consistently across the entire ROSA website. Every page, every component, every section must follow these rules exactly. Do not deviate from this design system anywhere on the site.
+
+=============================================
+ROSA DESIGN SYSTEM — COLOUR PALETTE
+=============================================
+
+CSS variables to define in :root and apply everywhere:
+
+:root {
+  /* Core palette */
+  --rosa-cream:        #FDF6F0;   /* Page background — warm off-white */
+  --rosa-blush:        #F5E6D3;   /* Section backgrounds, cards */
+  --rosa-sand:         #E8C4B8;   /* Borders, dividers, subtle accents */
+  --rosa-dusty:        #C9847A;   /* Secondary buttons, hover states */
+  --rosa-mauve:        #B06B8B;   /* Primary brand colour — buttons, highlights */
+  --rosa-deep:         #8B4F6E;   /* Headings, active states, emphasis */
+  --rosa-plum:         #6B3050;   /* Dark accents, footer background */
+  --rosa-gold:         #D4A574;   /* Rose gold — premium accents, icons, dividers */
+  --rosa-gold-light:   #F0D9BC;   /* Gold tints for backgrounds */
+
+  /* Text */
+  --rosa-text-dark:    #2C1810;   /* Primary body text */
+  --rosa-text-mid:     #6B3050;   /* Subheadings, labels */
+  --rosa-text-soft:    #9E7B8A;   /* Muted text, placeholders, captions */
+  --rosa-text-white:   #FFFFFF;   /* Text on dark/coloured backgrounds */
+
+  /* UI states */
+  --rosa-success:      #7A9E7E;   /* Soft green for success messages */
+  --rosa-warning:      #D4A574;   /* Reuse gold for warnings */
+  --rosa-error:        #C9847A;   /* Reuse dusty rose for errors */
+
+  /* Shadows */
+  --rosa-shadow-sm:    0 2px 8px rgba(176, 107, 139, 0.10);
+  --rosa-shadow-md:    0 4px 20px rgba(176, 107, 139, 0.15);
+  --rosa-shadow-lg:    0 8px 40px rgba(176, 107, 139, 0.20);
+
+  /* Border radius */
+  --rosa-radius-sm:    8px;
+  --rosa-radius-md:    14px;
+  --rosa-radius-lg:    22px;
+  --rosa-radius-xl:    40px;    /* For pill buttons and large cards */
+
+  /* Transitions */
+  --rosa-transition:   all 0.25s ease;
+}
+
+=============================================
+TYPOGRAPHY
+=============================================
+
+Font stack:
+- Headings: 'Playfair Display', Georgia, serif
+  — Use for all h1, h2, h3, hero titles, section titles
+  — Weight: 400 (regular) and 700 (bold)
+  — Colour: var(--rosa-deep) or var(--rosa-plum)
+
+- Body: 'Inter', -apple-system, sans-serif
+  — Use for all paragraphs, labels, buttons, navigation
+  — Weight: 300 (light), 400 (regular), 500 (medium)
+  — Colour: var(--rosa-text-dark)
+
+Import both from Google Fonts:
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500&display=swap');
+
+Font sizing scale:
+- Hero heading (h1):  clamp(2.5rem, 5vw, 4rem)   — Playfair Display 700
+- Section heading (h2): clamp(1.8rem, 3vw, 2.8rem) — Playfair Display 400
+- Sub-heading (h3):   1.3rem                        — Playfair Display 400
+- Body large:         1.1rem, line-height 1.8       — Inter 300
+- Body regular:       1rem, line-height 1.7         — Inter 400
+- Label / caption:    0.85rem                       — Inter 500
+- Button text:        0.95rem, letter-spacing 0.03em — Inter 500
+
+=============================================
+BACKGROUNDS
+=============================================
+
+Page background: var(--rosa-cream) — #FDF6F0
+Never use pure white (#FFFFFF) as a page background.
+
+Section backgrounds alternate between:
+- var(--rosa-cream)    — primary sections
+- var(--rosa-blush)    — alternate sections
+- var(--rosa-plum)     — dark premium sections (footer, CTA blocks)
+
+Card backgrounds: #FFFFFF with border: 1px solid var(--rosa-sand) and box-shadow: var(--rosa-shadow-sm)
+
+=============================================
+BUTTONS
+=============================================
+
+Primary button:
+- Background: var(--rosa-mauve)
+- Text: var(--rosa-text-white)
+- Border-radius: var(--rosa-radius-xl)
+- Padding: 14px 32px
+- Font: Inter 500, 0.95rem
+- Hover: background var(--rosa-deep), transform: translateY(-1px), shadow: var(--rosa-shadow-md)
+- Transition: var(--rosa-transition)
+
+Secondary button (outline):
+- Background: transparent
+- Border: 1.5px solid var(--rosa-mauve)
+- Text: var(--rosa-mauve)
+- Border-radius: var(--rosa-radius-xl)
+- Padding: 13px 30px
+- Hover: background var(--rosa-mauve), text white
+
+Gold accent button (for premium/special actions):
+- Background: var(--rosa-gold)
+- Text: var(--rosa-plum)
+- Border-radius: var(--rosa-radius-xl)
+- Padding: 14px 32px
+- Hover: background var(--rosa-gold-light), transform: translateY(-1px)
+
+=============================================
+CARDS
+=============================================
+
+Standard card:
+- Background: #FFFFFF
+- Border: 1px solid var(--rosa-sand)
+- Border-radius: var(--rosa-radius-lg)
+- Box-shadow: var(--rosa-shadow-sm)
+- Padding: 2rem
+- Hover: box-shadow var(--rosa-shadow-md), transform: translateY(-3px)
+- Transition: var(--rosa-transition)
+
+Premium card (for paid features, special sections):
+- Background: linear-gradient(135deg, var(--rosa-plum), #4A1F38)
+- Border: 1px solid var(--rosa-gold)
+- Border-radius: var(--rosa-radius-lg)
+- Text: var(--rosa-text-white)
+- Gold accents for icons and highlights
+
+Blush card (for soft/wellness content):
+- Background: var(--rosa-blush)
+- Border: 1px solid var(--rosa-sand)
+- Border-radius: var(--rosa-radius-lg)
+- No shadow
+
+=============================================
+NAVIGATION
+=============================================
+
+- Background: rgba(253, 246, 240, 0.92) — cream with blur backdrop-filter: blur(12px)
+- Border-bottom: 1px solid var(--rosa-sand)
+- Logo: Playfair Display, var(--rosa-deep)
+- Nav links: Inter 400, var(--rosa-text-dark), hover colour var(--rosa-mauve)
+- Active link: var(--rosa-mauve), font-weight 500
+- CTA button in nav: Primary button style
+- Sticky on scroll, height 70px desktop / 60px mobile
+
+=============================================
+ICONS AND DECORATIVE ELEMENTS
+=============================================
+
+- Use rose gold (#D4A574) for all feature icons
+- Icon style: outline/line style, not filled — softer and more premium
+- Rose motif: use a subtle rose SVG as a decorative element on hero, section dividers, and empty states
+- Dividers between sections: a thin line with a small rose icon centered — colour var(--rosa-gold)
+- Background texture on select sections: very subtle dot pattern or soft floral watermark at 4% opacity — do not make it heavy
+
+=============================================
+FORMS AND INPUTS
+=============================================
+
+Input fields:
+- Background: #FFFFFF
+- Border: 1.5px solid var(--rosa-sand)
+- Border-radius: var(--rosa-radius-md)
+- Padding: 14px 18px
+- Font: Inter 400, var(--rosa-text-dark)
+- Placeholder: var(--rosa-text-soft)
+- Focus: border-color var(--rosa-mauve), box-shadow 0 0 0 3px rgba(176,107,139,0.12)
+- Transition: var(--rosa-transition)
+
+Labels: Inter 500, 0.85rem, var(--rosa-text-mid), margin-bottom 6px
+
+=============================================
+DARK MODE (ROSA NIGHT MODE)
+=============================================
+
+Triggered automatically after 10pm in user's local timezone, and togglable manually.
+
+Dark mode palette:
+- Page background:  #1A0D12
+- Card background:  #2C1820
+- Border colour:    #4A2535
+- Primary text:     #F5E6D3  (blush — warm not harsh white)
+- Secondary text:   #C9847A  (dusty rose)
+- Accent:           #D4A574  (gold stays the same)
+- Button primary:   var(--rosa-mauve) — unchanged
+- Heading colour:   #F0D9BC  (gold light)
+
+Apply via: [data-theme="night"] selector on the html element.
+Smooth transition between modes: transition: background 0.4s ease, color 0.4s ease on body.
+
+=============================================
+ANIMATIONS AND TRANSITIONS
+=============================================
+
+All animations must feel smooth, soft, and premium — never jarring or fast.
+
+Page load: fade-in on all sections — opacity 0 to 1, translateY(20px) to 0, duration 0.6s ease
+Scroll reveal: same fade-in animation triggered when element enters viewport (use Intersection Observer)
+Button hover: translateY(-1px) + shadow increase, duration 0.25s
+Card hover: translateY(-3px) + shadow increase, duration 0.25s
+Modals/drawers: slide up from bottom on mobile, fade+scale on desktop, duration 0.35s ease
+
+ROSA Garden rose bloom: petal-by-petal SVG animation, organic timing (not linear), duration 1.2s
+Celebration animations: rose petals falling from top of screen — CSS keyframe animation, 2s duration, triggered on milestone achievement
+Streak fire: subtle pulse animation on streak counter icon, 2s loop
+
+Never use: jarring pops, aggressive bounces, or animations over 0.8s for UI transitions.
+Rose bloom and celebration animations can be longer (1–2s) as they are intentional moments.
+
+=============================================
+SPACING SYSTEM
+=============================================
+
+Use consistent spacing throughout:
+- xs:  4px
+- sm:  8px
+- md:  16px
+- lg:  24px
+- xl:  40px
+- 2xl: 64px
+- 3xl: 96px
+
+Section vertical padding: 96px top and bottom (desktop), 64px (mobile)
+Container max-width: 1200px, centered, padding 0 24px
+
+=============================================
+RESPONSIVE BREAKPOINTS
+=============================================
+
+This is a website — desktop experience is primary, mobile must also work perfectly.
+
+- Desktop:  1200px and above — full layout, multi-column grids
+- Tablet:   768px–1199px — adjusted grid, some columns stack
+- Mobile:   below 768px — single column, touch-friendly tap targets (min 44px)
+
+Navigation collapses to a hamburger menu below 768px.
+Font sizes scale down gracefully using clamp().
+Cards go from 3-column to 2-column to 1-column as screen shrinks.
+
+=============================================
+OVERALL FEEL
+=============================================
+
+ROSA must feel like a luxury wellness brand — think the visual quality of Goop, the warmth of a close friend, and the sophistication of a high-end spa.
+
+Every detail must feel intentional:
+- Generous whitespace — never cramped
+- Soft warm tones — never cold or clinical  
+- Elegant serif headings — feminine and confident
+- Smooth transitions — nothing feels abrupt
+- Gold accents used sparingly — they should feel special, not cheap
+- Rose motifs used as subtle decoration — not overwhelming
+
+The user should feel calm, valued, and inspired every time they open the site.
