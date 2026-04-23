@@ -65,10 +65,15 @@ export default function Subscription() {
       const name = localStorage.getItem("rosa_name") || "ROSA User";
       const priceId = selectedPlan === "monthly" ? prices?.monthly.id : prices?.yearly.id;
 
+      let gardenRoses = 0;
+      try {
+        const g = JSON.parse(localStorage.getItem("rosa_garden") || "{}");
+        gardenRoses = g.roses || 0;
+      } catch {}
       const resp = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailOrPhone, name, priceId, planType: selectedPlan }),
+        body: JSON.stringify({ emailOrPhone, name, priceId, planType: selectedPlan, gardenRoses }),
       });
 
       if (!resp.ok) throw new Error("Could not create checkout session");

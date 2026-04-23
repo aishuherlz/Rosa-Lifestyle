@@ -78,10 +78,12 @@ export default function Home() {
   };
 
   const getGreeting = () => {
-    const h = today.getHours();
+    const h = new Date().getHours();
+    if (h >= 0 && h < 5) return "Sweet dreams";
     if (h < 12) return "Good morning";
     if (h < 17) return "Good afternoon";
-    return "Good evening";
+    if (h < 21) return "Good evening";
+    return "Good night";
   };
 
   const handleCheckIn = () => {
@@ -270,13 +272,19 @@ export default function Home() {
       )}
 
       {/* Weekly Recap */}
-      <section className="rounded-3xl bg-gradient-to-r from-rose-100/60 to-pink-100/60 p-5 border border-rose-200/50">
-        <p className="text-xs uppercase tracking-widest text-rose-600 mb-2">This week, you bloomed 🌹</p>
+      <section className="rounded-3xl bg-gradient-to-r from-rose-200 to-pink-200 dark:from-rose-900/40 dark:to-pink-900/40 p-5 border border-rose-300/60 shadow-sm">
+        <p className="text-xs uppercase tracking-widest text-rose-800 dark:text-rose-200 mb-3 font-semibold">This week, you bloomed 🌹</p>
         <div className="grid grid-cols-3 gap-3">
-          <div className="text-center"><p className="text-2xl font-bold text-rose-600">{weeklyRecap.j}</p><p className="text-xs text-muted-foreground">journal entries</p></div>
-          <div className="text-center"><p className="text-2xl font-bold text-pink-600">{weeklyRecap.m}</p><p className="text-xs text-muted-foreground">moods logged</p></div>
-          <div className="text-center"><p className="text-2xl font-bold text-amber-600">{garden.streak}🔥</p><p className="text-xs text-muted-foreground">day streak</p></div>
+          <div className="text-center"><p className="text-3xl font-bold text-rose-900 dark:text-rose-100">{weeklyRecap.j}</p><p className="text-xs text-rose-800 dark:text-rose-200 font-medium mt-0.5">journal entries</p></div>
+          <div className="text-center"><p className="text-3xl font-bold text-pink-900 dark:text-pink-100">{weeklyRecap.m}</p><p className="text-xs text-pink-800 dark:text-pink-200 font-medium mt-0.5">moods logged</p></div>
+          <div className="text-center"><p className="text-3xl font-bold text-amber-900 dark:text-amber-100">{garden.streak}🔥</p><p className="text-xs text-amber-800 dark:text-amber-200 font-medium mt-0.5">day streak</p></div>
         </div>
+        {garden.roses >= 175 && (
+          <div className="mt-4 p-3 rounded-2xl bg-white/70 dark:bg-black/30 border border-rose-300/60">
+            <p className="text-sm font-serif text-rose-900 dark:text-rose-100">🎉 You've earned the <strong>Founders Garden 50% discount!</strong></p>
+            <p className="text-xs text-rose-800 dark:text-rose-200 mt-1">Use code <span className="font-mono font-bold">GARDEN175</span> at checkout · half-price ROSA Premium forever 🌹</p>
+          </div>
+        )}
       </section>
 
       {/* ROSA Daily Whisper */}

@@ -10,7 +10,7 @@ const router = Router();
 // Create or get Stripe customer + checkout session
 router.post('/stripe/checkout', async (req: any, res) => {
   try {
-    const { emailOrPhone, name, priceId, planType } = req.body;
+    const { emailOrPhone, name, priceId, planType, gardenRoses, promoCode } = req.body;
     if (!emailOrPhone || !priceId) {
       return res.status(400).json({ error: 'emailOrPhone and priceId are required' });
     }
@@ -53,7 +53,7 @@ router.post('/stripe/checkout', async (req: any, res) => {
     }
 
     const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams: any = {
       customer: customerId,
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
@@ -61,7 +61,20 @@ router.post('/stripe/checkout', async (req: any, res) => {
       success_url: `${baseUrl}/?checkout=success`,
       cancel_url: `${baseUrl}/subscription?checkout=cancel`,
       metadata: { userId: user.id.toString(), planType: planType || 'monthly' },
-    });
+      allow_promotion_codes: true,
+    };
+    // Founders Garden 50% off — auto-applied for users with 175+ roses, or via GARDEN175 code
+    const earnedDiscount = (typeof gardenRoses === "number" && gardenRoses >= 175) || promoCode === "GARDEN175";
+    if (earnedDiscount) {
+      try {
+        const promos = await stripe.promotionCodes.list({ code: "GARDEN175", active: true, limit: 1 });
+        if (promos.data[0]) {
+          sessionParams.discounts = [{ promotion_code: promos.data[0].id }];
+          delete sessionParams.allow_promotion_codes;
+        }
+      } catch (e) { logger.warn({ e }, "GARDEN175 promo lookup failed"); }
+    }
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     res.json({ url: session.url, userId: user.id, isFoundingMember: user.isFoundingMember, foundingMemberType: user.foundingMemberType });
   } catch (err: any) {
