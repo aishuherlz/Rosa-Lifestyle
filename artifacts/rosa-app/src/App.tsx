@@ -36,6 +36,7 @@ import CirclesPage from "@/pages/circles";
 import HealthSyncPage from "@/pages/health-sync";
 import ReportPage from "@/pages/report";
 import SanctuaryPage from "@/pages/sanctuary";
+import WisdomPage from "@/pages/wisdom";
 
 const queryClient = new QueryClient();
 
@@ -93,6 +94,7 @@ function Router() {
       <Route path="/health-sync">{() => <ProtectedRoute component={HealthSyncPage} />}</Route>
       <Route path="/report">{() => <ProtectedRoute component={ReportPage} />}</Route>
       <Route path="/sanctuary">{() => <ProtectedRoute component={SanctuaryPage} />}</Route>
+      <Route path="/wisdom">{() => <ProtectedRoute component={WisdomPage} />}</Route>
 
       <Route>
         {user ? (

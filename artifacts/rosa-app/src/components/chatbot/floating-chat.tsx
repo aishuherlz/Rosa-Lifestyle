@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Loader2, Trash2, Sparkles } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Trash2, Sparkles, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSubscription } from "@/lib/subscription-context";
@@ -22,8 +22,42 @@ export function FloatingChat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [speakReplies, setSpeakReplies] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const speechSupported = typeof window !== "undefined" && (("SpeechRecognition" in window) || ("webkitSpeechRecognition" in window));
+  const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
+
+  const toggleListen = () => {
+    if (!speechSupported) return;
+    if (listening) { recognitionRef.current?.stop(); setListening(false); return; }
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const rec = new SR();
+    rec.lang = "en-US"; rec.interimResults = true; rec.continuous = false;
+    rec.onresult = (e: any) => {
+      const transcript = Array.from(e.results).map((r: any) => r[0].transcript).join("");
+      setInput(transcript);
+      if (e.results[e.results.length - 1].isFinal) { rec.stop(); }
+    };
+    rec.onerror = () => setListening(false);
+    rec.onend = () => setListening(false);
+    recognitionRef.current = rec;
+    rec.start();
+    setListening(true);
+  };
+
+  const speak = (text: string) => {
+    if (!ttsSupported || !speakReplies) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1; u.pitch = 1.05; u.volume = 0.9;
+    const voices = window.speechSynthesis.getVoices();
+    const female = voices.find(v => /female|samantha|victoria|karen|tessa|moira|fiona|zira/i.test(v.name));
+    if (female) u.voice = female;
+    window.speechSynthesis.speak(u);
+  };
 
   useEffect(() => {
     if (open && !conversationId) {
@@ -128,9 +162,12 @@ export function FloatingChat() {
           }
         }
       }
-      setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m))
-      );
+      setMessages((prev) => {
+        const next = prev.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m));
+        const finished = next.find(m => m.id === assistantId);
+        if (finished) speak(finished.content);
+        return next;
+      });
     } catch {
       setMessages((prev) =>
         prev.map((m) =>
@@ -242,15 +279,30 @@ export function FloatingChat() {
 
             <div className="px-3 pb-3 pt-2 border-t border-border">
               <div className="flex gap-2">
+                {speechSupported && (
+                  <Button onClick={toggleListen} size="icon" variant={listening ? "default" : "outline"}
+                    className={`rounded-2xl shrink-0 ${listening ? "bg-rose-500 hover:bg-rose-600 text-white animate-pulse" : ""}`}
+                    title={listening ? "Stop listening" : "Voice input"} data-testid="button-mic">
+                    {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </Button>
+                )}
                 <Input
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                  placeholder="Talk to ROSA..."
+                  placeholder={listening ? "Listening…" : "Talk to ROSA…"}
                   className="rounded-2xl border-border text-sm"
                   disabled={loading}
                 />
+                {ttsSupported && (
+                  <Button onClick={() => { setSpeakReplies(s => !s); if (speakReplies) window.speechSynthesis.cancel(); }}
+                    size="icon" variant={speakReplies ? "default" : "outline"}
+                    className={`rounded-2xl shrink-0 ${speakReplies ? "bg-violet-500 hover:bg-violet-600 text-white" : ""}`}
+                    title={speakReplies ? "Mute voice replies" : "Hear ROSA's voice"} data-testid="button-tts">
+                    {speakReplies ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                  </Button>
+                )}
                 <Button
                   onClick={sendMessage}
                   disabled={!input.trim() || loading}

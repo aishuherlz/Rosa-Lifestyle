@@ -36,6 +36,7 @@ const NAV_ITEMS = [
   { href: "/health-sync", label: "Health Sync", icon: Activity },
   { href: "/report", label: "ROSA Report", icon: FileText },
   { href: "/sanctuary", label: "Sanctuary", icon: Moon },
+  { href: "/wisdom", label: "Wisdom", icon: BookHeart },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
