@@ -5,11 +5,12 @@ import { useUser } from "@/lib/user-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { OnboardingQuiz } from "@/components/onboarding/onboarding-quiz";
 
 export default function SignIn() {
   const [, setLocation] = useLocation();
   const { setUser } = useUser();
-  const [step, setStep] = useState<"auth" | "gender">("auth");
+  const [step, setStep] = useState<"auth" | "gender" | "onboarding">("auth");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
 
@@ -40,15 +41,19 @@ export default function SignIn() {
       joinedAt: new Date().toISOString(),
       personalityTags: [],
     });
-    setLocation("/");
+    setStep("onboarding");
   };
 
   const GENDERS = [
     { id: "female", label: "Female", desc: "She/Her" },
     { id: "male", label: "Male", desc: "He/Him" },
     { id: "non-binary", label: "Non-binary", desc: "They/Them" },
-    { id: "inclusive", label: "Inclusive LGBTQ+", desc: "All are welcome" }
+    { id: "inclusive", label: "Inclusive LGBTQ+", desc: "All are welcome" },
   ];
+
+  if (step === "onboarding") {
+    return <OnboardingQuiz onComplete={() => setLocation("/")} />;
+  }
 
   return (
     <div className="min-h-[100dvh] w-full flex bg-background items-center justify-center p-4">
@@ -72,9 +77,9 @@ export default function SignIn() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">How should we call you?</Label>
-                    <Input 
-                      id="name" 
-                      placeholder="Your beautiful name" 
+                    <Input
+                      id="name"
+                      placeholder="Your beautiful name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="bg-background/50 border-muted focus-visible:ring-primary/30"
@@ -83,10 +88,10 @@ export default function SignIn() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email or Phone</Label>
-                    <Input 
-                      id="email" 
-                      type="text" 
-                      placeholder="hello@example.com" 
+                    <Input
+                      id="email"
+                      type="text"
+                      placeholder="hello@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="bg-background/50 border-muted focus-visible:ring-primary/30"

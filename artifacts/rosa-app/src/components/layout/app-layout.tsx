@@ -1,26 +1,16 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
-  Home,
-  HeartPulse,
-  CalendarHeart,
-  Users,
-  Gift,
-  Map,
-  Shirt,
-  CalendarDays,
-  Dumbbell,
-  Quote,
-  MessageSquareHeart,
-  Settings,
-  Crown,
-  Utensils,
-  ClipboardList,
-  Timer,
+  Home, HeartPulse, CalendarHeart, Users, Gift, Map, Shirt,
+  CalendarDays, Dumbbell, Quote, MessageSquareHeart, Settings,
+  Crown, Utensils, ClipboardList, Timer, BookHeart, Target,
+  FlameKindling, Sparkles, Mail, Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FloatingChat } from "@/components/chatbot/floating-chat";
 import { useSubscription } from "@/lib/subscription-context";
+import { useGarden } from "@/lib/garden-context";
+import { useNightMode } from "@/lib/night-mode-context";
 import { Badge } from "@/components/ui/badge";
 
 const NAV_ITEMS = [
@@ -32,9 +22,14 @@ const NAV_ITEMS = [
   { href: "/travel", label: "Travel", icon: Map },
   { href: "/outfit", label: "Outfits", icon: Shirt },
   { href: "/food", label: "Food", icon: Utensils },
+  { href: "/health", label: "Health", icon: Dumbbell },
   { href: "/reminders", label: "Reminders", icon: CalendarDays },
   { href: "/milestones", label: "Milestones", icon: Timer },
-  { href: "/health", label: "Health", icon: Dumbbell },
+  { href: "/journal", label: "Journal", icon: BookHeart },
+  { href: "/goals", label: "Goals", icon: Target },
+  { href: "/challenges", label: "Challenges", icon: FlameKindling },
+  { href: "/skin", label: "Skin", icon: Sparkles },
+  { href: "/letters", label: "Letters", icon: Mail },
   { href: "/surveys", label: "Surveys", icon: ClipboardList },
   { href: "/quotes", label: "Quotes", icon: Quote },
 ];
@@ -42,13 +37,15 @@ const NAV_ITEMS = [
 export function AppLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { plan, daysLeftInTrial } = useSubscription();
+  const { garden } = useGarden();
+  const { isNight } = useNightMode();
 
   const MOBILE_NAV = [
     { href: "/", label: "Home", icon: Home },
     { href: "/mood", label: "Mood", icon: HeartPulse },
     { href: "/period", label: "Cycle", icon: CalendarHeart },
     { href: "/health", label: "Health", icon: Dumbbell },
-    { href: "/settings", label: "More", icon: Settings },
+    { href: "/journal", label: "Journal", icon: BookHeart },
   ];
 
   return (
@@ -58,63 +55,66 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <div className="p-6">
           <h1 className="text-3xl font-serif font-semibold text-primary">ROSA</h1>
           <p className="text-xs text-muted-foreground mt-1 tracking-widest uppercase">Your Sanctuary</p>
+
+          {/* Garden Summary */}
+          <div className="mt-3 bg-rose-50 rounded-xl px-3 py-2 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">🌹 {garden.roses} roses</span>
+            <span className="text-xs text-orange-500 font-medium">🔥 {garden.streak} streak</span>
+          </div>
+
+          {isNight && (
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-violet-500">
+              <Moon className="w-3.5 h-3.5" /> Night mode active
+            </div>
+          )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-4 pb-2 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-4 pb-2 space-y-0.5">
           {NAV_ITEMS.map((item) => {
             const isActive = location === item.href;
             return (
               <Link key={item.href} href={item.href}>
                 <div className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-300 cursor-pointer",
+                  "flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 cursor-pointer text-sm",
                   isActive
                     ? "bg-primary/10 text-primary font-medium"
                     : "text-foreground/70 hover:bg-secondary hover:text-foreground"
                 )}>
-                  <item.icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 2} />
+                  <item.icon className="w-4 h-4 shrink-0" strokeWidth={isActive ? 2.5 : 2} />
                   <span>{item.label}</span>
                 </div>
               </Link>
             );
           })}
 
-          <div className="pt-4 mt-4 border-t border-border/50 space-y-1">
+          <div className="pt-3 mt-3 border-t border-border/50 space-y-0.5">
             <Link href="/subscription">
               <div className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-300 cursor-pointer",
+                "flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 cursor-pointer text-sm",
                 location === "/subscription" ? "bg-primary/10 text-primary font-medium" : "text-foreground/70 hover:bg-secondary hover:text-foreground"
               )}>
-                <Crown className="w-5 h-5" />
+                <Crown className="w-4 h-4 shrink-0" />
                 <span>Premium</span>
                 {plan === "trial" && (
                   <Badge className="ml-auto bg-amber-100 text-amber-700 text-xs px-1.5 py-0">{daysLeftInTrial}d left</Badge>
                 )}
               </div>
             </Link>
-            <Link href="/surveys">
-              <div className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-300 cursor-pointer",
-                location === "/surveys" ? "bg-primary/10 text-primary font-medium" : "text-foreground/70 hover:bg-secondary hover:text-foreground"
-              )}>
-                <ClipboardList className="w-5 h-5" />
-                <span>Surveys</span>
-              </div>
-            </Link>
             <Link href="/support">
               <div className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-300 cursor-pointer",
+                "flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 cursor-pointer text-sm",
                 location === "/support" ? "bg-primary/10 text-primary font-medium" : "text-foreground/70 hover:bg-secondary hover:text-foreground"
               )}>
-                <MessageSquareHeart className="w-5 h-5" />
+                <MessageSquareHeart className="w-4 h-4 shrink-0" />
                 <span>Support</span>
               </div>
             </Link>
             <Link href="/settings">
               <div className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-300 cursor-pointer",
+                "flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 cursor-pointer text-sm",
                 location === "/settings" ? "bg-primary/10 text-primary font-medium" : "text-foreground/70 hover:bg-secondary hover:text-foreground"
               )}>
-                <Settings className="w-5 h-5" />
+                <Settings className="w-4 h-4 shrink-0" />
                 <span>Settings</span>
               </div>
             </Link>
@@ -138,16 +138,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <Link key={item.href} href={item.href}>
               <div className="flex flex-col items-center p-2 cursor-pointer">
                 <item.icon
-                  className={cn(
-                    "w-6 h-6 transition-all duration-300",
-                    isActive ? "text-primary scale-110" : "text-muted-foreground"
-                  )}
+                  className={cn("w-6 h-6 transition-all duration-300", isActive ? "text-primary scale-110" : "text-muted-foreground")}
                   strokeWidth={isActive ? 2.5 : 2}
                 />
-                <span className={cn(
-                  "text-[10px] mt-1 transition-all duration-300",
-                  isActive ? "text-primary font-medium" : "text-muted-foreground"
-                )}>{item.label}</span>
+                <span className={cn("text-[10px] mt-1 transition-all duration-300", isActive ? "text-primary font-medium" : "text-muted-foreground")}>{item.label}</span>
               </div>
             </Link>
           );

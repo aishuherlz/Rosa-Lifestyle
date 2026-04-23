@@ -4,6 +4,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider, useUser } from "@/lib/user-context";
 import { SubscriptionProvider } from "@/lib/subscription-context";
+import { GardenProvider } from "@/lib/garden-context";
+import { NightModeProvider } from "@/lib/night-mode-context";
 import { AppLayout } from "@/components/layout/app-layout";
 import NotFound from "@/pages/not-found";
 
@@ -25,6 +27,11 @@ import SettingsPage from "@/pages/settings";
 import SubscriptionPage from "@/pages/subscription";
 import FoodPlannerPage from "@/pages/food-planner";
 import SurveysPage from "@/pages/surveys";
+import JournalPage from "@/pages/journal";
+import GoalsPage from "@/pages/goals";
+import ChallengesPage from "@/pages/challenges";
+import SkinPage from "@/pages/skin";
+import LettersPage from "@/pages/letters";
 
 const queryClient = new QueryClient();
 
@@ -73,6 +80,11 @@ function Router() {
       <Route path="/subscription">{() => <ProtectedRoute component={SubscriptionPage} />}</Route>
       <Route path="/food">{() => <ProtectedRoute component={FoodPlannerPage} />}</Route>
       <Route path="/surveys">{() => <ProtectedRoute component={SurveysPage} />}</Route>
+      <Route path="/journal">{() => <ProtectedRoute component={JournalPage} />}</Route>
+      <Route path="/goals">{() => <ProtectedRoute component={GoalsPage} />}</Route>
+      <Route path="/challenges">{() => <ProtectedRoute component={ChallengesPage} />}</Route>
+      <Route path="/skin">{() => <ProtectedRoute component={SkinPage} />}</Route>
+      <Route path="/letters">{() => <ProtectedRoute component={LettersPage} />}</Route>
 
       <Route>
         {user ? (
@@ -91,14 +103,18 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <UserProvider>
-          <SubscriptionProvider>
-            <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
-              <Router />
-            </WouterRouter>
-            <Toaster />
-          </SubscriptionProvider>
-        </UserProvider>
+        <NightModeProvider>
+          <UserProvider>
+            <SubscriptionProvider>
+              <GardenProvider>
+                <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
+                  <Router />
+                </WouterRouter>
+                <Toaster />
+              </GardenProvider>
+            </SubscriptionProvider>
+          </UserProvider>
+        </NightModeProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
