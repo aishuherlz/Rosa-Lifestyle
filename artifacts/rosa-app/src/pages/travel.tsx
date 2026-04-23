@@ -406,7 +406,7 @@ export default function TravelPage() {
                                   </div>
                                 )}
                                 {dest.packingList && dest.packingList.length > 0 && (
-                                  <div>
+                                  <div className="mb-3">
                                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Packing List</p>
                                     <div className="grid grid-cols-2 gap-1">
                                       {dest.packingList.map((item, j) => (
@@ -417,6 +417,31 @@ export default function TravelPage() {
                                     </div>
                                   </div>
                                 )}
+                                {/* Local Discoveries — things to do, stay, eat, shop, gym */}
+                                <div>
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">In {dest.name} 🌹</p>
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    {(() => {
+                                      const place = encodeURIComponent(`${dest.name}, ${dest.country}`);
+                                      const links = [
+                                        { emoji: "🎯", label: "Things to do", url: `https://www.google.com/search?q=top+things+to+do+in+${place}` },
+                                        { emoji: "🏨", label: "Hotels", url: `https://www.booking.com/searchresults.html?ss=${place}` },
+                                        { emoji: "🍽️", label: "Best eats", url: `https://www.tripadvisor.com/Search?q=${place}+restaurants` },
+                                        { emoji: "🛍️", label: "Local shopping", url: `https://www.google.com/search?q=best+shopping+malls+and+boutiques+in+${place}` },
+                                        { emoji: "👗", label: "Outfit shops", url: `https://www.google.com/search?q=women+clothing+stores+in+${place}` },
+                                        { emoji: "💪", label: "Gyms / studios", url: `https://www.classpass.com/search/${place}` },
+                                        { emoji: "💆", label: "Spas & wellness", url: `https://www.google.com/search?q=best+spas+in+${place}` },
+                                        { emoji: "🚖", label: "Getting around", url: `https://www.google.com/search?q=public+transport+and+taxis+in+${place}` },
+                                      ];
+                                      return links.map(l => (
+                                        <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer"
+                                          className="flex items-center gap-1.5 text-xs px-2.5 py-2 rounded-lg bg-rose-50/60 border border-rose-100 hover:bg-rose-50 transition-colors text-foreground">
+                                          <span>{l.emoji}</span> <span className="truncate">{l.label}</span>
+                                        </a>
+                                      ));
+                                    })()}
+                                  </div>
+                                </div>
                               </motion.div>
                             )}
                           </AnimatePresence>

@@ -10,7 +10,10 @@ import {
   HeartPulse, CalendarHeart, Droplets, CalendarDays,
   Utensils, Dumbbell, Shirt, Map, Timer, Gift, Crown,
   ClipboardList, BookHeart, Target, Sparkles, Moon, FlameKindling, Flower2,
+  UsersRound, Activity, Bell, BellOff,
 } from "lucide-react";
+import { CommunityRose } from "@/components/community-rose";
+import { notifPermission, requestNotifPermission, fireDueSyncNotifications } from "@/lib/notifications";
 import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import confetti from "canvas-confetti";
@@ -56,7 +59,13 @@ function predictNextPeriod(): { start: Date; end: Date } | null {
 function SyncHub() {
   const [milestones] = useLocalStorage<Milestone[]>("rosa_milestones", []);
   const [destinations] = useLocalStorage<Destination[]>("rosa_destinations", []);
+  const [notifState, setNotifState] = useState<NotificationPermission>(typeof Notification !== "undefined" ? Notification.permission : "denied");
   const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+
+  async function enableNotifs() {
+    const p = await requestNotifPermission();
+    setNotifState(p);
+  }
 
   const nextPeriod = predictNextPeriod();
   const periodAlerts: { kind: "period" | "trip-clash"; title: string; sub: string; href: string; emoji: string }[] = [];
@@ -106,14 +115,50 @@ function SyncHub() {
     .sort((a, b) => a._days - b._days)
     .slice(0, 2);
 
-  if (!periodAlerts.length && !giftMilestones.length && !upcomingTrips.length) return null;
+  // Fire local notifications for time-sensitive sync events (next-day period or trip)
+  useEffect(() => {
+    if (notifState !== "granted") return;
+    const events: { id: string; title: string; body: string; url: string }[] = [];
+    const next = predictNextPeriod();
+    if (next) {
+      const days = Math.floor((next.start.getTime() - today0.getTime()) / 86400000);
+      if (days === 1) events.push({ id: "period-tomorrow", title: "ROSA 🌹", body: "Your period is predicted tomorrow — pack essentials & take it gently 💝", url: "/period" });
+      if (days === 0) events.push({ id: "period-today", title: "ROSA 🌹", body: "Your period may start today — rest & restore queen 👑", url: "/period" });
+    }
+    for (const d of destinations) {
+      if (d.visited || !d.startDate || d.type !== "planned") continue;
+      const days = Math.floor((new Date(d.startDate).getTime() - today0.getTime()) / 86400000);
+      if (days === 1) events.push({ id: `trip-tomorrow-${d.id}`, title: "Your trip starts tomorrow ✈️", body: `${d.name} — check your packing list & outfit ideas`, url: "/travel" });
+    }
+    if (events.length) fireDueSyncNotifications(events);
+  }, [notifState, destinations]);
+
+  const showNotifBanner = notifState === "default";
+  if (!periodAlerts.length && !giftMilestones.length && !upcomingTrips.length && !showNotifBanner) return null;
 
   return (
     <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
       className="rounded-3xl border border-rose-100 bg-gradient-to-br from-rose-50/60 via-pink-50/40 to-amber-50/40 p-4 space-y-2">
-      <div className="flex items-center gap-2 mb-1">
-        <Sparkles className="w-4 h-4 text-rose-500" />
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-rose-700">Today's Sync</h3>
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-rose-500" />
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-rose-700">Today's Sync</h3>
+        </div>
+        {notifState === "default" && (
+          <button onClick={enableNotifs} className="text-[11px] flex items-center gap-1 text-rose-600 hover:text-rose-700 font-medium">
+            <Bell className="w-3 h-3" /> Enable alerts
+          </button>
+        )}
+        {notifState === "granted" && (
+          <span className="text-[11px] flex items-center gap-1 text-emerald-600">
+            <Bell className="w-3 h-3" /> Alerts on
+          </span>
+        )}
+        {notifState === "denied" && (
+          <span className="text-[11px] flex items-center gap-1 text-muted-foreground">
+            <BellOff className="w-3 h-3" /> Alerts off
+          </span>
+        )}
       </div>
       <div className="space-y-2">
         {periodAlerts.map((a, i) => (
@@ -250,6 +295,8 @@ export default function Home() {
     { href: "/challenges", label: "Challenges", icon: FlameKindling, color: "text-red-500 bg-red-50" },
     { href: "/skin", label: "Skin", icon: Sparkles, color: "text-violet-500 bg-violet-50" },
     { href: "/letters", label: "Letters", icon: Moon, color: "text-purple-500 bg-purple-50" },
+    { href: "/circles", label: "Circles", icon: UsersRound, color: "text-rose-500 bg-rose-50" },
+    { href: "/health-sync", label: "Health Sync", icon: Activity, color: "text-emerald-500 bg-emerald-50" },
     { href: "/reminders", label: "Reminders", icon: CalendarDays, color: "text-violet-400 bg-violet-50" },
     { href: "/partner", label: "Partner", icon: CalendarHeart, color: "text-rose-400 bg-rose-50" },
     { href: "/surveys", label: "Surveys", icon: ClipboardList, color: "text-blue-500 bg-blue-50" },
@@ -312,6 +359,8 @@ export default function Home() {
       )}
 
       <SyncHub />
+
+      <CommunityRose />
 
       {/* ROSA Garden + Wellness Score Row */}
       <div className="grid grid-cols-2 gap-4">
