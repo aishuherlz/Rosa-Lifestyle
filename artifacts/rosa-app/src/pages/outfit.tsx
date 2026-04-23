@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Shirt, Cloud, Sun, Snowflake, Umbrella, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Shirt, Cloud, Sun, Snowflake, Umbrella, ChevronLeft, ChevronRight, Camera, Sparkles, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,11 @@ const WEATHER_SUGGESTIONS = {
   mild: "Perfect for transitional layering — denim jacket, midi skirts.",
 };
 
+type AiOutfit = { name: string; pieces: string[]; vibe: string; styleTip: string };
+type AiResult = { items?: string[]; outfits?: AiOutfit[]; missingPiece?: string; error?: string };
+
 export default function OutfitPage() {
+  const { toast } = useToast();
   const [outfits, setOutfits] = useLocalStorage<OutfitPlan[]>("rosa_outfits", []);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -48,6 +53,39 @@ export default function OutfitPage() {
   const [form, setForm] = useState({ description: "", occasion: "casual", mood: "happy" });
   const [partner] = useLocalStorage<PartnerData | null>("rosa_partner", null);
   const [weather, setWeather] = useState<{ temp: number; code: number } | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPreview, setAiPreview] = useState<string | null>(null);
+  const [aiOccasion, setAiOccasion] = useState("casual");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<AiResult | null>(null);
+  const aiInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAiFile = (file: File) => {
+    if (file.size > 6 * 1024 * 1024) {
+      toast({ title: "Image too large", description: "Please choose a photo under 6MB.", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => { setAiPreview(reader.result as string); setAiResult(null); };
+    reader.readAsDataURL(file);
+  };
+  const analyzeOutfit = async () => {
+    if (!aiPreview) return;
+    setAiLoading(true);
+    try {
+      const r = await fetch("/api/outfit-vision", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: aiPreview, occasion: aiOccasion, weather: weather ? `${weather.temp}°C` : undefined }),
+      });
+      const data = await r.json();
+      if (!r.ok || data.error) {
+        toast({ title: "Couldn't analyze", description: data.error === "not_clothing" ? "That doesn't look like clothing — try your closet or wardrobe." : (data.error || "Try again in a moment."), variant: "destructive" });
+        setAiResult(null);
+      } else { setAiResult(data); }
+    } catch {
+      toast({ title: "Network error", description: "Please try again.", variant: "destructive" });
+    } finally { setAiLoading(false); }
+  };
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(async pos => {
@@ -89,6 +127,60 @@ export default function OutfitPage() {
         <h1 className="text-3xl font-serif text-foreground">Outfit Planner</h1>
         <p className="text-muted-foreground mt-1">Dress with intention, every day.</p>
       </motion.div>
+
+      {/* AI Outfit Camera */}
+      <Card className="border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 to-rose-50 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="font-serif text-lg flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-fuchsia-500" /> AI Outfit Stylist
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!aiPreview && (
+            <button onClick={() => aiInputRef.current?.click()} className="w-full border-2 border-dashed border-fuchsia-300 rounded-2xl p-6 text-center hover:bg-fuchsia-100/40 transition-all" data-testid="button-outfit-ai-upload">
+              <Camera className="w-8 h-8 text-fuchsia-500 mx-auto mb-2" />
+              <p className="text-sm font-medium text-fuchsia-700">Snap your closet</p>
+              <p className="text-xs text-muted-foreground mt-0.5">ROSA will style 3 outfits from what's there.</p>
+            </button>
+          )}
+          <input ref={aiInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handleAiFile(e.target.files[0])} />
+          {aiPreview && (
+            <>
+              <img src={aiPreview} alt="closet" className="w-full max-h-64 object-cover rounded-2xl" />
+              <div className="flex gap-2 flex-wrap items-center">
+                <Select value={aiOccasion} onValueChange={setAiOccasion}>
+                  <SelectTrigger className="w-36 h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {["casual","formal","date","workout","cozy","work"].map(o => <SelectItem key={o} value={o} className="capitalize">{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button size="sm" onClick={analyzeOutfit} disabled={aiLoading} className="bg-fuchsia-500 hover:bg-fuchsia-600 text-white" data-testid="button-outfit-ai-analyze">
+                  {aiLoading ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Styling…</> : <><Sparkles className="w-4 h-4 mr-1.5" /> Style me</>}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setAiPreview(null); setAiResult(null); }}>Reset</Button>
+              </div>
+              {aiResult?.outfits && (
+                <div className="space-y-2 pt-1">
+                  {aiResult.outfits.map((o, i) => (
+                    <div key={i} className="bg-white/70 rounded-xl p-3 border border-fuchsia-100">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-foreground">{o.name}</p>
+                        <Badge variant="outline" className="text-[10px]">{o.vibe}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{o.pieces.join(" · ")}</p>
+                      <p className="text-xs italic text-fuchsia-700 mt-1">💫 {o.styleTip}</p>
+                      <Button size="sm" variant="ghost" className="mt-1 h-7 text-xs" onClick={() => { setForm({ description: `${o.name}: ${o.pieces.join(", ")}`, occasion: aiOccasion, mood: "confident" }); setSelectedDate(format(new Date(), "yyyy-MM-dd")); setOpen(true); }}>
+                        Save to today
+                      </Button>
+                    </div>
+                  ))}
+                  {aiResult.missingPiece && <p className="text-xs text-muted-foreground italic">Tip: a {aiResult.missingPiece} would round out your wardrobe.</p>}
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {weatherAdvice && (
         <Card className="border-sky-200 bg-sky-50 shadow-sm">

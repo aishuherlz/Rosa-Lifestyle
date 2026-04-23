@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useUser } from "@/lib/user-context";
 import { useSubscription } from "@/lib/subscription-context";
 import { useGarden } from "@/lib/garden-context";
+import { FoundersBanner } from "@/components/founders-banner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -171,6 +172,9 @@ export default function Home() {
           </div>
         </Link>
       )}
+
+      {/* Founding member badge */}
+      <FoundersBanner />
 
       {/* ROSA Garden + Wellness Score Row */}
       <div className="grid grid-cols-2 gap-4">

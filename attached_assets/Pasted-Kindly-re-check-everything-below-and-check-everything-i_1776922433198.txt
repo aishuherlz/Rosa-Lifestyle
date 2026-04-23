@@ -1,0 +1,223 @@
+Kindly re check everything below and check everything is included and if you have any other suggestions to make this site the next big thing add that too, so people will be engaged and happy to use it. Always sync everything together. for example, Like if the girl is on a period on her travel date just gives her heads up.thats what I meant by sync everything together.
+PRIORITY 1 - STRIPE PAYMENTS:
+Replace demo payment with real Stripe integration.
+- Free trial: 2 months
+- $5 CAD/month (price_id from env) or $50 CAD/year
+- India pricing: ₹50/month
+- Auto-detect currency based on location
+- Auto-renew toggle on/off
+- Accept cards and bank accounts globally
+- Stripe keys are in environment variables:
+  STRIPE_SECRET_KEY, VITE_STRIPE_PUBLIC_KEY
+  STRIPE_MONTHLY_PRICE_ID, STRIPE_YEARLY_PRICE_ID
+  STRIPE_WEBHOOK_SECRET
+- Handle webhooks for subscription events
+- Show upgrade prompts for premium features
+- Auto-link wishlist to birthdays and anniversaries
+
+PRIORITY 2 - AI CHATBOT:
+Fix the ROSA chatbot so it:
+- Responds instantly using OpenAI API
+- Understands user mood, cycle, goals, preferences
+- Gives emotional and mental wellness support
+- Helps navigate app features
+- Persists conversation in PostgreSQL database
+
+PRIORITY 3 - ROSA GARDEN CHECK-IN SYSTEM:
+Create a unique daily engagement system:
+- ROSA Garden on home screen
+- Each daily check-in adds a rose petal
+- Full rose = 10 roses earned
+- Different coloured roses for achievements
+- At 500 roses = 1 free month unlocked
+- Streak counter for consecutive days
+- Cycle Goddess titles by cycle phase:
+  Ovulation = "In Your Power Era"
+  PMS = "Warrior Mode"  
+  Period = "Rest and Restore Queen"
+- Achievement badges:
+  Log mood 7 days = special badge
+  Log food 14 days = "Nutrition Queen"
+  Workout 30 days = "Fitness Goddess"
+- Partner gets "Thoughtfulness Score"
+- Celebrate milestones with beautiful animations
+
+PRIORITY 4 - CYCLE SECTION UPGRADE:
+Make it better than Flo app:
+- Educational videos on periods, sex health, PMS
+- Improve sex life section with wellness videos
+- Mood and cycle sync
+- Personalized suggestions by cycle phase
+- Goddess title displayed based on phase
+
+PRIORITY 5 - FOOD AND FITNESS:
+Better than Noom app experience:
+- Merge food and nutrition into one section
+- Food preferences (veg, vegan, halal, gluten free etc)
+- Global food database multi-culture support
+- Calorie calculator with manual input
+- AI calorie estimate from food photo upload
+- Daily personalized workout plans
+- Animated workout videos for home and gym
+- Users input schedule and health conditions
+- Sync food + fitness + weight + cycle together
+
+PRIORITY 6 - SMART PERSONALIZATION:
+App adapts based on:
+- Gender and identity
+- Mood and cycle phase
+- Timezone and location auto-detect
+- Health conditions and disabilities
+- Food preferences and fitness goals
+
+PRIORITY 7 - TRAVEL AND OUTFITS:
+- Bucket list vs planned trip toggle
+- Outfit suggestions based on destination weather
+- Things to do with real clickable links
+- Map links for exact locations
+- Online and offline shopping links for outfits
+- Partner surprise trip outfit hints without revealing destination
+
+PRIORITY 8 - WISHLIST UPGRADE:
+- Auto-link wishlist items to birthdays and anniversaries
+- No need to re-add items manually
+- Partner gifting smart suggestions
+- Location based store recommendations
+
+PRIORITY 9 - MILESTONES AND REMINDERS:
+- Photo uploads for milestones
+- Shareable milestone cards for Instagram and WhatsApp
+- Sync milestones with reminders calendar
+- Beautiful shareable graphics
+
+PRIORITY 10 - SYSTEM SYNC:
+Sync everything together:
+- Mood ↔ Cycle
+- Food ↔ Fitness  
+- Milestones ↔ Reminders
+- Travel ↔ Outfit Planner
+- Wishlist ↔ Birthdays and Anniversaries
+
+PRIORITY 11 - GUEST MODE:
+- Guest users can switch to sign in easily
+- Preserve their temporary data until account creation
+
+PRIORITY 12 - GLOBAL EXPERIENCE:
+- Auto detect currency and timezone
+- Regional pricing India ₹50/month
+- Local store links based on location
+- Works globally across all countries
+
+Keep the luxury rose gold feminine design throughout.
+Keep all existing features working.
+Do not break anything that currently works.
+Push all changes to GitHub when complete.
+
+📸 Intro Cover Model Image
+YES great idea! Here's where to get free stock images with no text:
+* Unsplash.com — search "woman luxury lifestyle" or "woman self care" — completely free, no attribution needed
+* Pexels.com — same, totally free
+* Pixabay.com — free too
+Best search terms:
+* "woman rose gold"
+* "luxury self care woman"
+* "confident woman lifestyle"
+* "diverse women friends"
+Pick something diverse and inclusive — different ethnicities, body types — fits ROSA's brand perfectly! 🌹
+
+🎁 Limited Time Free Offer — GENIUS!
+This is called a Beta Launch Strategy — very smart! Here's how to structure it:
+"ROSA Founding Members"
+* First 100 users get 6 months free
+* First 500 users get 3 month free
+* Selected 10 testers get lifetime free in exchange for detailed feedback
+* Create a waitlist at launch — builds hype before full release!
+Add a banner on the app:
+"🌹 You're one of our first 100 founding members! Enjoy 3 months free — thank you for believing in ROSA"
+This makes people feel SPECIAL and they'll tell everyone! 👑
+
+👦 Making ROSA Appeal to Everyone
+Smart business move — more users = more money! Here's what to add:
+For Partners/Boyfriends/Husbands:
+* "For Him" dashboard — simple clean interface
+* See partner's mood without details
+* Gift reminder notifications
+* Surprise trip planner
+* "How to support her today" daily tip based on her cycle
+* Thoughtfulness score/badge
+For Non-Binary and LGBTQ+:
+* Already have gender identity selection ✅
+* Make sure ALL features work regardless of gender
+* Cycle tracker optional for everyone
+* "Wellness tracker" instead of "Period tracker" as option
+For Men independently:
+* Mental health check-ins
+* Fitness tracking
+* Relationship tips
+* Mood tracker
+* "Be a better partner" daily tips
+
+✨ WOW Features to Add
+These will make ROSA stand out from EVERY other app:
+1. 🌙 ROSA Night Mode
+* After 10pm app switches to calming night theme
+* Suggests sleep routine, wind down activities
+* Gentle reminder to log mood before sleep
+2. 🎵 Mood Music
+* Based on mood → suggest Spotify/Apple Music playlist
+* "You seem stressed today — here's your calm playlist 🎵"
+3. 🌍 ROSA World Map
+* Shows anonymously where ROSA users are worldwide
+* "12,847 women using ROSA right now 🌹"
+* Makes users feel part of a global community
+4. 💌 ROSA Letters
+* Write a letter to your future self
+* ROSA delivers it in 3/6/12 months
+* Emotional, shareable, viral feature!
+5. 🤝 ROSA Circles
+* Private groups of 2-10 women
+* Share moods, support each other
+* Like a private sisterhood within the app
+6. 📊 Monthly ROSA Report
+* Beautiful graphic showing your month
+* Mood patterns, cycle insights, fitness stats
+* Shareable on Instagram stories
+* "My ROSA Month in Review 🌹"
+7. 🎯 ROSA Goals
+* Set monthly intentions
+* App gently tracks and reminds
+* Celebrate when achieved with animations
+8. 💬 Daily ROSA Whisper
+* A beautiful personalised message every morning
+* Based on mood, cycle, weather, goals
+* Feels like a best friend checking in
+9. 🌸 Skin & Beauty Tracker
+* Track skin changes through cycle
+* Suggest skincare based on cycle phase
+* Link to buy recommended products
+10. 📸 ROSA Journal
+* Photo + text diary
+* Beautiful filtered layouts
+* Private and secure
+* Mood tagged photos
+ROSA Score — a daily wellness score (0–100) combining mood, sleep, cycle phase, hydration, and movement. Gamified but meaningful.
+AI Outfit Camera — point camera at your closet, ROSA suggests what to wear based on weather + mood + occasion.
+Crisis Mode — if mood logs very low 2+ days, ROSA gently checks in with mental health resources.
+ROSA Challenges — 7-day or 30-day wellness challenges (hydration, gratitude, steps) with community leaderboards.
+Period Passport — for travelers, warns about cycle timing vs travel dates so they can prepare.
+Voice Mode — talk to ROSA like a friend, voice input/output for hands-free journaling.
+Crisis Mode — this is both an ethical necessity and a huge trust signal. Users will stick with an app that genuinely cares about them.
+ROSA Wellness Score — this single number gives users a reason to open the app every single day. It's the hook.
+The Rose rewards system — the blooming rose animation filling up over time is genuinely different from anything on the market. That's your viral moment.
+Founding Members offer — do this before you add everything else. Launch with it now, it costs you nothing and builds a loyal early base fast.
+One extra thing I'd add that's not in the prompt yet: a "ROSA wrapped" annual review (like Spotify Wrapped) — a shareable, beautiful summary of the user's whole year in data. That alone could go viral every January and bring in thousands of new users organically.
+ROSA Wrapped — love it. Here's how I'd frame it in the prompt:
+Every January 1st (and on their ROSA anniversary), users get a beautiful full-screen animated recap: roses earned, streak record, top mood, cycle insights, biggest milestone, wellness score trend, and a personalised message from ROSA. Shareable as a video/graphic to Instagram, WhatsApp, TikTok. Tagline: "This was your year with ROSA 🌹"
+
+Partner pricing — here are three models to consider:
+The smartest option is probably "Partner joins free for 3 months, then 50% off forever as long as the primary account is active." This way the primary user feels like they're giving their partner a gift, the partner gets hooked during the free period, and you're still earning from both accounts long term. It also makes users want to invite their partner, which is free marketing for you.
+You could also do "Linked accounts: buy one, get partner 50% off" shown as a bundle at checkout — clean and simple.
+The build order at the bottom is intentional — I told Replit to fix payments and the AI chatbot first, then roses and streaks, because those are what will retain users from day one. The lifestyle features (travel, outfits, journal) will layer on top of a working core.
+ROSA Wrapped is set to trigger both on January 1st and on each user's personal ROSA anniversary — so users get two emotional moments per year instead of one, and it doesn't feel like just a Spotify copycat since the anniversary date is uniquely theirs.
+Partner pricing is fully built into the payment section — the 3 months free, the 50% forever discount, the invite link system, and what happens if the primary account cancels. Replit will have everything it needs to build it correctly.
+lso remebere about sync between each and as a whole so the app knows the user better. 

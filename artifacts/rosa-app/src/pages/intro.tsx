@@ -4,11 +4,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/lib/user-context";
 
 const UNSPLASH_IMAGES = [
-  "https://images.unsplash.com/photo-1552053831-71594a27632d?w=1200&q=80",
-  "https://images.unsplash.com/photo-1515377905703-c4788e51af15?w=1200&q=80",
   "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1200&q=80",
-  "https://images.unsplash.com/photo-1600334129128-685c5582fd35?w=1200&q=80",
-  "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=1200&q=80",
+  "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=1200&q=80",
+  "https://images.unsplash.com/photo-1543269865-cbf427effbad?w=1200&q=80",
+  "https://images.unsplash.com/photo-1488161628813-04466f872be2?w=1200&q=80",
+  "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=1200&q=80",
+  "https://images.unsplash.com/photo-1601412436009-d964bd02edbc?w=1200&q=80",
+  "https://images.unsplash.com/photo-1605405748313-a416a1b84491?w=1200&q=80",
+  "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?w=1200&q=80",
 ];
 
 export default function Intro() {

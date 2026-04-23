@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Utensils, Plus, Trash2, TrendingDown, Apple, Coffee, Moon, Sun, Lock } from "lucide-react";
+import { Utensils, Plus, Trash2, TrendingDown, Apple, Coffee, Moon, Sun, Lock, Camera, Sparkles, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -77,6 +78,42 @@ export default function FoodPlanner() {
   const [newCals, setNewCals] = useState("");
   const [newMeal, setNewMeal] = useState<"breakfast" | "lunch" | "dinner" | "snack">("breakfast");
   const [tab, setTab] = useState<"today" | "plan" | "history">("today");
+  const { toast } = useToast();
+  const aiInputRef = useRef<HTMLInputElement>(null);
+  const [aiPreview, setAiPreview] = useState<string | null>(null);
+  const [aiMeal, setAiMeal] = useState<"breakfast" | "lunch" | "dinner" | "snack">("lunch");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<{ name?: string; calories?: number; protein?: number; carbs?: number; fat?: number; healthNote?: string; items?: string[]; error?: string } | null>(null);
+
+  const handleAiFile = (file: File) => {
+    if (file.size > 6 * 1024 * 1024) { toast({ title: "Image too large", description: "Please use a photo under 6MB.", variant: "destructive" }); return; }
+    const reader = new FileReader();
+    reader.onload = () => { setAiPreview(reader.result as string); setAiResult(null); };
+    reader.readAsDataURL(file);
+  };
+  const analyzeFood = async () => {
+    if (!aiPreview) return;
+    setAiLoading(true);
+    try {
+      const r = await fetch("/api/food-vision", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: aiPreview, mealHint: aiMeal }),
+      });
+      const data = await r.json();
+      if (!r.ok || data.error) {
+        toast({ title: "Couldn't analyze", description: data.error === "not_food" ? "That doesn't look like food — try a clearer meal photo." : (data.error || "Try again."), variant: "destructive" });
+        setAiResult(null);
+      } else { setAiResult(data); }
+    } catch { toast({ title: "Network error", description: "Please try again.", variant: "destructive" }); }
+    finally { setAiLoading(false); }
+  };
+  const logAiFood = () => {
+    if (!aiResult?.name || !aiResult?.calories) return;
+    const newEntry: FoodEntry = { id: Date.now().toString(), name: aiResult.name, calories: Math.round(aiResult.calories), meal: aiMeal, date: today };
+    setEntries([...entries, newEntry]);
+    toast({ title: "Logged 🌹", description: `${aiResult.name} · ${Math.round(aiResult.calories)} kcal` });
+    setAiPreview(null); setAiResult(null);
+  };
 
   if (!isPremium) {
     return (
@@ -181,6 +218,56 @@ export default function FoodPlanner() {
                     ))}
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-rose-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-500" /> AI Calorie Camera
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {!aiPreview && (
+                  <button onClick={() => aiInputRef.current?.click()} className="w-full border-2 border-dashed border-amber-300 rounded-2xl p-5 text-center hover:bg-amber-100/40 transition-all" data-testid="button-food-ai-upload">
+                    <Camera className="w-7 h-7 text-amber-500 mx-auto mb-1.5" />
+                    <p className="text-sm font-medium text-amber-700">Snap your meal</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">ROSA estimates calories &amp; macros for you.</p>
+                  </button>
+                )}
+                <input ref={aiInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handleAiFile(e.target.files[0])} />
+                {aiPreview && (
+                  <>
+                    <img src={aiPreview} alt="meal" className="w-full max-h-56 object-cover rounded-2xl" />
+                    <div className="flex gap-2 flex-wrap items-center">
+                      <Select value={aiMeal} onValueChange={(v) => setAiMeal(v as any)}>
+                        <SelectTrigger className="w-32 h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(["breakfast","lunch","dinner","snack"] as const).map(m => <SelectItem key={m} value={m} className="capitalize">{m}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Button size="sm" onClick={analyzeFood} disabled={aiLoading} className="bg-amber-500 hover:bg-amber-600 text-white" data-testid="button-food-ai-analyze">
+                        {aiLoading ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Estimating…</> : <><Sparkles className="w-4 h-4 mr-1.5" /> Analyze</>}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setAiPreview(null); setAiResult(null); }}>Reset</Button>
+                    </div>
+                    {aiResult?.name && (
+                      <div className="bg-white/70 rounded-xl p-3 border border-amber-100 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">{aiResult.name}</p>
+                          <Badge className="bg-amber-100 text-amber-700 border-0">{Math.round(aiResult.calories || 0)} kcal</Badge>
+                        </div>
+                        {(aiResult.protein || aiResult.carbs || aiResult.fat) && (
+                          <p className="text-xs text-muted-foreground">P {Math.round(aiResult.protein||0)}g · C {Math.round(aiResult.carbs||0)}g · F {Math.round(aiResult.fat||0)}g</p>
+                        )}
+                        {aiResult.healthNote && <p className="text-xs italic text-amber-700">💛 {aiResult.healthNote}</p>}
+                        <Button size="sm" onClick={logAiFood} className="w-full mt-1 h-8 bg-rose-500 hover:bg-rose-600 text-white" data-testid="button-food-ai-log">
+                          Log this meal
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
               </CardContent>
             </Card>
 
