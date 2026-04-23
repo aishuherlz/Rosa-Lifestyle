@@ -4,7 +4,7 @@ import {
   Home, HeartPulse, CalendarHeart, Users, Gift, Map, Shirt,
   CalendarDays, Dumbbell, Quote, MessageSquareHeart, Settings,
   Crown, Utensils, ClipboardList, Timer, BookHeart, Target,
-  FlameKindling, Sparkles, Mail, Moon,
+  FlameKindling, Sparkles, Mail, Moon, Globe, Activity, FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FloatingChat } from "@/components/chatbot/floating-chat";
@@ -32,6 +32,9 @@ const NAV_ITEMS = [
   { href: "/letters", label: "Letters", icon: Mail },
   { href: "/surveys", label: "Surveys", icon: ClipboardList },
   { href: "/quotes", label: "Quotes", icon: Quote },
+  { href: "/circles", label: "Circles", icon: Globe },
+  { href: "/health-sync", label: "Health Sync", icon: Activity },
+  { href: "/report", label: "ROSA Report", icon: FileText },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
