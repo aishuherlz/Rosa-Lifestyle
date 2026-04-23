@@ -10,9 +10,12 @@ import { OnboardingQuiz } from "@/components/onboarding/onboarding-quiz";
 export default function SignIn() {
   const [, setLocation] = useLocation();
   const { setUser } = useUser();
-  const [step, setStep] = useState<"auth" | "gender" | "onboarding">("auth");
+  const [step, setStep] = useState<"auth" | "gender" | "pronouns" | "onboarding">("auth");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [gender, setGender] = useState("");
+  const [pronouns, setPronouns] = useState("");
+  const [customPronouns, setCustomPronouns] = useState("");
 
   const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +28,7 @@ export default function SignIn() {
       name: "Guest",
       emailOrPhone: "",
       gender: "unspecified",
+      pronouns: "she/her",
       guestMode: true,
       joinedAt: new Date().toISOString(),
       personalityTags: [],
@@ -32,11 +36,20 @@ export default function SignIn() {
     setLocation("/");
   };
 
-  const handleSelectGender = (gender: string) => {
+  const handleSelectGender = (g: string) => {
+    setGender(g);
+    const defaultPronoun = g === "female" ? "she/her" : g === "male" ? "he/him" : g === "non-binary" ? "they/them" : "";
+    setPronouns(defaultPronoun);
+    setStep("pronouns");
+  };
+
+  const handleSavePronouns = () => {
+    const finalPronouns = pronouns === "custom" ? (customPronouns.trim() || "she/her") : (pronouns || "she/her");
     setUser({
       name,
       emailOrPhone: email,
       gender,
+      pronouns: finalPronouns,
       guestMode: false,
       joinedAt: new Date().toISOString(),
       personalityTags: [],
@@ -49,6 +62,16 @@ export default function SignIn() {
     { id: "male", label: "Male", desc: "He/Him" },
     { id: "non-binary", label: "Non-binary", desc: "They/Them" },
     { id: "inclusive", label: "Inclusive LGBTQ+", desc: "All are welcome" },
+  ];
+
+  const PRONOUN_OPTIONS = [
+    { id: "she/her", label: "She / Her" },
+    { id: "he/him", label: "He / Him" },
+    { id: "they/them", label: "They / Them" },
+    { id: "she/they", label: "She / They" },
+    { id: "he/they", label: "He / They" },
+    { id: "any", label: "Any pronouns are fine" },
+    { id: "custom", label: "Let me write my own" },
   ];
 
   if (step === "onboarding") {
@@ -136,6 +159,7 @@ export default function SignIn() {
                     key={g.id}
                     onClick={() => handleSelectGender(g.id)}
                     className="flex items-center justify-between p-6 rounded-2xl border border-border/50 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all text-left group"
+                    data-testid={`button-gender-${g.id}`}
                   >
                     <div>
                       <h3 className="font-medium text-lg text-foreground group-hover:text-primary transition-colors">{g.label}</h3>
@@ -144,6 +168,58 @@ export default function SignIn() {
                   </button>
                 ))}
               </div>
+            </motion.div>
+          )}
+
+          {step === "pronouns" && (
+            <motion.div
+              key="pronouns"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.5 }}
+              className="space-y-6"
+            >
+              <div className="text-center space-y-2">
+                <h2 className="text-3xl font-serif text-primary">Your pronouns 🌹</h2>
+                <p className="text-muted-foreground">So ROSA addresses you the way you deserve.</p>
+              </div>
+
+              <div className="grid gap-2">
+                {PRONOUN_OPTIONS.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setPronouns(p.id)}
+                    className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${pronouns === p.id ? "border-primary bg-primary/10 ring-2 ring-primary/30" : "border-border/50 bg-card hover:bg-primary/5"}`}
+                    data-testid={`button-pronoun-${p.id.replace("/", "-")}`}
+                  >
+                    <span className="font-medium">{p.label}</span>
+                    {pronouns === p.id && <span className="text-primary text-xl">✓</span>}
+                  </button>
+                ))}
+              </div>
+
+              {pronouns === "custom" && (
+                <div className="space-y-2">
+                  <Label htmlFor="custom-pronouns">Your pronouns</Label>
+                  <Input
+                    id="custom-pronouns"
+                    placeholder="e.g. ze/zir, fae/faer"
+                    value={customPronouns}
+                    onChange={(e) => setCustomPronouns(e.target.value)}
+                    data-testid="input-custom-pronouns"
+                  />
+                </div>
+              )}
+
+              <Button
+                onClick={handleSavePronouns}
+                disabled={!pronouns || (pronouns === "custom" && !customPronouns.trim())}
+                className="w-full bg-primary hover:bg-primary/90 text-white rounded-full py-6 text-lg"
+                data-testid="button-save-pronouns"
+              >
+                Continue 🌸
+              </Button>
             </motion.div>
           )}
         </AnimatePresence>

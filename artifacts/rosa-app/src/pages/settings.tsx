@@ -44,6 +44,7 @@ export default function SettingsPage() {
   const [form, setForm] = useState({
     name: user?.name || "",
     gender: user?.gender || "",
+    pronouns: user?.pronouns || "she/her",
     personalityTags: user?.personalityTags || [] as string[],
   });
   const [privacy, setPrivacy] = useLocalStorage<PrivacySettings>("rosa_privacy", {
@@ -71,7 +72,7 @@ export default function SettingsPage() {
 
   const handleSave = () => {
     if (!user) return;
-    const updated = { ...user, name: form.name, gender: form.gender, personalityTags: form.personalityTags };
+    const updated = { ...user, name: form.name, gender: form.gender, pronouns: form.pronouns, personalityTags: form.personalityTags };
     setUser(updated);
     toast({ title: "Saved!", description: "Your profile has been updated." });
   };
@@ -146,6 +147,25 @@ export default function SettingsPage() {
                 {GENDER_OPTIONS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+          <div>
+            <Label>Pronouns 🌹</Label>
+            <Select value={form.pronouns} onValueChange={(v) => setForm((f) => ({ ...f, pronouns: v }))}>
+              <SelectTrigger data-testid="select-pronouns"><SelectValue placeholder="Select pronouns" /></SelectTrigger>
+              <SelectContent>
+                {["she/her", "he/him", "they/them", "she/they", "he/they", "any"].map((p) => (
+                  <SelectItem key={p} value={p}>{p === "any" ? "Any pronouns are fine" : p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">Or type your own:</p>
+            <Input
+              className="mt-1"
+              placeholder="e.g. ze/zir, fae/faer"
+              value={form.pronouns}
+              onChange={(e) => setForm((f) => ({ ...f, pronouns: e.target.value }))}
+              data-testid="input-pronouns-custom"
+            />
           </div>
           <div>
             <Label>Account</Label>

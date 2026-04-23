@@ -128,6 +128,11 @@ export default function Home() {
             {getGreeting()},<br />
             <span className="text-primary italic">{user?.name || "Beautiful"}</span>
           </h1>
+          {user?.pronouns && (
+            <p className="text-xs uppercase tracking-widest text-muted-foreground/80 mt-1" data-testid="text-pronouns-badge">
+              {user.pronouns}
+            </p>
+          )}
           {/* Cycle Goddess Title */}
           {cycleInfo.phase !== "unknown" && (
             <motion.p

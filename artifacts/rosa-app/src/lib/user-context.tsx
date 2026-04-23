@@ -4,6 +4,7 @@ export type User = {
   name: string;
   emailOrPhone: string;
   gender: string;
+  pronouns: string;
   guestMode: boolean;
   joinedAt: string;
   personalityTags: string[];

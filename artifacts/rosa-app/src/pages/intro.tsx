@@ -4,14 +4,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/lib/user-context";
 
 const UNSPLASH_IMAGES = [
-  "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1200&q=80",
   "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=1200&q=80",
+  "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=1200&q=80",
   "https://images.unsplash.com/photo-1543269865-cbf427effbad?w=1200&q=80",
-  "https://images.unsplash.com/photo-1488161628813-04466f872be2?w=1200&q=80",
-  "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=1200&q=80",
+  "https://images.unsplash.com/photo-1604004215854-e1e85f5398a7?w=1200&q=80",
+  "https://images.unsplash.com/photo-1581824283135-0666cf353f35?w=1200&q=80",
+  "https://images.unsplash.com/photo-1573496800248-9af9051836a4?w=1200&q=80",
   "https://images.unsplash.com/photo-1601412436009-d964bd02edbc?w=1200&q=80",
-  "https://images.unsplash.com/photo-1605405748313-a416a1b84491?w=1200&q=80",
-  "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?w=1200&q=80",
+  "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=1200&q=80",
+  "https://images.unsplash.com/photo-1611042553484-d61f84d22784?w=1200&q=80",
+  "https://images.unsplash.com/photo-1591084728795-1149f32d9866?w=1200&q=80",
+  "https://images.unsplash.com/photo-1488716820095-cbe80883c496?w=1200&q=80",
+  "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=1200&q=80",
 ];
 
 export default function Intro() {
