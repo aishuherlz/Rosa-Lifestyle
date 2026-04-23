@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useSubscription } from "@/lib/subscription-context";
 import { useState, useEffect } from "react";
+import { apiUrl } from "@/lib/api";
 
 const FREE_FEATURES = [
   "Period & cycle tracking",
@@ -48,7 +49,7 @@ export default function Subscription() {
   const [showPortalBtn, setShowPortalBtn] = useState(false);
 
   useEffect(() => {
-    fetch("/api/stripe/prices")
+    fetch(apiUrl("/api/stripe/prices"))
       .then(r => r.json())
       .then(setPrices)
       .catch(() => setPrices({
@@ -70,7 +71,7 @@ export default function Subscription() {
         const g = JSON.parse(localStorage.getItem("rosa_garden") || "{}");
         gardenRoses = g.roses || 0;
       } catch {}
-      const resp = await fetch("/api/stripe/checkout", {
+      const resp = await fetch(apiUrl("/api/stripe/checkout"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emailOrPhone, name, priceId, planType: selectedPlan, gardenRoses }),
@@ -99,7 +100,7 @@ export default function Subscription() {
     setLoading(true);
     try {
       const emailOrPhone = localStorage.getItem("rosa_email") || localStorage.getItem("rosa_phone") || "guest@rosa.app";
-      const resp = await fetch("/api/stripe/portal", {
+      const resp = await fetch(apiUrl("/api/stripe/portal"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emailOrPhone }),

@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Users, Plus, Send, Copy, Heart, LogOut, Globe, Lock, Sparkles, Gamepad2 } from "lucide-react";
 import { format } from "date-fns";
 import { ShareButton } from "@/components/share-button";
+import { apiUrl } from "@/lib/api";
 
 type CircleMessage = { id: string; author: string; text: string; ts: number; reactions: number };
 type Circle = { id: string; name: string; code: string; createdBy: string; members: string[]; messages: CircleMessage[]; createdAt: number };
@@ -107,7 +108,7 @@ export default function CirclesPage() {
 
   const refreshPublicList = useCallback(async () => {
     try {
-      const r = await fetch("/api/circles/public");
+      const r = await fetch(apiUrl("/api/circles/public"));
       const d = await r.json();
       if (d.ok) setPublicList(d.circles);
     } catch {}
@@ -116,7 +117,7 @@ export default function CirclesPage() {
   const loadPublicCircle = useCallback(async (id: string) => {
     setLoadingPub(true);
     try {
-      const r = await fetch(`/api/circles/public/${id}`);
+      const r = await fetch(apiUrl(`/api/circles/public/${id}`));
       const d = await r.json();
       if (d.ok) setActivePublic(d.circle);
     } catch {} finally { setLoadingPub(false); }
@@ -126,7 +127,7 @@ export default function CirclesPage() {
   useEffect(() => {
     if (!activePublicId) { setActivePublic(null); return; }
     loadPublicCircle(activePublicId);
-    fetch(`/api/circles/public/${activePublicId}/join`, {
+    fetch(apiUrl(`/api/circles/public/${activePublicId}/join`), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: me }),
     }).catch(() => {});
@@ -182,7 +183,7 @@ export default function CirclesPage() {
     const text = publicDraft.trim();
     setPublicDraft("");
     try {
-      const r = await fetch(`/api/circles/public/${activePublicId}/messages`, {
+      const r = await fetch(apiUrl(`/api/circles/public/${activePublicId}/messages`), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ author: me, text, anonymous }),
       });
@@ -193,7 +194,7 @@ export default function CirclesPage() {
   async function rosePublic(msgId: string) {
     if (!activePublicId) return;
     try {
-      const r = await fetch(`/api/circles/public/${activePublicId}/messages/${msgId}/rose`, { method: "POST" });
+      const r = await fetch(apiUrl(`/api/circles/public/${activePublicId}/messages/${msgId}/rose`), { method: "POST" });
       const d = await r.json();
       if (d.ok) {
         loadPublicCircle(activePublicId);
@@ -204,7 +205,7 @@ export default function CirclesPage() {
   async function createPublic() {
     if (!pubName.trim() || !pubTopic.trim()) return;
     try {
-      const r = await fetch("/api/circles/public", {
+      const r = await fetch(apiUrl("/api/circles/public"), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: pubName, topic: pubTopic, emoji: pubEmoji, createdBy: me }),
       });

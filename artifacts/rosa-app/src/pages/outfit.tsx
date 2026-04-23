@@ -13,6 +13,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { getNextPlannedTrip } from "@/lib/sync";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from "date-fns";
 import { cn } from "@/lib/utils";
+import { apiUrl } from "@/lib/api";
 
 type OutfitPlan = {
   id: string;
@@ -74,7 +75,7 @@ export default function OutfitPage() {
     if (!aiPreview) return;
     setAiLoading(true);
     try {
-      const r = await fetch("/api/outfit-vision", {
+      const r = await fetch(apiUrl("/api/outfit-vision"), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: aiPreview, occasion: aiOccasion, weather: weather ? `${weather.temp}°C` : undefined }),
       });

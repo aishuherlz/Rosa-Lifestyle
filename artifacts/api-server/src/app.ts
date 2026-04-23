@@ -48,7 +48,24 @@ app.use(pinoHttp({
     res(res) { return { statusCode: res.statusCode }; },
   },
 }));
-app.use(cors());
+// Allowed CORS origins. In production, set ALLOWED_ORIGINS to a comma-separated
+// list (e.g. "https://rosainclusive.lifestyle,https://www.rosainclusive.lifestyle").
+// In dev, missing/blank Origin (curl, same-origin) and any localhost/Replit
+// preview origin are accepted automatically.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://rosainclusive.lifestyle,https://www.rosainclusive.lifestyle")
+  .split(",").map(s => s.trim()).filter(Boolean);
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin) return cb(null, true); // same-origin / curl / SSR
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return cb(null, true);
+    if (/\.replit\.(dev|app|co)$/.test(new URL(origin).hostname)) return cb(null, true);
+    return cb(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 

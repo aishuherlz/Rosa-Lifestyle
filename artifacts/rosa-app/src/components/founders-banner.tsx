@@ -4,6 +4,7 @@ import { Crown } from "lucide-react";
 import { useUser } from "@/lib/user-context";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useBetaOptIn } from "@/lib/use-beta-optin";
+import { apiUrl } from "@/lib/api";
 
 type FounderClaim = { number: number; tier: "first_100" | "first_500" | "regular" | "lifetime"; freeMonths: number; beta?: boolean; raffleWinner?: boolean };
 
@@ -14,7 +15,7 @@ export function FoundersBanner() {
   const [status, setStatus] = useState<{ total: number; spotsLeftFirst100: number; spotsLeftFirst500: number; betaActive?: boolean; betaDaysLeft?: number } | null>(null);
 
   useEffect(() => {
-    fetch("/api/founders/status").then(r => r.json()).then(d => { if (d.ok) setStatus(d); }).catch(() => {});
+    fetch(apiUrl("/api/founders/status")).then(r => r.json()).then(d => { if (d.ok) setStatus(d); }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -22,7 +23,7 @@ export function FoundersBanner() {
     let token: string | null = null;
     try { token = localStorage.getItem("rosa_auth_token"); } catch {}
     if (!token) return; // Without a verified-email token the server will (correctly) reject the claim.
-    fetch("/api/founders/claim", {
+    fetch(apiUrl("/api/founders/claim"), {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
       body: JSON.stringify({}),

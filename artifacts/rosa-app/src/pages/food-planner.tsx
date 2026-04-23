@@ -13,6 +13,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useSubscription } from "@/lib/subscription-context";
 import { useLocation } from "wouter";
 import { readCyclePhase, PHASE_FOOD, getNextPlannedTrip } from "@/lib/sync";
+import { apiUrl } from "@/lib/api";
 
 type FoodEntry = {
   id: string;
@@ -96,7 +97,7 @@ export default function FoodPlanner() {
     if (!aiPreview) return;
     setAiLoading(true);
     try {
-      const r = await fetch("/api/food-vision", {
+      const r = await fetch(apiUrl("/api/food-vision"), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: aiPreview, mealHint: aiMeal }),
       });

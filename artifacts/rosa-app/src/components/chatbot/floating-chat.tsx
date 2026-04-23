@@ -3,14 +3,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Loader2, Trash2, Sparkles, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { apiUrl } from "@/lib/api";
 type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   streaming?: boolean;
 };
-
-const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
 
 export function FloatingChat() {
   const [open, setOpen] = useState(false);
@@ -76,7 +75,7 @@ export function FloatingChat() {
       const stored = localStorage.getItem("rosa_chatbot_conversation");
       if (stored) {
         const { id } = JSON.parse(stored);
-        const res = await fetch(`${BASE_URL}/api/openai/conversations/${id}`);
+        const res = await fetch(apiUrl(`/api/openai/conversations/${id}`));
         if (res.ok) {
           const data = await res.json();
           setConversationId(id);
@@ -91,7 +90,7 @@ export function FloatingChat() {
           return;
         }
       }
-      const res = await fetch(`${BASE_URL}/api/openai/conversations`, {
+      const res = await fetch(apiUrl(`/api/openai/conversations`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: "ROSA Chat" }),
@@ -127,7 +126,7 @@ export function FloatingChat() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${BASE_URL}/api/openai/conversations/${conversationId}/messages`, {
+      const res = await fetch(apiUrl(`/api/openai/conversations/${conversationId}/messages`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: userMsg.content }),
@@ -180,7 +179,7 @@ export function FloatingChat() {
   async function clearChat() {
     if (conversationId) {
       try {
-        await fetch(`${BASE_URL}/api/openai/conversations/${conversationId}`, { method: "DELETE" });
+        await fetch(apiUrl(`/api/openai/conversations/${conversationId}`), { method: "DELETE" });
       } catch {}
     }
     localStorage.removeItem("rosa_chatbot_conversation");

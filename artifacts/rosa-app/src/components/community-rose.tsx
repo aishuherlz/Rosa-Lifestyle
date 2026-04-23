@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useGarden } from "@/lib/garden-context";
+import { apiUrl } from "@/lib/api";
 
 type Stats = { totalCheckIns: number; activeToday: number; goalToday: number; petalsFilled: number };
 
@@ -10,14 +11,14 @@ export function CommunityRose() {
 
   async function load() {
     try {
-      const r = await fetch("/api/community/stats");
+      const r = await fetch(apiUrl("/api/community/stats"));
       if (r.ok) setStats(await r.json());
     } catch {}
   }
 
   async function ping() {
     try {
-      await fetch("/api/community/checkin", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      await fetch(apiUrl("/api/community/checkin"), { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       await load();
     } catch {}
   }

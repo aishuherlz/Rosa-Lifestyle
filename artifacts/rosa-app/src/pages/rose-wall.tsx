@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Heart, Send, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { apiUrl } from "@/lib/api";
 
 type Post = { id: string; text: string; emoji: string; ts: number; roses: number };
 
@@ -20,7 +21,7 @@ export default function RoseWallPage() {
 
   async function load() {
     try {
-      const r = await fetch("/api/rose-wall");
+      const r = await fetch(apiUrl("/api/rose-wall"));
       const d = await r.json();
       setPosts(d.posts || []);
     } catch {}
@@ -31,7 +32,7 @@ export default function RoseWallPage() {
     if (!draft.trim() || submitting) return;
     setSubmitting(true);
     try {
-      const r = await fetch("/api/rose-wall", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: draft.trim(), emoji }) });
+      const r = await fetch(apiUrl("/api/rose-wall"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: draft.trim(), emoji }) });
       const d = await r.json();
       if (!r.ok) { toast({ title: "Hold on 🌹", description: d.error || "Try again" }); return; }
       setPosts(p => [d.post, ...p]);
@@ -42,7 +43,7 @@ export default function RoseWallPage() {
 
   async function rose(id: string) {
     setPosts(p => p.map(x => x.id === id ? { ...x, roses: x.roses + 1 } : x));
-    try { await fetch(`/api/rose-wall/${id}/rose`, { method: "POST" }); } catch {}
+    try { await fetch(apiUrl(`/api/rose-wall/${id}/rose`), { method: "POST" }); } catch {}
   }
 
   return (
