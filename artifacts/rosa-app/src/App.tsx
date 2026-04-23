@@ -42,6 +42,7 @@ import AffirmationPage from "@/pages/affirmation";
 import SOSPage from "@/pages/sos";
 import RoseWallPage from "@/pages/rose-wall";
 import RoseQuizPage from "@/pages/rose-quiz";
+import SleepPage from "@/pages/sleep";
 
 const queryClient = new QueryClient();
 
@@ -104,6 +105,7 @@ function Router() {
       <Route path="/sos">{() => <ProtectedRoute component={SOSPage} />}</Route>
       <Route path="/rose-wall">{() => <ProtectedRoute component={RoseWallPage} />}</Route>
       <Route path="/rose-quiz">{() => <ProtectedRoute component={RoseQuizPage} />}</Route>
+      <Route path="/sleep">{() => <ProtectedRoute component={SleepPage} />}</Route>
 
       <Route>
         {user ? (

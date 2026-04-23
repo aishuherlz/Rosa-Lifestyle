@@ -55,6 +55,22 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 // Health check (cheap, never rate-limited) — useful for uptime probes.
 app.get("/api/health", (_req, res) => { res.json({ ok: true, ts: Date.now() }); });
 
+// Lightweight metrics so we can see live load (event loop lag, memory, uptime) without external tools.
+let lastTick = Date.now();
+let loopLagMs = 0;
+setInterval(() => { const now = Date.now(); loopLagMs = Math.max(0, now - lastTick - 1000); lastTick = now; }, 1000).unref();
+app.get("/api/metrics", (_req, res) => {
+  const mem = process.memoryUsage();
+  res.json({
+    ok: true,
+    uptimeSec: Math.round(process.uptime()),
+    loopLagMs,
+    memMB: { rss: Math.round(mem.rss / 1e6), heapUsed: Math.round(mem.heapUsed / 1e6), heapTotal: Math.round(mem.heapTotal / 1e6) },
+    threadpoolSize: process.env.UV_THREADPOOL_SIZE,
+    nodeVersion: process.version,
+  });
+});
+
 // Global rate limit: protects every endpoint from a single noisy client overwhelming the box.
 // 300 req/min/IP is generous for a real user but caps abusive spikes well under crash territory.
 const globalLimiter = rateLimit({

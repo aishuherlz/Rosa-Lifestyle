@@ -1,3 +1,9 @@
+// Bump libuv's thread pool BEFORE anything else loads — gives DB / file I/O 4× more parallel
+// capacity, so the event loop never starves during traffic spikes.
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || "16";
+// Allow plenty of listeners on long-lived emitters under high concurrency.
+process.setMaxListeners(50);
+
 import app from "./app";
 import { logger } from "./lib/logger";
 import { runMigrations } from "stripe-replit-sync";

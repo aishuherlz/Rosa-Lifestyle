@@ -42,6 +42,7 @@ const NAV_ITEMS = [
   { href: "/rose-wall", label: "Rose Wall", icon: Flower2 },
   { href: "/rose-quiz", label: "Rose Quiz", icon: Sparkles },
   { href: "/sos", label: "Period SOS", icon: AlertCircle },
+  { href: "/sleep", label: "Sleep", icon: Moon },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {

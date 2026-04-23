@@ -131,13 +131,18 @@ Keep responses warm, conversational, and concise unless the user wants more dept
 
     let fullResponse = "";
     let emittedAny = false;
+    // Hard timeout so a stuck upstream call can't hold a socket forever (frees capacity for other users).
+    const abort = new AbortController();
+    const abortTimer = setTimeout(() => abort.abort(), 90_000);
+    // If the user closes the tab mid-stream, abort the upstream call too.
+    req.on("close", () => { if (!res.writableEnded) abort.abort(); });
     try {
       const stream = await openai.chat.completions.create({
         model: "gpt-5-mini",
         max_completion_tokens: 2048,
         messages: chatMessages,
         stream: true,
-      });
+      }, { signal: abort.signal });
       for await (const chunk of stream) {
         const chunkContent = chunk.choices[0]?.delta?.content;
         if (chunkContent) {
@@ -159,10 +164,12 @@ Keep responses warm, conversational, and concise unless the user wants more dept
           model: "gpt-4o-mini",
           max_tokens: 1024,
           messages: chatMessages,
-        });
+        }, { signal: abort.signal });
         fullResponse = completion.choices[0]?.message?.content || "I'm having a moment, sister 🌹 — please try again.";
         res.write(`data: ${JSON.stringify({ content: fullResponse })}\n\n`);
       }
+    } finally {
+      clearTimeout(abortTimer);
     }
 
     await db.insert(messages).values({
