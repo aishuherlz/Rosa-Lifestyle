@@ -50,7 +50,24 @@ export default function Intro() {
       </AnimatePresence>
 
       {/* Rose overlay gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-[#3d1a24]/80 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-[#3d1a24]/20 to-[#3d1a24]/85 pointer-events-none" />
+
+      {/* Phase 1 — gentle welcome text on the photo */}
+      <AnimatePresence>
+        {phase === "image" && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
+            className="absolute inset-0 flex items-end justify-center pb-24 px-6 pointer-events-none"
+          >
+            <p className="text-white/90 text-base md:text-lg font-light tracking-[0.3em] uppercase">
+              For every woman 🌹
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Logo layer */}
       <AnimatePresence>

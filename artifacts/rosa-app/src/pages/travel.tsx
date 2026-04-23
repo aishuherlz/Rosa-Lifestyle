@@ -162,7 +162,7 @@ export default function TravelPage() {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"planned" | "bucket" | "inspire">("planned");
   const [form, setForm] = useState({
-    name: "", country: "", notes: "", type: "bucket" as TripType,
+    name: "", country: "", notes: "", type: "planned" as TripType,
     startDate: "", endDate: "", itinerary: "", packingList: [] as string[],
   });
   const [newPackItem, setNewPackItem] = useState("");
@@ -186,7 +186,7 @@ export default function TravelPage() {
     };
     setDestinations([...destinations, item]);
     setOpen(false);
-    setForm({ name: "", country: "", notes: "", type: "bucket", startDate: "", endDate: "", itinerary: "", packingList: [] });
+    setForm({ name: "", country: "", notes: "", type: "planned", startDate: "", endDate: "", itinerary: "", packingList: [] });
     setNewPackItem("");
   };
 
