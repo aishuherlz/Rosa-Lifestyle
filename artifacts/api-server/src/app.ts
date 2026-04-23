@@ -1,11 +1,17 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import helmet from "helmet";
+import compression from "compression";
+import rateLimit from "express-rate-limit";
 import router from "./routes";
 import { WebhookHandlers } from "./webhookHandlers";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
+
+// Trust the Replit proxy so req.ip is the real client IP (needed for rate limiting).
+app.set("trust proxy", 1);
 
 // Register Stripe webhook BEFORE other middleware (needs raw Buffer)
 app.post(
@@ -33,6 +39,8 @@ app.post(
   }
 );
 
+app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false, crossOriginEmbedderPolicy: false }));
+app.use(compression());
 app.use(pinoHttp({
   logger,
   serializers: {
@@ -41,9 +49,43 @@ app.use(pinoHttp({
   },
 }));
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
+// Health check (cheap, never rate-limited) — useful for uptime probes.
+app.get("/api/health", (_req, res) => { res.json({ ok: true, ts: Date.now() }); });
+
+// Global rate limit: protects every endpoint from a single noisy client overwhelming the box.
+// 300 req/min/IP is generous for a real user but caps abusive spikes well under crash territory.
+const globalLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 300,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { ok: false, error: "Too many requests — please slow down a moment 🌹" },
+});
+
+// Stricter limit on the expensive AI endpoints (each call costs OpenAI tokens & holds an SSE connection).
+// 20 req/min/IP is plenty for a real chat session but stops a single user from draining the API quota for everyone.
+const aiLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 20,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { ok: false, error: "You're chatting fast! Take a breath and try again in a minute 💗" },
+});
+
+app.use("/api/openai", aiLimiter);
+app.use("/api/food-vision", aiLimiter);
+app.use("/api/outfit-vision", aiLimiter);
+app.use("/api", globalLimiter);
 app.use("/api", router);
+
+// Catch-all error handler so a thrown route never crashes the process.
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+  logger.error({ err, url: req.url }, "Unhandled route error");
+  if (res.headersSent) return;
+  res.status(500).json({ ok: false, error: "Something went wrong on our side. Please try again." });
+});
 
 export default app;
