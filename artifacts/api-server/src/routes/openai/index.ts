@@ -138,8 +138,9 @@ Keep responses warm, conversational, and concise unless the user wants more dept
     req.on("close", () => { if (!res.writableEnded) abort.abort(); });
     try {
       const stream = await openai.chat.completions.create({
-        model: "gpt-5-mini",
-        max_completion_tokens: 2048,
+        model: "gpt-4o",
+        max_tokens: 1024,
+        temperature: 0.85,
         messages: chatMessages,
         stream: true,
       }, { signal: abort.signal });

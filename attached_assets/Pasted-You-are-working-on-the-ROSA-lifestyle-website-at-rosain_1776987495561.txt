@@ -1,0 +1,393 @@
+You are working on the ROSA lifestyle website at rosainclusive.lifestyle.
+Stack: React + Vite frontend, Express backend, PostgreSQL database, OpenAI API for AI features, Railway for deployment, GitHub for version control.
+
+IMPORTANT RULES:
+- Do ONE step at a time
+- After completing each step, stop and ask "Ready for the next step? Type YES to continue"
+- Do NOT move to the next step until I say YES or continue
+- Test each feature after building it before asking to continue
+- Keep the luxury rose gold feminine design throughout
+- Do not break anything currently working
+- Push to GitHub after every step is complete
+
+===========================================
+STEP 1 — FIX ROSA AI CHATBOT (CRITICAL)
+===========================================
+
+The ROSA AI chatbot is not responding at all. Fix it completely.
+
+What needs to work:
+- Use the OPENAI_API_KEY environment variable already set in Railway
+- Use model: gpt-4o
+- ROSA must respond instantly (under 2 seconds)
+- ROSA understands user context: mood, cycle phase, goals, food preferences, fitness level
+- ROSA provides: emotional support, mental wellness advice, navigation help, personalized suggestions
+- Conversation history stored in PostgreSQL per user per session
+- ROSA remembers previous conversations when user returns
+- Tone: warm, intelligent best friend — never robotic
+- Embedded across the whole app not just one screen
+- Test it: send a message and confirm a response comes back before marking done
+
+After completing Step 1, stop and ask me to continue to Step 2.
+
+===========================================
+STEP 2 — FIX EMAIL SIGNUP + VERIFICATION
+===========================================
+
+Email signup is not sending verification emails. Fix the complete auth flow.
+
+What needs to work:
+- User signs up with email and password
+- App immediately sends a verification email from the ROSA app email address already configured
+- Email contains a verification code or link
+- User cannot log in until email is verified
+- Resend verification option available
+- Password reset via email also working
+- Login with email and password works after verification
+- Show clear error messages if email already exists, wrong password, not verified
+- Session persists — user stays logged in across page refreshes
+- Test the full flow: sign up → get email → verify → log in successfully
+
+After completing Step 2, stop and ask me to continue to Step 3.
+
+===========================================
+STEP 3 — FIX ROSE WALL POSTING + MODERATION
+===========================================
+
+Rose Wall posts are not working — users cannot post. Fix and add content moderation.
+
+What needs to work:
+- Users can create a post on the Rose Wall
+- Post options: anonymous OR as their ROSA nickname (set in Step 4)
+- Posts can include: text, optionally tag a mood, optionally share to a specific friend or partner
+- Posts show in a beautiful Instagram-style feed
+- Content moderation using OpenAI API:
+  - Automatically scan every post before it goes live
+  - Block: hate speech, bullying, false allegations, harassment, explicit content
+  - If flagged: show message "This post couldn't be shared as it goes against our community guidelines 🌹"
+  - Safe, positive, supportive content goes live immediately
+- Users can report a post
+- Reported posts go into a review queue
+- Like and comment on posts
+- Delete own posts
+- Test: post something positive → appears in feed. Post something hateful → gets blocked.
+
+After completing Step 3, stop and ask me to continue to Step 4.
+
+===========================================
+STEP 4 — ROSA ID + NICKNAME SYSTEM
+===========================================
+
+Every user needs a unique ROSA ID and nickname for the Rose Wall and social features.
+
+What needs to work:
+- During onboarding, after signup, prompt user to choose a ROSA nickname
+- Nickname must be unique across all users (check in real time as they type)
+- Nickname shown as @rosanickname format
+- Users can change nickname up to 3 times total (after that locked)
+- Auto-generate a unique ROSA ID (e.g. ROSA#4821) that never changes even if nickname changes
+- ROSA ID used for friend search and sharing
+- Nickname shown publicly on Rose Wall posts and Rose Circles
+- Profile page shows: nickname, ROSA ID, profile photo, bio, rose count, streak, badges
+- Share ROSA ID button — generates a shareable link or card
+- QR code for ROSA ID shareable too
+
+After completing Step 4, stop and ask me to continue to Step 5.
+
+===========================================
+STEP 5 — FRIENDS SYSTEM + ROSA ID SEARCH
+===========================================
+
+Users should be able to find and connect with friends inside ROSA.
+
+What needs to work:
+- Search bar to find friends by ROSA ID or nickname
+- Send friend request — other user gets notification and can accept or decline
+- Friends list in profile
+- Friends can: play games together, see each other on Rose Wall, join same Rose Circle
+- Privacy controls: user chooses what friends can see on their profile
+- Block user option
+- Remove friend option
+- Friend suggestions based on mutual friends or similar interests
+- Notification when friend request accepted
+- Partner linking is separate from friends (partner gets special access set by user)
+
+After completing Step 5, stop and ask me to continue to Step 6.
+
+===========================================
+STEP 6 — ROSE CIRCLES (PRIVATE + PUBLIC)
+===========================================
+
+Rose Circles are group spaces. Both private and public need to work properly with moderation.
+
+What needs to work:
+Private Circles:
+- Create a private circle (2-10 members)
+- Invite by ROSA ID
+- Only members can see content
+- Admin can remove members
+- Share moods, support each other, chat
+
+Public Circles:
+- Browse and join public circles by topic (e.g. "Period Warriors", "New Moms", "Fitness Queens")
+- All public posts moderated by OpenAI before going live (same as Rose Wall)
+- Report post option in public circles
+- Admin moderation queue for reported content
+- Circle has: description, member count, topic tags
+
+Both types:
+- Real time or near real time messaging
+- Emoji reactions
+- Photo sharing (moderated)
+- Pin important messages
+- Notification when someone posts in your circle
+
+After completing Step 6, stop and ask me to continue to Step 7.
+
+===========================================
+STEP 7 — COUPLES GAMES SECTION
+===========================================
+
+Add fun engaging games for couples AND friends to play together inside ROSA.
+
+Games to build:
+1. Love Language Quiz — find out each other's love language, compare results
+2. Would You Rather — couples edition with fun/romantic/funny questions
+3. Never Have I Ever — safe, fun version for couples
+4. Relationship Trivia — how well do you know your partner
+5. Mood Match — both partners log mood independently, app reveals if they match
+6. Date Night Spinner — spin to randomly pick a date idea based on budget and location
+7. Couple Goals — set goals together, track progress, celebrate when done
+8. Rose or Thorn — share the best and worst part of your day with partner
+
+Features:
+- Play in real time with a friend or partner via ROSA ID invite
+- Save game results to profile
+- Share results to Rose Wall (optional)
+- Daily new question/challenge for couples
+- Leaderboard for fun games among friends
+
+After completing Step 7, stop and ask me to continue to Step 8.
+
+===========================================
+STEP 8 — TRAVEL PAGE UPGRADE
+===========================================
+
+The travel page needs a full upgrade with real destination data.
+
+What needs to work:
+- Searchable dropdown of every country and major city in the world
+  (as user types, suggestions appear — like Google search autocomplete)
+- When destination is selected, show:
+  - Top places to visit (with photos and map links)
+  - Best restaurants to eat (with cuisine type, price range, map link)
+  - Things to do (free, adventure, unique, family-friendly — filterable)
+  - Hidden gems and local tips
+  - Best time to visit
+  - Weather at destination (live weather API)
+  - Packing suggestions based on weather and activities
+  - Outfit suggestions synced with weather and trip type
+- Budget-based trip suggestions:
+  - User enters: budget, travel style (flight/drive/combine), current location, preferences
+  - ROSA suggests 3-5 destination options that match
+- Period Passport: warn user if period predicted during travel dates, suggest what to pack
+- Bucket list vs Planned Trip toggle per destination
+- Save trips to profile
+- Partner surprise trip planner: partner plans without revealing destination to primary user
+
+After completing Step 8, stop and ask me to continue to Step 9.
+
+===========================================
+STEP 9 — SKIN SECTION UPGRADE
+===========================================
+
+Skin section needs a questionnaire, home remedies, and food sync.
+
+What needs to work:
+- Skin questionnaire at first visit:
+  - Skin type (oily, dry, combination, sensitive, normal)
+  - Current concerns (acne, dark spots, dullness, wrinkles, redness)
+  - Current routine (what they already use)
+  - Diet habits
+  - Water intake
+  - Sleep hours
+  - Stress level
+- Based on answers, ROSA provides:
+  - Personalised morning and evening skincare routine
+  - Home remedies using ingredients they likely have (honey, aloe, turmeric etc.)
+  - Foods to eat and avoid for their skin type (sync with food planner)
+  - Products to consider with buy links
+  - Cycle-phase skin tips (skin changes through cycle — adjust routine)
+- Weekly skin check-in: log how skin is doing, track improvement over time
+- Optional: photo log to visually track skin changes
+- Sync with food planner: if user has acne, food plan avoids dairy and sugar automatically
+
+After completing Step 9, stop and ask me to continue to Step 10.
+
+===========================================
+STEP 10 — WHAT ROSE ARE YOU — FIX + UPGRADE
+===========================================
+
+The rose quiz result cannot be downloaded or shared. Fix this and add more engagement.
+
+What needs to work:
+- Fix the download button — result card must download as a proper PNG image
+- Fix sharing — shareable to Instagram stories, WhatsApp, and general share sheet
+- The downloaded card must look beautiful — rose gold design, their rose type, their traits
+- Add more quiz content beyond just rose type:
+  - "What Goddess Era Are You In?" quiz
+  - "What's Your Self Care Style?" quiz  
+  - "What Kind of Partner Are You?" quiz
+  - "What's Your Cycle Superpower?" quiz
+- Each quiz has a beautiful shareable result card
+- Results saved to profile
+- New quiz unlocks every week to bring users back
+- Retake option after 30 days
+- Share results to Rose Wall option
+
+After completing Step 10, stop and ask me to continue to Step 11.
+
+===========================================
+STEP 11 — HOMEPAGE 3-SECOND MESSAGE + BRANDING
+===========================================
+
+When someone lands on the homepage they must instantly understand what ROSA is.
+
+Hero section must communicate in 3 seconds:
+- Headline: "Your world. Your wellness. Your ROSA." or similar — powerful, clear, feminine
+- Subheadline: One sentence explaining what ROSA is and who it's for
+- Clear CTA button: "Join the Roses 🌹" — takes to signup
+- Secondary CTA: "See how it works" — smooth scroll to features
+
+Below hero add these sections in order:
+1. Feature highlights — 6 core features with icons and one-line descriptions
+2. ROSA Garden preview — animated rose blooming showing the rewards system
+3. "For everyone" section — showing it works for women, couples, partners, LGBTQ+
+4. Community section — Rose Wall preview, Rose Circles preview
+5. Testimonials — 3 real-looking testimonials with photos (use diverse stock photos)
+6. Pricing section — free trial, monthly, yearly plans clearly shown
+7. Founding members banner — "Join our first 500 founding members" with counter
+8. Final CTA — "Start your ROSA journey today 🌹"
+
+Premium visual consistency:
+- Rose gold (#D4A574) accents throughout
+- Playfair Display for all headings
+- Smooth scroll animations on every section
+- Mobile looks just as premium as desktop
+
+After completing Step 11, stop and ask me to continue to Step 12.
+
+===========================================
+STEP 12 — TRUST SIGNALS + FOUNDER STORY
+===========================================
+
+Visitors need to trust ROSA before they sign up. Add these trust elements.
+
+Founder story section:
+Add a warm, personal founder story section with this content:
+"ROSA was born from a very real moment. Founder Aiswarya Saji was in the middle of a demanding work week when her period arrived — and it hit hard. She had to take days off, felt completely unprepared, and realised there was no single app that truly understood what women go through every single day. Aiswarya was new to coding and app development, but that didn't stop her. She taught herself, stayed up late, asked for help, and built ROSA from scratch — because she believed every woman deserved an app that felt like a best friend. One that understood your body, your mood, your relationships, your dreams. ROSA is not just an app. It is a movement. Built by a woman, for everyone who has ever needed a little more support, a little more understanding, and a whole lot of self-love. 🌹"
+
+Add photo placeholder for founder (or a rose illustration)
+
+Trust signals to add:
+- "256-bit encrypted data" badge
+- "Your data is never sold" badge  
+- "GDPR compliant" badge
+- Secure checkout icons near pricing
+- "Join X founding members already on ROSA" live counter
+- Star rating display (show 4.9 stars)
+- 3 detailed testimonials:
+  Testimonial 1: About how ROSA helped with period tracking and mood
+  Testimonial 2: About how the partner feature helped their relationship
+  Testimonial 3: About the community and feeling less alone
+
+Community values section:
+- Body positivity statement
+- Inclusivity values (all genders, all bodies, all backgrounds)
+- Accessibility commitment
+- No shame, no judgment tone throughout
+
+After completing Step 12, stop and ask me to continue to Step 13.
+
+===========================================
+STEP 13 — PRIVACY + SAFETY MESSAGING
+===========================================
+
+ROSA deals with sensitive topics — periods, sex health, mental health, relationships. Users need to feel completely safe.
+
+Add throughout the site:
+- Privacy notice on all sensitive sections (cycle, mood, skin, mental health):
+  "Everything you share here is private. Only you can see this. We never sell your data. 🌹"
+- Secure data banner in account/profile settings
+- On cycle and sex health sections add:
+  "This content is for wellness and educational purposes. Always consult a healthcare professional for medical advice."
+- On mental health and mood sections:
+  "If you are in crisis please reach out to a professional. ROSA is here to support you, not replace medical care."
+- Crisis resources auto-shown if mood logged very low 2+ days (already in previous prompt — confirm it is working)
+- No shame language audit: go through every page and replace any clinical, cold, or judgmental language with warm inclusive alternatives
+- Cookie and privacy policy page (basic but present)
+- Terms of service page (basic but present)
+
+After completing Step 13, stop and ask me to continue to Step 14.
+
+===========================================
+STEP 14 — GOOGLE SEO — SHOW UP IN SEARCH
+===========================================
+
+ROSA does not appear in Google search. Fix this completely.
+
+What needs to be done:
+- Add proper meta tags to every page:
+  - Title: "ROSA — Your Wellness, Your World | rosainclusive.lifestyle"
+  - Description: "ROSA is the ultimate wellness app for women and couples. Track your cycle, mood, fitness, travel, relationships and more. Join thousands of roses worldwide."
+  - Keywords: wellness app for women, period tracker, couple app, mood tracker, self care app
+- Add Open Graph tags for social sharing (Facebook, WhatsApp preview)
+- Add Twitter card tags
+- Create sitemap.xml file at rosainclusive.lifestyle/sitemap.xml
+- Create robots.txt file allowing Google to crawl
+- Add structured data (JSON-LD) for the homepage
+- Add canonical URLs on every page
+- Make sure all pages load fast (affects Google ranking)
+- Add alt text to all images
+- Submit sitemap to Google Search Console (provide instructions for how to do this manually)
+- Add Google Analytics setup instructions
+
+After completing Step 14, stop and ask me to continue to Step 15.
+
+===========================================
+STEP 15 — FULL SITE TEST OF EVERY FEATURE
+===========================================
+
+Test every single feature end to end and fix anything broken.
+
+Test checklist — confirm each works:
+- Homepage loads fast and looks premium
+- Sign up with email → verification email received → verified → logged in
+- Guest mode works and data preserved on signup
+- ROSA AI chatbot responds warmly and understands context
+- Cycle tracker logs period, shows phase, shows Goddess title
+- Mood tracker logs mood, syncs with cycle
+- Food planner shows meal suggestions based on preferences
+- Fitness section shows workout plan
+- ROSA Garden shows blooming rose, roses earned on actions
+- Streak counter works and increments daily
+- Rose Wall: post appears, anonymous option works, hate post gets blocked
+- Rose Circles: create private circle, invite friend, chat works
+- Couples games: start a game, play with partner
+- Travel page: search a destination, see results
+- Skin section: complete questionnaire, see routine
+- Outfit page loads with suggestions
+- Wishlist: add item, link to birthday
+- Milestones: add milestone with photo
+- Reminders: set reminder, syncs with milestone
+- What Rose Are You: complete quiz, download result card
+- Profile: shows nickname, ROSA ID, badges, rose count
+- Friend search: find by ROSA ID, send request
+- Night mode: toggles on and off
+- Pricing page: shows plans clearly (Stripe pending approval is fine)
+- Privacy pages exist
+- Site loads on mobile properly
+
+For anything that fails during testing — fix it immediately before marking Step 15 complete.
+
+After completing Step 15 and all fixes, push everything to GitHub and confirm the live site at rosainclusive.lifestyle is fully working. Then give me a complete summary of everything that was built and fixed.

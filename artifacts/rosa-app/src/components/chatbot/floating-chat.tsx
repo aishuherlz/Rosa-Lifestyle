@@ -3,8 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Loader2, Trash2, Sparkles, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useSubscription } from "@/lib/subscription-context";
-
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -15,7 +13,6 @@ type Message = {
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
 
 export function FloatingChat() {
-  const { isPremium } = useSubscription();
   const [open, setOpen] = useState(false);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -191,18 +188,6 @@ export function FloatingChat() {
     setMessages([]);
     setOpen(false);
     setTimeout(() => setOpen(true), 100);
-  }
-
-  if (!isPremium) {
-    return (
-      <motion.button
-        whileTap={{ scale: 0.9 }}
-        onClick={() => window.location.href = "#/subscription"}
-        className="fixed bottom-24 right-4 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-rose-400 to-pink-600 shadow-lg flex items-center justify-center text-white"
-      >
-        <MessageCircle className="w-6 h-6" />
-      </motion.button>
-    );
   }
 
   return (
