@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -37,6 +38,10 @@ import HealthSyncPage from "@/pages/health-sync";
 import ReportPage from "@/pages/report";
 import SanctuaryPage from "@/pages/sanctuary";
 import WisdomPage from "@/pages/wisdom";
+import AffirmationPage from "@/pages/affirmation";
+import SOSPage from "@/pages/sos";
+import RoseWallPage from "@/pages/rose-wall";
+import RoseQuizPage from "@/pages/rose-quiz";
 
 const queryClient = new QueryClient();
 
@@ -95,6 +100,10 @@ function Router() {
       <Route path="/report">{() => <ProtectedRoute component={ReportPage} />}</Route>
       <Route path="/sanctuary">{() => <ProtectedRoute component={SanctuaryPage} />}</Route>
       <Route path="/wisdom">{() => <ProtectedRoute component={WisdomPage} />}</Route>
+      <Route path="/affirmation">{() => <ProtectedRoute component={AffirmationPage} />}</Route>
+      <Route path="/sos">{() => <ProtectedRoute component={SOSPage} />}</Route>
+      <Route path="/rose-wall">{() => <ProtectedRoute component={RoseWallPage} />}</Route>
+      <Route path="/rose-quiz">{() => <ProtectedRoute component={RoseQuizPage} />}</Route>
 
       <Route>
         {user ? (
@@ -110,6 +119,29 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    import("@/lib/notifications").then(async ({ registerSW, requestNotifPermission, showLocalNotification }) => {
+      await registerSW();
+      const today = new Date().toISOString().split("T")[0];
+      const lastRose = localStorage.getItem("rosa_daily_notif");
+      if (lastRose !== today) {
+        const perm = await requestNotifPermission();
+        if (perm === "granted") {
+          const whispers = [
+            "🌹 Good morning, sister. Take a soft breath.",
+            "🌹 You are someone's answered prayer today.",
+            "🌹 Romanticise your morning. You deserve it.",
+            "🌹 Bloom check-in: how is your heart today?",
+            "🌹 Your softness is your superpower.",
+          ];
+          const w = whispers[new Date().getDate() % whispers.length];
+          showLocalNotification("ROSA 🌹", w, "/affirmation");
+          localStorage.setItem("rosa_daily_notif", today);
+        }
+      }
+    }).catch(() => {});
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

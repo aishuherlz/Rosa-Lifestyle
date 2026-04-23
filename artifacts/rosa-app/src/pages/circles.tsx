@@ -235,6 +235,18 @@ export default function CirclesPage() {
 
         {/* PUBLIC LOUNGES */}
         <TabsContent value="public" className="mt-4">
+          {(() => {
+            const sisters = ["Aaliyah 🌹","Sofia ✨","Priya 🌸","Mei 💗","Zara 🦋","Camila 🌙","Aisha 👑","Jade 🍓","Naomi 🌿","Luna 💎"];
+            const today = new Date().getDate();
+            const sister = sisters[today % sisters.length];
+            return (
+              <div className="rounded-2xl bg-gradient-to-r from-rose-100 to-pink-100 p-4 mb-3 border border-rose-200">
+                <p className="text-xs uppercase tracking-widest text-rose-600">Sister Spotlight ✨ Today</p>
+                <p className="font-serif text-lg text-rose-900 mt-1">{sister}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Most kind energy in the lounges this week — drop her a 🌹</p>
+              </div>
+            );
+          })()}
           <div className="flex justify-between items-center mb-3">
             <p className="text-sm text-muted-foreground">{publicList.length} lounges · open to every ROSA sister 🌍</p>
             <Dialog open={createPubOpen} onOpenChange={setCreatePubOpen}>

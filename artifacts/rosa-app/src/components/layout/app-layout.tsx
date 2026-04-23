@@ -5,6 +5,7 @@ import {
   CalendarDays, Dumbbell, Quote, MessageSquareHeart, Settings,
   Crown, Utensils, ClipboardList, Timer, BookHeart, Target,
   FlameKindling, Sparkles, Mail, Moon, Globe, Activity, FileText,
+  Sunrise, AlertCircle, Flower2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FloatingChat } from "@/components/chatbot/floating-chat";
@@ -37,6 +38,10 @@ const NAV_ITEMS = [
   { href: "/report", label: "ROSA Report", icon: FileText },
   { href: "/sanctuary", label: "Sanctuary", icon: Moon },
   { href: "/wisdom", label: "Wisdom", icon: BookHeart },
+  { href: "/affirmation", label: "Affirmation", icon: Sunrise },
+  { href: "/rose-wall", label: "Rose Wall", icon: Flower2 },
+  { href: "/rose-quiz", label: "Rose Quiz", icon: Sparkles },
+  { href: "/sos", label: "Period SOS", icon: AlertCircle },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {

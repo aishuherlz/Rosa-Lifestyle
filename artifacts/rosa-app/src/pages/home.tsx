@@ -115,7 +115,23 @@ export default function Home() {
     { href: "/reminders", label: "Reminders", icon: CalendarDays, color: "text-violet-400 bg-violet-50" },
     { href: "/partner", label: "Partner", icon: CalendarHeart, color: "text-rose-400 bg-rose-50" },
     { href: "/surveys", label: "Surveys", icon: ClipboardList, color: "text-blue-500 bg-blue-50" },
+    { href: "/affirmation", label: "Affirmation", icon: Sparkles, color: "text-rose-500 bg-rose-50" },
+    { href: "/rose-wall", label: "Rose Wall", icon: BookHeart, color: "text-pink-500 bg-pink-50" },
+    { href: "/rose-quiz", label: "Rose Quiz", icon: Sparkles, color: "text-violet-500 bg-violet-50" },
+    { href: "/sos", label: "Period SOS", icon: HeartPulse, color: "text-red-500 bg-red-50" },
+    { href: "/sanctuary", label: "Sanctuary", icon: Moon, color: "text-indigo-500 bg-indigo-50" },
+    { href: "/wisdom", label: "Wisdom", icon: BookHeart, color: "text-amber-500 bg-amber-50" },
   ];
+
+  const weeklyRecap = (() => {
+    const journal = JSON.parse(localStorage.getItem("rosa_journal") || "[]");
+    const moods = JSON.parse(localStorage.getItem("rosa_moods") || "[]");
+    const weekAgo = Date.now() - 7 * 86400000;
+    const j = journal.filter((e: any) => new Date(e.date).getTime() > weekAgo).length;
+    const m = Array.isArray(moods) ? moods.filter((e: any) => (typeof e.date === "string" ? new Date(e.date).getTime() : e.date) > weekAgo).length : 0;
+    const blooms = Math.floor(garden.streak / 7);
+    return { j, m, blooms };
+  })();
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 md:p-10 space-y-7 max-w-4xl mx-auto pb-24">
@@ -252,6 +268,16 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Weekly Recap */}
+      <section className="rounded-3xl bg-gradient-to-r from-rose-100/60 to-pink-100/60 p-5 border border-rose-200/50">
+        <p className="text-xs uppercase tracking-widest text-rose-600 mb-2">This week, you bloomed 🌹</p>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="text-center"><p className="text-2xl font-bold text-rose-600">{weeklyRecap.j}</p><p className="text-xs text-muted-foreground">journal entries</p></div>
+          <div className="text-center"><p className="text-2xl font-bold text-pink-600">{weeklyRecap.m}</p><p className="text-xs text-muted-foreground">moods logged</p></div>
+          <div className="text-center"><p className="text-2xl font-bold text-amber-600">{garden.streak}🔥</p><p className="text-xs text-muted-foreground">day streak</p></div>
+        </div>
+      </section>
 
       {/* ROSA Daily Whisper */}
       <section className="relative overflow-hidden rounded-3xl bg-secondary/30 p-7 border border-primary/10">

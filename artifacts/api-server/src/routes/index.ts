@@ -8,6 +8,7 @@ import communityRouter from "./community";
 import foundersRouter from "./founders";
 import foodVisionRouter from "./food-vision";
 import outfitVisionRouter from "./outfit-vision";
+import roseWallRouter from "./rose-wall";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(communityRouter);
 router.use(foundersRouter);
 router.use(foodVisionRouter);
 router.use(outfitVisionRouter);
+router.use(roseWallRouter);
 
 export default router;
