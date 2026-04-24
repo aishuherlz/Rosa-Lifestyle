@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/lib/user-context";
@@ -6,21 +6,101 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { OnboardingQuiz } from "@/components/onboarding/onboarding-quiz";
+import { apiUrl } from "@/lib/api";
 
 export default function SignIn() {
   const [, setLocation] = useLocation();
   const { setUser } = useUser();
-  const [step, setStep] = useState<"auth" | "gender" | "pronouns" | "onboarding">("auth");
+  const [step, setStep] = useState<"auth" | "verify" | "gender" | "pronouns" | "onboarding">("auth");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [gender, setGender] = useState("");
   const [pronouns, setPronouns] = useState("");
   const [customPronouns, setCustomPronouns] = useState("");
 
-  const handleSignIn = (e: React.FormEvent) => {
+  // Verification step state
+  const [code, setCode] = useState("");
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [resendIn, setResendIn] = useState(0);
+
+  // Countdown for the resend button so users can't spam send-code.
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setInterval(() => setResendIn((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [resendIn]);
+
+  function isEmail(s: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
+  }
+
+  async function sendCode(): Promise<boolean> {
+    setError(null); setInfo(null); setDevCode(null);
+    if (!isEmail(email)) {
+      setError("Please enter a valid email address.");
+      return false;
+    }
+    setSending(true);
+    try {
+      const res = await fetch(apiUrl("/api/auth/send-code"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ destination: email.trim().toLowerCase(), name }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setError(data?.error || "Couldn't send code. Please try again.");
+        return false;
+      }
+      setInfo(data.message || "Code sent to your email.");
+      if (data.devCode) setDevCode(String(data.devCode));
+      setResendIn(30);
+      return true;
+    } catch {
+      setError("Network error. Please check your connection and try again.");
+      return false;
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function verifyCode(): Promise<void> {
+    setError(null);
+    if (!/^\d{6}$/.test(code.trim())) {
+      setError("Please enter the 6-digit code from your email.");
+      return;
+    }
+    setVerifying(true);
+    try {
+      const res = await fetch(apiUrl("/api/auth/verify-code"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ destination: email.trim().toLowerCase(), code: code.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setError(data?.error || "Incorrect code. Please try again.");
+        return;
+      }
+      setAuthToken(typeof data.token === "string" ? data.token : null);
+      setStep("gender");
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !name) return;
-    setStep("gender");
+    const ok = await sendCode();
+    if (ok) setStep("verify");
   };
 
   const handleGuest = () => {
@@ -53,6 +133,8 @@ export default function SignIn() {
       guestMode: false,
       joinedAt: new Date().toISOString(),
       personalityTags: [],
+      authToken,
+      emailVerified: !!authToken,
     });
     setStep("onboarding");
   };
@@ -110,22 +192,34 @@ export default function SignIn() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email or Phone</Label>
+                    <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
-                      type="text"
+                      type="email"
+                      autoComplete="email"
                       placeholder="hello@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="bg-background/50 border-muted focus-visible:ring-primary/30"
                       required
+                      data-testid="input-signin-email"
                     />
+                    <p className="text-xs text-muted-foreground">We'll send a 6-digit code to verify it's you.</p>
                   </div>
                 </div>
 
+                {error && step === "auth" && (
+                  <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2" role="alert">{error}</p>
+                )}
+
                 <div className="space-y-3 pt-2">
-                  <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white rounded-full py-6 text-lg shadow-sm hover:shadow transition-all">
-                    Sign In
+                  <Button
+                    type="submit"
+                    disabled={sending || !email || !name}
+                    className="w-full bg-primary hover:bg-primary/90 text-white rounded-full py-6 text-lg shadow-sm hover:shadow transition-all disabled:opacity-60"
+                    data-testid="button-signin-send-code"
+                  >
+                    {sending ? "Sending code…" : "Send verification code"}
                   </Button>
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
@@ -134,6 +228,91 @@ export default function SignIn() {
                   <Button type="button" variant="outline" onClick={handleGuest} className="w-full rounded-full py-6 border-primary/20 text-primary hover:bg-primary/5">
                     Continue as Guest
                   </Button>
+                </div>
+              </form>
+            </motion.div>
+          )}
+
+          {step === "verify" && (
+            <motion.div
+              key="verify"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.5 }}
+              className="space-y-6"
+            >
+              <div className="text-center space-y-2">
+                <h2 className="text-3xl font-serif text-primary">Check your email 🌹</h2>
+                <p className="text-muted-foreground">
+                  We sent a 6-digit code to<br />
+                  <span className="font-medium text-foreground break-all">{email}</span>
+                </p>
+              </div>
+
+              <form
+                onSubmit={(e) => { e.preventDefault(); verifyCode(); }}
+                className="space-y-5 bg-card p-8 rounded-2xl shadow-sm border border-border/50"
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="code">Verification code</Label>
+                  <Input
+                    id="code"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    placeholder="123456"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    className="bg-background/50 border-muted focus-visible:ring-primary/30 text-center text-2xl tracking-[0.5em] font-mono"
+                    autoFocus
+                    required
+                    data-testid="input-verify-code"
+                  />
+                  <p className="text-xs text-muted-foreground text-center">Code expires in 10 minutes.</p>
+                </div>
+
+                {info && (
+                  <p className="text-sm text-primary/80 bg-primary/5 rounded-lg px-3 py-2 text-center">{info}</p>
+                )}
+                {devCode && (
+                  <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 text-center">
+                    Dev mode — use code: <span className="font-mono font-bold">{devCode}</span>
+                  </p>
+                )}
+                {error && (
+                  <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2" role="alert">{error}</p>
+                )}
+
+                <Button
+                  type="submit"
+                  disabled={verifying || code.length !== 6}
+                  className="w-full bg-primary hover:bg-primary/90 text-white rounded-full py-6 text-lg disabled:opacity-60"
+                  data-testid="button-verify-code"
+                >
+                  {verifying ? "Verifying…" : "Verify & continue 🌸"}
+                </Button>
+
+                <div className="flex items-center justify-between text-sm pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setStep("auth"); setCode(""); setError(null); setInfo(null); setDevCode(null); }}
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                    data-testid="button-change-email"
+                  >
+                    ← Change email
+                  </button>
+                  <button
+                    type="button"
+                    disabled={resendIn > 0 || sending}
+                    onClick={sendCode}
+                    className="text-primary hover:underline disabled:text-muted-foreground disabled:no-underline disabled:cursor-not-allowed"
+                    data-testid="button-resend-code"
+                  >
+                    {resendIn > 0 ? `Resend in ${resendIn}s` : sending ? "Sending…" : "Resend code"}
+                  </button>
                 </div>
               </form>
             </motion.div>

@@ -8,6 +8,10 @@ export type User = {
   guestMode: boolean;
   joinedAt: string;
   personalityTags: string[];
+  // Email-verified signed token from POST /api/auth/verify-code.
+  // Null for guests; present once the user has verified their email.
+  authToken?: string | null;
+  emailVerified?: boolean;
 };
 
 type UserContextType = {
