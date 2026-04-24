@@ -1,20 +1,19 @@
 import { Router } from "express";
 import { db, conversations, messages } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { getOpenAI } from "../../lib/openai-client";
+import { streamChat, chatOnce, getActiveProvider } from "../../lib/chat-client";
 import { logger } from "../../lib/logger";
 
 const router = Router();
 
-// Surface a 503 with a clear message instead of a silent 500 if the key isn't configured.
-function ensureOpenAI(res: any): ReturnType<typeof getOpenAI> | null {
-  try {
-    return getOpenAI();
-  } catch (e: any) {
-    logger.error({ err: e?.message }, "OpenAI client unavailable");
+// Surface a 503 with a clear message instead of a silent 500 if no AI provider configured.
+function ensureProvider(res: any): boolean {
+  if (getActiveProvider() === "missing") {
+    logger.error("Chat provider missing — set GEMINI_API_KEY or OPENAI_API_KEY");
     res.status(503).json({ error: "AI service is not configured. Please contact support." });
-    return null;
+    return false;
   }
+  return true;
 }
 
 // Validate a numeric URL param before any DB call so we never query with NaN.
@@ -104,8 +103,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
     return;
   }
 
-  const openai = ensureOpenAI(res);
-  if (!openai) return;
+  if (!ensureProvider(res)) return;
 
   try {
     await db.insert(messages).values({
@@ -151,47 +149,40 @@ Keep responses warm, conversational, and concise unless the user wants more dept
     // If the user closes the tab mid-stream, abort the upstream call too.
     req.on("close", () => { if (!res.writableEnded) abort.abort(); });
     try {
-      const stream = await openai.chat.completions.create({
-        model: "gpt-4o",
-        max_tokens: 1024,
-        temperature: 0.85,
-        messages: chatMessages,
-        stream: true,
-      }, { signal: abort.signal });
-      for await (const chunk of stream) {
-        const chunkContent = chunk.choices[0]?.delta?.content;
-        if (chunkContent) {
-          fullResponse += chunkContent;
-          emittedAny = true;
-          res.write(`data: ${JSON.stringify({ content: chunkContent })}\n\n`);
-        }
+      for await (const chunkContent of streamChat(chatMessages, { signal: abort.signal, maxTokens: 1024, temperature: 0.85 })) {
+        fullResponse += chunkContent;
+        emittedAny = true;
+        res.write(`data: ${JSON.stringify({ content: chunkContent })}\n\n`);
       }
     } catch (streamErr: any) {
-      console.error("Chatbot stream error:", streamErr?.message || streamErr);
+      logger.error({ err: streamErr?.message, status: streamErr?.status, provider: getActiveProvider() }, "Chatbot stream error");
       if (emittedAny) {
         // Don't append a second answer; tell the client we cut off and persist what we have.
         const note = "\n\n(…my words got tangled, sister — please ask again 🌹)";
         fullResponse += note;
         res.write(`data: ${JSON.stringify({ content: note })}\n\n`);
       } else {
-        // Safe to fall back to a fresh non-streaming response (nothing was sent yet).
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          max_tokens: 1024,
-          messages: chatMessages,
-        }, { signal: abort.signal });
-        fullResponse = completion.choices[0]?.message?.content || "I'm having a moment, sister 🌹 — please try again.";
-        res.write(`data: ${JSON.stringify({ content: fullResponse })}\n\n`);
+        // Safe to fall back to a non-streaming response (nothing was sent yet).
+        try {
+          fullResponse = await chatOnce(chatMessages, { signal: abort.signal, maxTokens: 1024 });
+          if (!fullResponse) fullResponse = "I'm having a moment, sister 🌹 — please try again.";
+          res.write(`data: ${JSON.stringify({ content: fullResponse })}\n\n`);
+        } catch (fallbackErr: any) {
+          throw streamErr; // bubble to outer catch so user-friendly message is sent
+        }
       }
     } finally {
       clearTimeout(abortTimer);
     }
 
-    await db.insert(messages).values({
-      conversationId: id,
-      role: "assistant",
-      content: fullResponse,
-    });
+    // Only persist a real reply — never insert empty assistant rows that pollute conversation history.
+    if (fullResponse.trim()) {
+      await db.insert(messages).values({
+        conversationId: id,
+        role: "assistant",
+        content: fullResponse,
+      });
+    }
 
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
     res.end();

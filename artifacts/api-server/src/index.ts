@@ -6,13 +6,13 @@ process.setMaxListeners(50);
 
 import app from "./app";
 import { logger } from "./lib/logger";
-import { logOpenAIConfig } from "./lib/openai-client";
+import { logChatProviderConfig } from "./lib/chat-client";
 import { db, conversations } from "@workspace/db";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./stripeClient";
 
 // Boot diagnostics — surface config problems immediately in Railway/Replit logs.
-logOpenAIConfig();
+logChatProviderConfig();
 if (!process.env.DATABASE_URL?.trim()) {
   logger.error("DATABASE_URL is MISSING — chatbot, rose wall, circles will all 500.");
 } else {
