@@ -1,97 +1,111 @@
 import { Router } from "express";
 import { db, conversations, messages } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { getOpenAI } from "../../lib/openai-client";
+import { logger } from "../../lib/logger";
 
 const router = Router();
 
-router.get("/conversations", async (req, res) => {
+// Surface a 503 with a clear message instead of a silent 500 if the key isn't configured.
+function ensureOpenAI(res: any): ReturnType<typeof getOpenAI> | null {
+  try {
+    return getOpenAI();
+  } catch (e: any) {
+    logger.error({ err: e?.message }, "OpenAI client unavailable");
+    res.status(503).json({ error: "AI service is not configured. Please contact support." });
+    return null;
+  }
+}
+
+// Validate a numeric URL param before any DB call so we never query with NaN.
+function parseId(raw: string | undefined): number | null {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+}
+
+router.get("/conversations", async (_req, res) => {
   try {
     const result = await db
       .select()
       .from(conversations)
       .orderBy(conversations.createdAt);
     res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch conversations" });
+  } catch (err: any) {
+    logger.error({ err: err?.message, stack: err?.stack }, "GET /conversations failed");
+    res.status(500).json({ error: err?.message || "Failed to fetch conversations" });
   }
 });
 
 router.post("/conversations", async (req, res) => {
   try {
-    const { title } = req.body;
+    const { title } = req.body || {};
     const [conv] = await db
       .insert(conversations)
-      .values({ title: title || "ROSA Chat" })
+      .values({ title: typeof title === "string" && title.trim() ? title.trim() : "ROSA Chat" })
       .returning();
+    if (!conv) {
+      res.status(500).json({ error: "Insert returned no row" });
+      return;
+    }
     res.status(201).json(conv);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to create conversation" });
+  } catch (err: any) {
+    logger.error({ err: err?.message, stack: err?.stack }, "POST /conversations failed");
+    res.status(500).json({ error: err?.message || "Failed to create conversation" });
   }
 });
 
 router.get("/conversations/:id", async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) { res.status(400).json({ error: "Invalid conversation id" }); return; }
   try {
-    const id = parseInt(req.params.id, 10);
-    const [conv] = await db
-      .select()
-      .from(conversations)
-      .where(eq(conversations.id, id));
-    if (!conv) {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
-    const msgs = await db
-      .select()
-      .from(messages)
-      .where(eq(messages.conversationId, id))
-      .orderBy(messages.createdAt);
+    const [conv] = await db.select().from(conversations).where(eq(conversations.id, id));
+    if (!conv) { res.status(404).json({ error: "Not found" }); return; }
+    const msgs = await db.select().from(messages).where(eq(messages.conversationId, id)).orderBy(messages.createdAt);
     res.json({ ...conv, messages: msgs });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch conversation" });
+  } catch (err: any) {
+    logger.error({ err: err?.message, stack: err?.stack, id }, "GET /conversations/:id failed");
+    res.status(500).json({ error: err?.message || "Failed to fetch conversation" });
   }
 });
 
 router.delete("/conversations/:id", async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) { res.status(400).json({ error: "Invalid conversation id" }); return; }
   try {
-    const id = parseInt(req.params.id, 10);
     await db.delete(messages).where(eq(messages.conversationId, id));
-    const deleted = await db
-      .delete(conversations)
-      .where(eq(conversations.id, id))
-      .returning();
-    if (!deleted.length) {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
+    const deleted = await db.delete(conversations).where(eq(conversations.id, id)).returning();
+    if (!deleted.length) { res.status(404).json({ error: "Not found" }); return; }
     res.status(204).end();
-  } catch (err) {
-    res.status(500).json({ error: "Failed to delete conversation" });
+  } catch (err: any) {
+    logger.error({ err: err?.message, stack: err?.stack, id }, "DELETE /conversations/:id failed");
+    res.status(500).json({ error: err?.message || "Failed to delete conversation" });
   }
 });
 
 router.get("/conversations/:id/messages", async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) { res.status(400).json({ error: "Invalid conversation id" }); return; }
   try {
-    const id = parseInt(req.params.id, 10);
-    const msgs = await db
-      .select()
-      .from(messages)
-      .where(eq(messages.conversationId, id))
-      .orderBy(messages.createdAt);
+    const msgs = await db.select().from(messages).where(eq(messages.conversationId, id)).orderBy(messages.createdAt);
     res.json(msgs);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch messages" });
+  } catch (err: any) {
+    logger.error({ err: err?.message, stack: err?.stack, id }, "GET /conversations/:id/messages failed");
+    res.status(500).json({ error: err?.message || "Failed to fetch messages" });
   }
 });
 
 router.post("/conversations/:id/messages", async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const { content } = req.body as { content: string };
+  const id = parseId(req.params.id);
+  if (id === null) { res.status(400).json({ error: "Invalid conversation id" }); return; }
+  const { content } = (req.body || {}) as { content?: string };
 
-  if (!content) {
+  if (!content || typeof content !== "string" || !content.trim()) {
     res.status(400).json({ error: "content is required" });
     return;
   }
+
+  const openai = ensureOpenAI(res);
+  if (!openai) return;
 
   try {
     await db.insert(messages).values({
@@ -182,7 +196,7 @@ Keep responses warm, conversational, and concise unless the user wants more dept
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
     res.end();
   } catch (err: any) {
-    console.error("Chatbot error:", err?.message || err, err?.stack);
+    logger.error({ err: err?.message, stack: err?.stack }, "Chatbot route failed");
     try { res.write(`data: ${JSON.stringify({ content: "I'm having a moment, sister 🌹 — please try again in a bit." })}\n\n`); res.write(`data: ${JSON.stringify({ done: true })}\n\n`); } catch {}
     res.end();
   }

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { getOpenAI } from "../lib/openai-client";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -44,7 +44,7 @@ router.post("/outfit-vision", async (req, res) => {
     const safeWeather = String(weather || "").slice(0, 40);
     const safeMood = String(mood || "").slice(0, 40);
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: "gpt-5",
       max_completion_tokens: 700,
       messages: [

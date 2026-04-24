@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { getOpenAI } from "../lib/openai-client";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -34,7 +34,7 @@ router.post("/food-vision", async (req, res) => {
     const safeMealHint = typeof mealHint === "string" && /^(breakfast|lunch|dinner|snack)$/.test(mealHint)
       ? mealHint : undefined;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: "gpt-5",
       max_completion_tokens: 800,
       messages: [

@@ -6,8 +6,26 @@ process.setMaxListeners(50);
 
 import app from "./app";
 import { logger } from "./lib/logger";
+import { logOpenAIConfig } from "./lib/openai-client";
+import { db, conversations } from "@workspace/db";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./stripeClient";
+
+// Boot diagnostics — surface config problems immediately in Railway/Replit logs.
+logOpenAIConfig();
+if (!process.env.DATABASE_URL?.trim()) {
+  logger.error("DATABASE_URL is MISSING — chatbot, rose wall, circles will all 500.");
+} else {
+  logger.info("DATABASE_URL loaded");
+  // Verify the conversations table is reachable. If not, the user almost
+  // certainly forgot to run `pnpm db:push` against the production database.
+  db.select().from(conversations).limit(1)
+    .then(() => logger.info("conversations table OK"))
+    .catch((err: any) => logger.error(
+      { err: err?.message },
+      "conversations table NOT reachable — run `pnpm db:push` against your production DATABASE_URL."
+    ));
+}
 
 // Keep the server alive even if a single request handler throws / a promise rejects.
 // Without these, one bad request can take the whole site down for everyone.
