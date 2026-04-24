@@ -27,6 +27,17 @@ function escape(s: string): string {
   );
 }
 
+// Strip every CR / LF / NUL plus other control chars, then trim and cap.
+// Anything that gets baked into a mail header (Subject, From-name, etc.)
+// MUST go through this — a stray "\r\nBcc: attacker@x" in a name field
+// would otherwise let a user inject an extra header (RFC 5322 §2.2).
+function safeForHeader(s: string, maxLen = 120): string {
+  return String(s || "")
+    .replace(/[\r\n\u0000-\u001f\u007f]/g, " ")
+    .trim()
+    .slice(0, maxLen);
+}
+
 function buildSupportHtml(args: {
   type: string; subject: string; name: string; email: string; message: string; receivedAt: string;
 }): string {
@@ -79,16 +90,41 @@ async function sendViaSendGrid(args: {
         personalizations: [{ to: [{ email: args.to }] }],
         from: { email: from, name: "ROSA Support 🌹" },
         // Reply-To with the user's name+email so Gmail "Reply" goes to them.
-        reply_to: { email: args.replyTo, name: args.replyToName || undefined },
+        // The name component lives inside a mail header, so it must be
+        // CR/LF-stripped just like the Subject — same RFC 5322 §2.2
+        // header-injection concern (see safeForHeader at top of file).
+        reply_to: { email: args.replyTo, name: safeForHeader(args.replyToName, 80) || undefined },
         subject: args.subject,
         categories: ["rosa-support"],
         custom_args: { kind: "support", reply_to: args.replyTo },
+        // Deliverability-focused headers. Owner specifically requested
+        // X-Priority/Importance to flag these as high importance. Gmail
+        // treats these as weak hints — main spam signals are SPF/DKIM/
+        // DMARC alignment + sender reputation (see comment at bottom).
+        //
+        // List-Unsubscribe is mailto-only (no HTTPS one-click endpoint
+        // exists yet), so we deliberately do NOT send List-Unsubscribe-Post
+        // — RFC 8058 only allows that paired with an https:// URI.
+        //
+        // X-Entity-Ref-ID is a per-message unique id used by Gmail to
+        // dedupe and group legitimate transactional traffic.
+        headers: {
+          "X-Priority": "1",
+          "X-MSMail-Priority": "High",
+          "Importance": "High",
+          "List-Unsubscribe": `<mailto:${args.to}?subject=unsubscribe>`,
+          "X-Entity-Ref-ID": `rosa-support-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        },
         mail_settings: { sandbox_mode: { enable: false } },
         tracking_settings: {
           click_tracking: { enable: false, enable_text: false },
           open_tracking: { enable: false },
           subscription_tracking: { enable: false },
         },
+        // ORDER MATTERS: per RFC 2046, the *last* part is what most
+        // clients render. So plain-text comes first, HTML last — this is
+        // the standard Gmail-friendly ordering and what SendGrid examples
+        // use too.
         content: [
           { type: "text/plain", value: args.text },
           { type: "text/html", value: args.html },
@@ -142,9 +178,14 @@ router.post("/support/send", async (req, res) => {
     "Support Request";
 
   const userSubject = (subject || "").trim() || message.split("\n")[0].slice(0, 80) || typeLabel;
-  // Final email subject — exactly the format the owner asked for:
-  //   "ROSA Support Request 🌹 — [their subject]"
-  const emailSubject = `ROSA ${typeLabel} 🌹 — ${userSubject}`;
+  // Friendly personal subject line. The user-supplied name is sanitised
+  // first to strip CR/LF — without this a malicious name like
+  //   "Ann\r\nBcc: attacker@x.com"
+  // could let a sender inject extra mail headers via SendGrid (header
+  // injection, RFC 5322 §2.2). The body of the email still shows the
+  // category/subject so the recipient has full context.
+  const safeName = safeForHeader(name, 80) || "a sister";
+  const emailSubject = `💌 New message from ${safeName} via ROSA`;
 
   const receivedAt = new Date().toLocaleString("en-US", {
     weekday: "short",
@@ -153,17 +194,27 @@ router.post("/support/send", async (req, res) => {
     timeZoneName: "short",
   });
 
+  // Plain-text version. Gmail's spam classifier penalises HTML-only
+  // emails, so we send a clean, well-formatted text/plain part too. Keep
+  // the structure scannable so it reads naturally even in a terminal.
   const text =
-`Type: ${typeLabel}
-Subject: ${userSubject}
-From: ${name} <${email}>
-Received: ${receivedAt}
+`Hi Aiswarya,
+
+You have a new ${typeLabel.toLowerCase()} from ${name} on ROSA.
+
+  From:     ${name} <${email}>
+  Subject:  ${userSubject}
+  Received: ${receivedAt}
 
 Message:
+--------
 ${message}
 
----
-Reply directly to this email — your response goes straight to ${name}.`;
+--
+Reply directly to this email and your response goes straight to ${name}.
+
+ROSA — for women, by women 🌹
+https://rosainclusive.lifestyle`;
 
   const html = buildSupportHtml({ type: typeLabel, subject: userSubject, name, email, message, receivedAt });
 
