@@ -317,12 +317,35 @@ router.post("/auth/send-code", async (req, res) => {
 // Look up (or upsert) the rosa_users row for an email so we have a stable
 // tokenVersion. We don't require name here — sign-up may flow through gender/
 // pronouns step before saving full profile elsewhere.
-async function ensureUserRow(email: string): Promise<{ tokenVersion: number }> {
+// Sanitises any incoming marketingOptIn value to one of three safe states.
+// Anything unrecognised falls back to "later" so we never write garbage to DB.
+function cleanMarketingPref(v: unknown): "yes" | "later" | "never" {
+  return v === "yes" || v === "never" ? v : "later";
+}
+
+async function ensureUserRow(
+  email: string,
+  marketingOptIn?: "yes" | "later" | "never",
+): Promise<{ tokenVersion: number }> {
   const existing = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
-  if (existing[0]) return { tokenVersion: existing[0].tokenVersion ?? 1 };
+  if (existing[0]) {
+    // Existing user: only OVERWRITE the marketing pref if a value was sent
+    // explicitly (so re-verifying without sending the field never silently
+    // resets a previously-set preference).
+    if (marketingOptIn) {
+      await db.update(rosaUsers)
+        .set({ marketingOptIn })
+        .where(eq(rosaUsers.emailOrPhone, email));
+    }
+    return { tokenVersion: existing[0].tokenVersion ?? 1 };
+  }
   const [row] = await db
     .insert(rosaUsers)
-    .values({ emailOrPhone: email, name: email.split("@")[0] || "Friend" })
+    .values({
+      emailOrPhone: email,
+      name: email.split("@")[0] || "Friend",
+      marketingOptIn: marketingOptIn ?? "later",
+    })
     .onConflictDoNothing({ target: rosaUsers.emailOrPhone })
     .returning();
   if (row) return { tokenVersion: row.tokenVersion ?? 1 };
@@ -332,7 +355,7 @@ async function ensureUserRow(email: string): Promise<{ tokenVersion: number }> {
 }
 
 router.post("/auth/verify-code", async (req, res) => {
-  const { destination, code, rememberMe, deviceName } = req.body || {};
+  const { destination, code, rememberMe, deviceName, marketingOptIn } = req.body || {};
   if (!destination || !code) return res.status(400).json({ ok: false, error: "Missing fields" });
   const dest = normalize(destination);
   const entry = codes.get(dest);
@@ -356,7 +379,10 @@ router.post("/auth/verify-code", async (req, res) => {
   const ip = getClientIp(req);
 
   try {
-    const { tokenVersion } = await ensureUserRow(dest);
+    const { tokenVersion } = await ensureUserRow(
+      dest,
+      marketingOptIn !== undefined ? cleanMarketingPref(marketingOptIn) : undefined,
+    );
     await db.insert(trustedDevices).values({
       email: dest,
       deviceId,
@@ -417,6 +443,8 @@ async function requireSession(req: any, res: any, next: any): Promise<void> {
   next();
 }
 
+// Surface marketingOptIn to the client so the Settings page can show the
+// current preference selected. Returned alongside other public profile fields.
 router.get("/auth/me", requireSession, async (req: any, res) => {
   const { email } = req.session;
   const [user] = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
@@ -432,6 +460,7 @@ router.get("/auth/me", requireSession, async (req: any, res) => {
       isLifetimeFree: user.isLifetimeFree,
       subscriptionStatus: user.subscriptionStatus,
       trialEndsAt: user.trialEndsAt,
+      marketingOptIn: user.marketingOptIn ?? "later",
     } : null,
   });
 });
@@ -468,6 +497,18 @@ router.delete("/auth/devices/:deviceId", requireSession, async (req: any, res) =
     .returning();
   if (!result.length) return res.status(404).json({ ok: false, error: "Device not found" });
   res.json({ ok: true, removed: target });
+});
+
+// Update marketing consent for the signed-in user. Mounted under requireSession
+// so only the logged-in person can change their own preference.
+router.put("/auth/marketing-pref", requireSession, async (req: any, res) => {
+  const { email } = req.session;
+  const pref = cleanMarketingPref(req.body?.marketingOptIn);
+  await db
+    .update(rosaUsers)
+    .set({ marketingOptIn: pref, updatedAt: new Date() })
+    .where(eq(rosaUsers.emailOrPhone, email));
+  res.json({ ok: true, marketingOptIn: pref });
 });
 
 router.post("/auth/logout-all", requireSession, async (req: any, res) => {

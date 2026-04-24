@@ -224,7 +224,10 @@ Keep responses warm, conversational, and concise unless the user wants more dept
     if (status === 429 || /quota|rate limit|insufficient_quota/i.test(msg)) {
       userMsg = "ROSA's chat is taking a little break 🌸 — our AI quota is full right now. Aiswarya has been notified and we'll be back soon. In the meantime, try the journal or quotes pages 💝";
     } else if (status === 401 || status === 403 || /api key|authentication|permission/i.test(msg)) {
-      userMsg = "ROSA's chat needs a moment to wake up 🌹 — please try again shortly.";
+      // Be honest: this isn't fixable by retrying — the AI key on the server is
+      // bad/expired/revoked and Aiswarya needs to rotate it. Telling users to
+      // "try again shortly" makes them re-send forever and trust ROSA less.
+      userMsg = "ROSA's chat is offline right now, sister 🌹 — Aiswarya has been notified. While you wait, the journal, quotes, and affirmations pages are still here for you 💝";
     } else if (blockReason || /safety|blocked/i.test(msg)) {
       userMsg = "Let me think of a softer way to answer that, sister 🌸 — try asking it a slightly different way?";
     } else if (/empty response|no user message/i.test(msg)) {

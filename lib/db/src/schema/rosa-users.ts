@@ -17,6 +17,10 @@ export const rosaUsers = pgTable("rosa_users", {
   // Bumping this number invalidates every session token issued for this user.
   // Used by "Log out of all devices" so all old tokens fail signature/version check.
   tokenVersion: integer("token_version").notNull().default(1),
+  // Marketing email consent: "yes" | "later" | "never".
+  // Default "later" so a fresh signup is treated as "ask me again from settings"
+  // — this keeps us GDPR/CAN-SPAM friendly (no implicit opt-in).
+  marketingOptIn: text("marketing_opt_in").notNull().default("later"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

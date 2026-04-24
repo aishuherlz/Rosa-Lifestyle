@@ -22,6 +22,10 @@ export default function SignIn() {
   // Persistent-session opt-in. Default true because the most common ROSA use
   // case is the user's own phone/laptop and re-verifying every visit is friction.
   const [rememberMe, setRememberMe] = useState(true);
+  // Marketing email consent. Default "later" so we don't auto-opt anyone in
+  // (CAN-SPAM/GDPR friendly) and so users who don't notice the choice can be
+  // gently re-asked from the Settings page.
+  const [marketingOptIn, setMarketingOptIn] = useState<"yes" | "later" | "never">("later");
 
   // Verification step state
   const [code, setCode] = useState("");
@@ -89,6 +93,7 @@ export default function SignIn() {
           destination: email.trim().toLowerCase(),
           code: code.trim(),
           rememberMe,
+          marketingOptIn,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -240,6 +245,50 @@ export default function SignIn() {
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {rememberMe ? "Stay signed in for 30 days." : "Sign me out when I close my browser."}
                     </p>
+                  </div>
+                </div>
+
+                {/* Marketing email opt-in — three explicit choices so we have
+                    real consent (not a pre-checked dark pattern). "Later" is
+                    default so the Settings page can re-ask gently. */}
+                <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-4 space-y-2">
+                  <Label className="text-sm font-medium text-foreground">
+                    Stay in the loop?
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Promotional offers, exclusive deals, and ROSA updates from <span className="font-medium text-foreground">news@rosainclusive.lifestyle</span>. Your verification codes still come from <span className="font-medium text-foreground">noreply@rosainclusive.lifestyle</span> regardless.
+                  </p>
+                  <div className="grid gap-2 pt-1">
+                    {([
+                      { v: "yes", label: "Yes, sign me up", hint: "I'd love offers and deals 💝" },
+                      { v: "later", label: "Maybe later", hint: "Ask me again from settings" },
+                      { v: "never", label: "No thank you", hint: "Don't ever email me promotions" },
+                    ] as const).map((opt) => (
+                      <label
+                        key={opt.v}
+                        htmlFor={`marketing-${opt.v}`}
+                        className={`flex items-start gap-2 rounded-lg px-3 py-2 cursor-pointer border transition-colors ${
+                          marketingOptIn === opt.v
+                            ? "border-primary/60 bg-primary/[0.08]"
+                            : "border-border/50 hover:border-primary/30 hover:bg-primary/[0.03]"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          id={`marketing-${opt.v}`}
+                          name="marketing-opt-in"
+                          value={opt.v}
+                          checked={marketingOptIn === opt.v}
+                          onChange={() => setMarketingOptIn(opt.v)}
+                          data-testid={`radio-marketing-${opt.v}`}
+                          className="mt-1 accent-primary"
+                        />
+                        <div className="leading-tight">
+                          <div className="text-sm">{opt.label}</div>
+                          <div className="text-[11px] text-muted-foreground">{opt.hint}</div>
+                        </div>
+                      </label>
+                    ))}
                   </div>
                 </div>
 

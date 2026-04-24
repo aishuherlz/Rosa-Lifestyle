@@ -14,6 +14,7 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { TrustedDevices } from "@/components/trusted-devices";
+import { MarketingPreferences } from "@/components/marketing-preferences";
 
 const PERSONALITY_TAGS = ["feminist", "spiritual", "adventurous", "gentle", "bold", "self-love", "strength", "growth"];
 
@@ -308,6 +309,9 @@ export default function SettingsPage() {
       <Button onClick={handleSave} className="w-full bg-primary hover:bg-primary/90">
         Save Changes
       </Button>
+
+      {/* Email preferences — only shows for verified email users */}
+      <MarketingPreferences />
 
       {/* Trusted Devices — only shows for verified email users */}
       <TrustedDevices />
