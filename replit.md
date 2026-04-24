@@ -24,7 +24,7 @@ A luxurious full-featured lifestyle web app for women. "An app made for women, b
 
 **Pages / Features:**
 - Intro animation — ROSA wordmark, founder tagline ("Built by Aiswarya Saji — a woman who struggled just like you")
-- Sign In — email/phone/guest + gender identity selection
+- Sign In — email-only verification + gender identity selection. **Persistent login**: "Remember me on this device" checkbox (default ON, 30 days) — otherwise session lasts 1 day. Sessions are signed v2 tokens (HMAC + tokenVersion + deviceId + exp), stored obfuscated in localStorage (remember-me) or sessionStorage. Each verified login creates a row in `trusted_devices` (Settings → Trusted Devices shows them, lets user revoke individually or "Sign out of all devices" — which bumps `tokenVersion` so every old token is instantly invalid).
 - Home — weather (OpenMeteo), daily quote, quick-access grid (12 sections), trial/subscription banners, founder note
 - Mood Tracker — daily mood logging, activity/food/workout suggestions
 - Period Tracker — cycle logging, ovulation, calendar, PMS suggestions

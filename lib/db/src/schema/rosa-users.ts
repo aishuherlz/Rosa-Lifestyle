@@ -14,6 +14,25 @@ export const rosaUsers = pgTable("rosa_users", {
   subscriptionStatus: text("subscription_status").default("trial"),
   partnerInviteCode: text("partner_invite_code"),
   partnerOfUserId: integer("partner_of_user_id"),
+  // Bumping this number invalidates every session token issued for this user.
+  // Used by "Log out of all devices" so all old tokens fail signature/version check.
+  tokenVersion: integer("token_version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// One row per "trusted device" for a given email. Created on every successful
+// verify-code that opted into Remember Me. Used to power the Trusted Devices
+// settings panel so users can see and revoke individual sessions.
+export const trustedDevices = pgTable("trusted_devices", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull(),
+  deviceId: text("device_id").notNull().unique(),
+  deviceName: text("device_name"),
+  userAgent: text("user_agent"),
+  ipHash: text("ip_hash"),
+  rememberMe: boolean("remember_me").notNull().default(false),
+  expiresAt: timestamp("expires_at").notNull(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
 });

@@ -5,22 +5,27 @@ import { useUser } from "@/lib/user-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { OnboardingQuiz } from "@/components/onboarding/onboarding-quiz";
 import { apiUrl } from "@/lib/api";
+import type { StoredSession } from "@/lib/auth-storage";
 
 export default function SignIn() {
   const [, setLocation] = useLocation();
-  const { setUser } = useUser();
+  const { setUser, signInWith } = useUser();
   const [step, setStep] = useState<"auth" | "verify" | "gender" | "pronouns" | "onboarding">("auth");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [gender, setGender] = useState("");
   const [pronouns, setPronouns] = useState("");
   const [customPronouns, setCustomPronouns] = useState("");
+  // Persistent-session opt-in. Default true because the most common ROSA use
+  // case is the user's own phone/laptop and re-verifying every visit is friction.
+  const [rememberMe, setRememberMe] = useState(true);
 
   // Verification step state
   const [code, setCode] = useState("");
-  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [pendingSession, setPendingSession] = useState<StoredSession | null>(null);
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,14 +85,30 @@ export default function SignIn() {
       const res = await fetch(apiUrl("/api/auth/verify-code"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ destination: email.trim().toLowerCase(), code: code.trim() }),
+        body: JSON.stringify({
+          destination: email.trim().toLowerCase(),
+          code: code.trim(),
+          rememberMe,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
         setError(data?.error || "Incorrect code. Please try again.");
         return;
       }
-      setAuthToken(typeof data.token === "string" ? data.token : null);
+      // Stash the full session so handleSavePronouns can persist it atomically
+      // alongside the rest of the profile (name/gender/pronouns).
+      if (typeof data.token === "string" && data.deviceId && data.expiresAt) {
+        setPendingSession({
+          token: data.token,
+          email: email.trim().toLowerCase(),
+          deviceId: data.deviceId,
+          expiresAt: data.expiresAt,
+          rememberMe: !!data.rememberMe,
+        });
+      } else {
+        setPendingSession(null);
+      }
       setStep("gender");
     } catch {
       setError("Network error. Please try again.");
@@ -125,7 +146,7 @@ export default function SignIn() {
 
   const handleSavePronouns = () => {
     const finalPronouns = pronouns === "custom" ? (customPronouns.trim() || "she/her") : (pronouns || "she/her");
-    setUser({
+    signInWith({
       name,
       emailOrPhone: email,
       gender,
@@ -133,9 +154,7 @@ export default function SignIn() {
       guestMode: false,
       joinedAt: new Date().toISOString(),
       personalityTags: [],
-      authToken,
-      emailVerified: !!authToken,
-    });
+    }, pendingSession);
     setStep("onboarding");
   };
 
@@ -205,6 +224,22 @@ export default function SignIn() {
                       data-testid="input-signin-email"
                     />
                     <p className="text-xs text-muted-foreground">We'll send a 6-digit code to verify it's you.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2 pt-1">
+                  <Checkbox
+                    id="remember-me"
+                    checked={rememberMe}
+                    onCheckedChange={(v) => setRememberMe(v === true)}
+                    data-testid="checkbox-remember-me"
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <Label htmlFor="remember-me" className="text-sm cursor-pointer">Remember me on this device</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {rememberMe ? "Stay signed in for 30 days." : "Sign me out when I close my browser."}
+                    </p>
                   </div>
                 </div>
 

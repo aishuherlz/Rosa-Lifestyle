@@ -13,6 +13,7 @@ import { useSubscription } from "@/lib/subscription-context";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { TrustedDevices } from "@/components/trusted-devices";
 
 const PERSONALITY_TAGS = ["feminist", "spiritual", "adventurous", "gentle", "bold", "self-love", "strength", "growth"];
 
@@ -37,7 +38,7 @@ type TimezoneSettings = {
 };
 
 export default function SettingsPage() {
-  const { user, setUser } = useUser();
+  const { user, setUser, logout } = useUser();
   const { plan, daysLeftInTrial } = useSubscription();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -80,9 +81,9 @@ export default function SettingsPage() {
     toast({ title: "Saved!", description: "Your profile has been updated." });
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    sessionStorage.removeItem("rosa_intro_seen");
+  const handleLogout = async () => {
+    // Revokes the current device server-side AND clears all local storage.
+    await logout();
     setLocation("/sign-in");
   };
 
@@ -307,6 +308,9 @@ export default function SettingsPage() {
       <Button onClick={handleSave} className="w-full bg-primary hover:bg-primary/90">
         Save Changes
       </Button>
+
+      {/* Trusted Devices — only shows for verified email users */}
+      <TrustedDevices />
 
       {/* Sign out */}
       <Card className="border-destructive/20 shadow-sm">

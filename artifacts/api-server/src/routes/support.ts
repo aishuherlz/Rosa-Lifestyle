@@ -5,12 +5,17 @@ const router = Router();
 router.use(express.json({ limit: "50kb" }));
 
 const SUPPORT_INBOX = process.env.SUPPORT_EMAIL || "rosainclusivelifestyle@gmail.com";
+
+// Per-IP rate limit. User asked for max 3 per hour to deter spam without
+// punishing real people who hit Send twice by accident.
 const RATE = new Map<string, number[]>();
+const WINDOW_MS = 60 * 60 * 1000;
+const MAX_PER_WINDOW = 3;
 
 function rateLimit(ip: string): boolean {
   const now = Date.now();
-  const arr = (RATE.get(ip) || []).filter((t) => now - t < 60_000);
-  if (arr.length >= 3) return false;
+  const arr = (RATE.get(ip) || []).filter((t) => now - t < WINDOW_MS);
+  if (arr.length >= MAX_PER_WINDOW) return false;
   arr.push(now);
   RATE.set(ip, arr);
   return true;
@@ -23,22 +28,33 @@ function escape(s: string): string {
 }
 
 function buildSupportHtml(args: {
-  type: string; name: string; email: string; message: string;
+  type: string; subject: string; name: string; email: string; message: string; receivedAt: string;
 }): string {
-  const { type, name, email, message } = args;
+  const { type, subject, name, email, message, receivedAt } = args;
   return `<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#fdf6f4;font-family:Georgia,serif;color:#3d1a24;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f4;padding:32px 16px;">
     <tr><td align="center">
-      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(139,34,82,0.10);">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(139,34,82,0.10);">
         <tr><td style="background:linear-gradient(135deg,#8b2252 0%,#c14b7c 100%);padding:28px 32px;text-align:center;">
-          <h1 style="margin:0;font-size:24px;color:#fff;letter-spacing:3px;">ROSA — ${escape(type)}</h1>
+          <h1 style="margin:0;font-size:22px;color:#fff;letter-spacing:3px;">ROSA — ${escape(type)}</h1>
+          <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-style:italic;font-size:13px;">${escape(subject)}</p>
         </td></tr>
         <tr><td style="padding:28px 32px;">
-          <p style="margin:0 0 4px;font-size:13px;color:#a85a78;text-transform:uppercase;letter-spacing:1px;">From</p>
-          <p style="margin:0 0 18px;font-size:16px;"><strong>${escape(name)}</strong> &lt;${escape(email)}&gt;</p>
-          <p style="margin:0 0 4px;font-size:13px;color:#a85a78;text-transform:uppercase;letter-spacing:1px;">Message</p>
-          <div style="background:#fdf6f4;border-radius:12px;padding:18px;font-size:15px;line-height:1.6;white-space:pre-wrap;">${escape(message)}</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;color:#6b3a48;">
+            <tr><td style="padding:6px 0;width:90px;color:#a85a78;text-transform:uppercase;letter-spacing:1px;font-size:11px;">From</td>
+                <td style="padding:6px 0;color:#3d1a24;"><strong>${escape(name)}</strong></td></tr>
+            <tr><td style="padding:6px 0;color:#a85a78;text-transform:uppercase;letter-spacing:1px;font-size:11px;">Email</td>
+                <td style="padding:6px 0;"><a href="mailto:${escape(email)}" style="color:#8b2252;text-decoration:none;">${escape(email)}</a></td></tr>
+            <tr><td style="padding:6px 0;color:#a85a78;text-transform:uppercase;letter-spacing:1px;font-size:11px;">Received</td>
+                <td style="padding:6px 0;">${escape(receivedAt)}</td></tr>
+          </table>
+          <hr style="border:none;border-top:1px solid #fbe8eb;margin:20px 0;">
+          <p style="margin:0 0 8px;font-size:11px;color:#a85a78;text-transform:uppercase;letter-spacing:1px;">Message</p>
+          <div style="background:#fdf6f4;border-radius:12px;padding:18px;font-size:15px;line-height:1.6;white-space:pre-wrap;color:#3d1a24;">${escape(message)}</div>
+          <p style="margin:24px 0 0;font-size:12px;color:#a08591;font-style:italic;">
+            Reply directly to this email — your response goes straight to ${escape(name)}.
+          </p>
         </td></tr>
       </table>
     </td></tr>
@@ -47,7 +63,7 @@ function buildSupportHtml(args: {
 }
 
 async function sendViaSendGrid(args: {
-  to: string; replyTo: string; subject: string; html: string; text: string;
+  to: string; replyTo: string; replyToName: string; subject: string; html: string; text: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const key = process.env.SENDGRID_API_KEY;
   const from = process.env.SENDGRID_FROM_EMAIL;
@@ -62,8 +78,17 @@ async function sendViaSendGrid(args: {
       body: JSON.stringify({
         personalizations: [{ to: [{ email: args.to }] }],
         from: { email: from, name: "ROSA Support 🌹" },
-        reply_to: { email: args.replyTo },
+        // Reply-To with the user's name+email so Gmail "Reply" goes to them.
+        reply_to: { email: args.replyTo, name: args.replyToName || undefined },
         subject: args.subject,
+        categories: ["rosa-support"],
+        custom_args: { kind: "support", reply_to: args.replyTo },
+        mail_settings: { sandbox_mode: { enable: false } },
+        tracking_settings: {
+          click_tracking: { enable: false, enable_text: false },
+          open_tracking: { enable: false },
+          subscription_tracking: { enable: false },
+        },
         content: [
           { type: "text/plain", value: args.text },
           { type: "text/html", value: args.html },
@@ -89,12 +114,11 @@ async function sendViaSendGrid(args: {
 router.post("/support/send", async (req, res) => {
   const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown";
   if (!rateLimit(ip)) {
-    return res.status(429).json({ ok: false, error: "Too many messages. Please wait a minute and try again." });
+    return res.status(429).json({ ok: false, error: "Too many messages from this device. Please try again later (limit 3 per hour)." });
   }
 
-  const { type, name, email, message } = (req.body || {}) as Record<string, string>;
+  const { type, name, email, message, subject } = (req.body || {}) as Record<string, string>;
 
-  // Validation
   if (!name || !email || !message) {
     return res.status(400).json({ ok: false, error: "Please fill in your name, email, and message." });
   }
@@ -104,22 +128,50 @@ router.post("/support/send", async (req, res) => {
   if (message.length > 5000) {
     return res.status(400).json({ ok: false, error: "Message is too long (max 5000 characters)." });
   }
+  if (subject && subject.length > 200) {
+    return res.status(400).json({ ok: false, error: "Subject is too long (max 200 characters)." });
+  }
 
   const cleanType = ["support", "feedback", "bug", "feature"].includes(type) ? type : "support";
+  // Plain labels — the 🌹 is appended once at the end so we don't get
+  // "ROSA Feedback 💌 🌹 — …" double-emoji subjects.
   const typeLabel =
-    cleanType === "feedback" ? "Feedback 💌" :
-    cleanType === "bug" ? "Bug Report 🐞" :
-    cleanType === "feature" ? "Feature Request ✨" :
-    "Support";
+    cleanType === "feedback" ? "Feedback" :
+    cleanType === "bug" ? "Bug Report" :
+    cleanType === "feature" ? "Feature Request" :
+    "Support Request";
 
-  const subject = `[ROSA ${typeLabel}] from ${name}`;
-  const text = `Type: ${typeLabel}\nFrom: ${name} <${email}>\n\nMessage:\n${message}`;
-  const html = buildSupportHtml({ type: typeLabel, name, email, message });
+  const userSubject = (subject || "").trim() || message.split("\n")[0].slice(0, 80) || typeLabel;
+  // Final email subject — exactly the format the owner asked for:
+  //   "ROSA Support Request 🌹 — [their subject]"
+  const emailSubject = `ROSA ${typeLabel} 🌹 — ${userSubject}`;
+
+  const receivedAt = new Date().toLocaleString("en-US", {
+    weekday: "short",
+    year: "numeric", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit",
+    timeZoneName: "short",
+  });
+
+  const text =
+`Type: ${typeLabel}
+Subject: ${userSubject}
+From: ${name} <${email}>
+Received: ${receivedAt}
+
+Message:
+${message}
+
+---
+Reply directly to this email — your response goes straight to ${name}.`;
+
+  const html = buildSupportHtml({ type: typeLabel, subject: userSubject, name, email, message, receivedAt });
 
   const result = await sendViaSendGrid({
     to: SUPPORT_INBOX,
     replyTo: email,
-    subject,
+    replyToName: name,
+    subject: emailSubject,
     html,
     text,
   });
@@ -131,7 +183,7 @@ router.post("/support/send", async (req, res) => {
     });
   }
 
-  res.json({ ok: true, message: "Sent with love, sister 🌹" });
+  res.json({ ok: true, message: "Sent with love, sister 🌹 — we'll reply within 48 hours." });
 });
 
 export default router;

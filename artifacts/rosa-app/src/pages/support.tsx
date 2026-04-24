@@ -20,7 +20,7 @@ const TYPES: { id: ContactType; label: string; icon: any; subject: string; place
 ];
 
 export default function SupportPage() {
-  const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [type, setType] = useState<ContactType>("support");
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
@@ -39,6 +39,7 @@ export default function SupportPage() {
           type,
           name: form.name.trim(),
           email: form.email.trim(),
+          subject: form.subject.trim(),
           message: form.message.trim(),
         }),
       });
@@ -106,11 +107,17 @@ export default function SupportPage() {
             <div>
               <Label>Your Email</Label>
               <Input type="email" placeholder="hello@example.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} data-testid="input-support-email" />
+              <p className="text-xs text-muted-foreground mt-1">We'll reply directly to this address.</p>
+            </div>
+            <div>
+              <Label>Subject</Label>
+              <Input placeholder="A short summary" value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} maxLength={200} data-testid="input-support-subject" />
             </div>
             <div>
               <Label>{active.label === "Feature Idea" ? "Your idea" : active.label === "Report Bug" ? "What happened?" : "Message"}</Label>
               <Textarea placeholder={active.placeholder} value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
-                className="resize-none min-h-[140px]" data-testid="textarea-support-message" />
+                className="resize-none min-h-[140px]" maxLength={5000} data-testid="textarea-support-message" />
+              <p className="text-xs text-muted-foreground mt-1 text-right">{form.message.length} / 5000</p>
             </div>
             {error && (
               <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2" role="alert">{error}</p>
@@ -129,7 +136,7 @@ export default function SupportPage() {
               <div className="text-4xl mb-3">💌</div>
               <h3 className="font-serif text-xl mb-2">Sent with love, sister 🌹</h3>
               <p className="text-muted-foreground text-sm">Your message landed safely with the ROSA team. We'll reply to <strong>{form.email}</strong> within 48 hours 🌹</p>
-              <Button variant="outline" className="mt-4" onClick={() => { setSent(false); setForm({ name: "", email: "", message: "" }); setError(null); }} data-testid="button-send-another">Send Another</Button>
+              <Button variant="outline" className="mt-4" onClick={() => { setSent(false); setForm({ name: "", email: "", subject: "", message: "" }); setError(null); }} data-testid="button-send-another">Send Another</Button>
             </CardContent>
           </Card>
         </motion.div>

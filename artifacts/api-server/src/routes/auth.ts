@@ -1,6 +1,8 @@
 import { Router } from "express";
 import express from "express";
 import crypto from "crypto";
+import { eq, and, desc } from "drizzle-orm";
+import { db, rosaUsers, trustedDevices } from "@workspace/db";
 import { requireAdmin } from "../lib/admin-auth";
 
 const router = Router();
@@ -13,23 +15,63 @@ const AUTH_SECRET = (() => {
   }
   return "rosa-dev-secret-change-me";
 })();
-export function signEmailToken(email: string): string {
-  const e = email.trim().toLowerCase();
-  const sig = crypto.createHmac("sha256", AUTH_SECRET).update(`v1:${e}`).digest("base64url");
-  return `v1.${Buffer.from(e).toString("base64url")}.${sig}`;
+
+// ─── Token format ──────────────────────────────────────────────────────────
+// v2.<base64(json payload)>.<sig>
+// payload = { e: email, exp: epochSec, v: tokenVersion, d: deviceId, r: 0|1 }
+// - exp: hard expiry (30d for remember-me, 1d otherwise)
+// - v: tokenVersion from rosa_users; bumping invalidates ALL old tokens for the user
+// - d: trusted_device.id this token is bound to (so device-revoke works)
+// We keep verifying v1 tokens (no expiry, no version) for backward compat with
+// already-signed-in users until they re-verify.
+type TokenPayload = { e: string; exp: number; v: number; d: string; r: 0 | 1 };
+
+export function signSessionToken(payload: TokenPayload): string {
+  const json = JSON.stringify(payload);
+  const body = Buffer.from(json, "utf-8").toString("base64url");
+  const sig = crypto.createHmac("sha256", AUTH_SECRET).update(`v2:${body}`).digest("base64url");
+  return `v2.${body}.${sig}`;
 }
-export function verifyEmailToken(token: string): string | null {
+
+export function verifySessionToken(token: string): TokenPayload | { e: string; legacy: true } | null {
   if (!token || typeof token !== "string") return null;
   const parts = token.split(".");
-  if (parts.length !== 3 || parts[0] !== "v1") return null;
+  if (parts.length !== 3) return null;
+  // v1 (legacy) — no expiry, no version. Still accept so existing logins keep working.
+  if (parts[0] === "v1") {
+    try {
+      const email = Buffer.from(parts[1], "base64url").toString("utf-8");
+      const expected = crypto.createHmac("sha256", AUTH_SECRET).update(`v1:${email}`).digest("base64url");
+      if (parts[2].length !== expected.length) return null;
+      if (!crypto.timingSafeEqual(Buffer.from(parts[2]), Buffer.from(expected))) return null;
+      return { e: email, legacy: true };
+    } catch { return null; }
+  }
+  if (parts[0] !== "v2") return null;
   try {
-    const email = Buffer.from(parts[1], "base64url").toString("utf-8");
-    const expected = crypto.createHmac("sha256", AUTH_SECRET).update(`v1:${email}`).digest("base64url");
+    const expected = crypto.createHmac("sha256", AUTH_SECRET).update(`v2:${parts[1]}`).digest("base64url");
     if (parts[2].length !== expected.length) return null;
     if (!crypto.timingSafeEqual(Buffer.from(parts[2]), Buffer.from(expected))) return null;
-    return email;
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf-8")) as TokenPayload;
+    if (payload.exp && payload.exp * 1000 < Date.now()) return null;
+    return payload;
   } catch { return null; }
 }
+
+// Back-compat shim — older code imported these names.
+export const signEmailToken = (email: string): string =>
+  signSessionToken({
+    e: email.trim().toLowerCase(),
+    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
+    v: 1,
+    d: "legacy",
+    r: 0,
+  });
+export const verifyEmailToken = (token: string): string | null => {
+  const r = verifySessionToken(token);
+  return r ? r.e : null;
+};
+
 router.use(express.json({ limit: "50kb" }));
 
 type CodeEntry = { code: string; expiresAt: number; attempts: number; sent: number; channel: "email" | "phone" };
@@ -48,6 +90,35 @@ function rateLimit(ip: string): boolean {
   arr.push(now);
   RATE.set(ip, arr);
   return true;
+}
+
+function hashIp(ip: string): string {
+  // Salted with the auth secret so the stored value is not reversible to the raw IP.
+  return crypto.createHmac("sha256", AUTH_SECRET).update(`ip:${ip}`).digest("base64url").slice(0, 22);
+}
+
+function getClientIp(req: any): string {
+  return (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown";
+}
+
+// Best-effort device label from the User-Agent string (no UA parsing dep).
+function describeDevice(ua: string | undefined): string {
+  if (!ua) return "Unknown device";
+  const u = ua.toLowerCase();
+  const os =
+    u.includes("iphone") ? "iPhone" :
+    u.includes("ipad") ? "iPad" :
+    u.includes("android") ? "Android" :
+    u.includes("mac os x") || u.includes("macintosh") ? "Mac" :
+    u.includes("windows") ? "Windows" :
+    u.includes("linux") ? "Linux" : "Device";
+  const browser =
+    u.includes("edg/") ? "Edge" :
+    u.includes("chrome") && !u.includes("chromium") ? "Chrome" :
+    u.includes("firefox") ? "Firefox" :
+    u.includes("safari") && !u.includes("chrome") ? "Safari" :
+    "Browser";
+  return `${browser} on ${os}`;
 }
 
 function buildHtml(code: string, name: string): string {
@@ -100,9 +171,6 @@ async function sendEmailViaSendGrid(to: string, code: string, name: string): Pro
     console.error("[SendGrid] Skipped: SENDGRID_API_KEY or SENDGRID_FROM_EMAIL not set on server.");
     return { ok: false, error: "missing_config" };
   }
-  // Gmail-to-Gmail via 3rd-party senders is the worst-case for deliverability.
-  // Adding List-Unsubscribe + Reply-To + a stable Message-ID and tagging the
-  // category lifts spam-folder placement noticeably.
   const fromGmail = /@gmail\.com$/i.test(from);
   const toGmail = /@gmail\.com$/i.test(to);
   const fromName = "ROSA — Aiswarya";
@@ -114,7 +182,6 @@ async function sendEmailViaSendGrid(to: string, code: string, name: string): Pro
         personalizations: [{
           to: [{ email: to, name: name || undefined }],
           headers: {
-            // Gmail/Outlook prioritise messages with a working unsubscribe.
             "List-Unsubscribe": `<mailto:${from}?subject=unsubscribe>`,
             "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
           },
@@ -122,12 +189,9 @@ async function sendEmailViaSendGrid(to: string, code: string, name: string): Pro
         from: { email: from, name: fromName },
         reply_to: { email: from, name: fromName },
         subject: `Your ROSA verification code 🌹 — ${code}`,
-        // Custom_args show up in the Activity Feed so we can correlate failures.
         custom_args: { kind: "verification", to_domain: to.split("@")[1] || "" },
         categories: ["rosa-verification"],
-        // mail_settings.sandbox_mode would silently swallow mail — make absolutely sure it's off.
         mail_settings: { sandbox_mode: { enable: false } },
-        // tracking_settings: keep open/click tracking off so the email stays clean and snappy.
         tracking_settings: {
           click_tracking: { enable: false, enable_text: false },
           open_tracking: { enable: false },
@@ -161,7 +225,6 @@ To unsubscribe, reply with "unsubscribe".` },
       return { ok: true, messageId };
     }
     const errText = await res.text();
-    // The #1 cause of "email never arrives" is an unverified sender — log it loudly.
     console.error(`[SendGrid] FAILED ${res.status} sending to ${to} from ${from}: ${errText.slice(0, 500)}`);
     if (res.status === 401 || res.status === 403) {
       console.error(`[SendGrid] HINT: Your SENDGRID_FROM_EMAIL "${from}" is probably not verified as a Single Sender in SendGrid. Go to SendGrid → Sender Authentication → Single Sender Verification.`);
@@ -173,11 +236,6 @@ To unsubscribe, reply with "unsubscribe".` },
   }
 }
 
-// Diagnostic endpoint: queries SendGrid's Activity Feed to see what actually
-// happened to recent emails (delivered? bounced? blocked? marked as spam?).
-// Usage: GET /api/auth/sendgrid-activity?email=foo@gmail.com
-// Note: Requires the SendGrid API key to have the "Email Activity Read" scope,
-// AND your SendGrid plan must include Activity Feed access (free plan: 3 days).
 router.get("/auth/sendgrid-activity", requireAdmin, async (req, res) => {
   const key = process.env.SENDGRID_API_KEY;
   if (!key) return res.status(503).json({ ok: false, error: "SENDGRID_API_KEY not set" });
@@ -215,8 +273,6 @@ router.get("/auth/sendgrid-activity", requireAdmin, async (req, res) => {
   }
 });
 
-// Diagnostic endpoint: tells you whether SendGrid env vars are set on the server.
-// Safe to expose — it never reveals the key itself, only whether it's configured.
 router.get("/auth/sendgrid-status", (_req, res) => {
   const key = process.env.SENDGRID_API_KEY;
   const from = process.env.SENDGRID_FROM_EMAIL;
@@ -232,7 +288,7 @@ router.get("/auth/sendgrid-status", (_req, res) => {
 });
 
 router.post("/auth/send-code", async (req, res) => {
-  const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown";
+  const ip = getClientIp(req);
   if (!rateLimit(ip)) return res.status(429).json({ ok: false, error: "Too many requests. Please wait a minute." });
 
   const { destination, name } = req.body || {};
@@ -250,18 +306,33 @@ router.post("/auth/send-code", async (req, res) => {
   if (channel === "email") {
     const sent = await sendEmailViaSendGrid(dest, code, name || "");
     if (sent.ok) return res.json({ ok: true, channel, sent: true, message: "Code sent to your email" });
-    // Fallback for misconfigured email — return code so dev can keep moving
     return res.json({ ok: true, channel, sent: false, devCode: process.env.NODE_ENV !== "production" ? code : undefined,
       message: process.env.NODE_ENV !== "production" ? `Email service not configured (${sent.error}). Use the code shown.` : "Could not send email. Please try again later." });
   }
 
-  // Phone — Twilio not yet wired
   return res.json({ ok: true, channel, sent: false, devCode: process.env.NODE_ENV !== "production" ? code : undefined,
     message: "SMS coming soon — for now, please use email." });
 });
 
-router.post("/auth/verify-code", (req, res) => {
-  const { destination, code } = req.body || {};
+// Look up (or upsert) the rosa_users row for an email so we have a stable
+// tokenVersion. We don't require name here — sign-up may flow through gender/
+// pronouns step before saving full profile elsewhere.
+async function ensureUserRow(email: string): Promise<{ tokenVersion: number }> {
+  const existing = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
+  if (existing[0]) return { tokenVersion: existing[0].tokenVersion ?? 1 };
+  const [row] = await db
+    .insert(rosaUsers)
+    .values({ emailOrPhone: email, name: email.split("@")[0] || "Friend" })
+    .onConflictDoNothing({ target: rosaUsers.emailOrPhone })
+    .returning();
+  if (row) return { tokenVersion: row.tokenVersion ?? 1 };
+  // Race: another request created it; re-read.
+  const again = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
+  return { tokenVersion: again[0]?.tokenVersion ?? 1 };
+}
+
+router.post("/auth/verify-code", async (req, res) => {
+  const { destination, code, rememberMe, deviceName } = req.body || {};
   if (!destination || !code) return res.status(400).json({ ok: false, error: "Missing fields" });
   const dest = normalize(destination);
   const entry = codes.get(dest);
@@ -271,8 +342,152 @@ router.post("/auth/verify-code", (req, res) => {
   entry.attempts++;
   if (String(code).trim() !== entry.code) return res.status(400).json({ ok: false, error: "Incorrect code. Please try again." });
   codes.delete(dest);
-  const token = entry.channel === "email" ? signEmailToken(dest) : null;
-  res.json({ ok: true, verified: true, channel: entry.channel, token });
+
+  if (entry.channel !== "email") {
+    return res.json({ ok: true, verified: true, channel: entry.channel, token: null });
+  }
+
+  const remember = rememberMe === true;
+  const ttlSec = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 24; // 30d vs 1d
+  const exp = Math.floor(Date.now() / 1000) + ttlSec;
+  const deviceId = crypto.randomBytes(18).toString("base64url");
+  const ua = (req.headers["user-agent"] as string | undefined) || "";
+  const label = (typeof deviceName === "string" && deviceName.trim()) ? deviceName.trim().slice(0, 80) : describeDevice(ua);
+  const ip = getClientIp(req);
+
+  try {
+    const { tokenVersion } = await ensureUserRow(dest);
+    await db.insert(trustedDevices).values({
+      email: dest,
+      deviceId,
+      deviceName: label,
+      userAgent: ua.slice(0, 500),
+      ipHash: hashIp(ip),
+      rememberMe: remember,
+      expiresAt: new Date(exp * 1000),
+    });
+    const token = signSessionToken({ e: dest, exp, v: tokenVersion, d: deviceId, r: remember ? 1 : 0 });
+    res.json({
+      ok: true,
+      verified: true,
+      channel: entry.channel,
+      token,
+      deviceId,
+      deviceName: label,
+      expiresAt: new Date(exp * 1000).toISOString(),
+      rememberMe: remember,
+    });
+  } catch (e: any) {
+    console.error("[Auth] verify-code failed to register device:", e?.message || e);
+    res.status(500).json({ ok: false, error: "Verification succeeded but session could not be created. Please try again." });
+  }
+});
+
+// Bearer-token middleware. Attaches { email, deviceId, legacy } to req on success.
+async function requireSession(req: any, res: any, next: any): Promise<void> {
+  const auth = (req.headers.authorization || "").trim();
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token) return res.status(401).json({ ok: false, error: "Not signed in" });
+  const payload = verifySessionToken(token);
+  if (!payload) return res.status(401).json({ ok: false, error: "Session expired or invalid" });
+  // Legacy v1 tokens have no expiry and ignore tokenVersion — they would
+  // survive a "Log out of all devices". For any session-protected endpoint
+  // we reject them so the user is forced to re-verify and get a v2 token.
+  // (verifySessionToken still accepts v1 at the function level for any
+  // non-protected back-compat uses.)
+  if ("legacy" in payload) {
+    return res.status(401).json({ ok: false, error: "Session format is outdated. Please sign in again." });
+  }
+  // Validate the user's tokenVersion matches (cheap query, indexed by unique email).
+  const [user] = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, payload.e)).limit(1);
+  if (!user || (user.tokenVersion ?? 1) !== payload.v) {
+    return res.status(401).json({ ok: false, error: "Session was revoked. Please sign in again." });
+  }
+  // Confirm the device row still exists (revocation works without bumping version).
+  const [device] = await db.select().from(trustedDevices).where(eq(trustedDevices.deviceId, payload.d)).limit(1);
+  if (!device || device.email !== payload.e) {
+    return res.status(401).json({ ok: false, error: "This device was removed. Please sign in again." });
+  }
+  // Fire-and-forget last-seen update so the Trusted Devices list stays fresh.
+  db.update(trustedDevices)
+    .set({ lastSeenAt: new Date() })
+    .where(eq(trustedDevices.deviceId, payload.d))
+    .catch(() => {});
+  req.session = { email: payload.e, deviceId: payload.d, legacy: false };
+  next();
+}
+
+router.get("/auth/me", requireSession, async (req: any, res) => {
+  const { email } = req.session;
+  const [user] = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
+  res.json({
+    ok: true,
+    email,
+    deviceId: req.session.deviceId,
+    legacy: req.session.legacy,
+    user: user ? {
+      name: user.name,
+      isFoundingMember: user.isFoundingMember,
+      foundingMemberType: user.foundingMemberType,
+      isLifetimeFree: user.isLifetimeFree,
+      subscriptionStatus: user.subscriptionStatus,
+      trialEndsAt: user.trialEndsAt,
+    } : null,
+  });
+});
+
+router.get("/auth/devices", requireSession, async (req: any, res) => {
+  const { email, deviceId } = req.session;
+  const rows = await db
+    .select()
+    .from(trustedDevices)
+    .where(eq(trustedDevices.email, email))
+    .orderBy(desc(trustedDevices.lastSeenAt));
+  res.json({
+    ok: true,
+    currentDeviceId: deviceId,
+    devices: rows.map((r) => ({
+      deviceId: r.deviceId,
+      deviceName: r.deviceName,
+      rememberMe: r.rememberMe,
+      lastSeenAt: r.lastSeenAt,
+      createdAt: r.createdAt,
+      expiresAt: r.expiresAt,
+      isCurrent: r.deviceId === deviceId,
+    })),
+  });
+});
+
+router.delete("/auth/devices/:deviceId", requireSession, async (req: any, res) => {
+  const { email } = req.session;
+  const target = String(req.params.deviceId || "").trim();
+  if (!target) return res.status(400).json({ ok: false, error: "Missing deviceId" });
+  const result = await db
+    .delete(trustedDevices)
+    .where(and(eq(trustedDevices.email, email), eq(trustedDevices.deviceId, target)))
+    .returning();
+  if (!result.length) return res.status(404).json({ ok: false, error: "Device not found" });
+  res.json({ ok: true, removed: target });
+});
+
+router.post("/auth/logout-all", requireSession, async (req: any, res) => {
+  const { email } = req.session;
+  const [user] = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
+  if (!user) return res.status(404).json({ ok: false, error: "User not found" });
+  await db
+    .update(rosaUsers)
+    .set({ tokenVersion: (user.tokenVersion ?? 1) + 1, updatedAt: new Date() })
+    .where(eq(rosaUsers.id, user.id));
+  await db.delete(trustedDevices).where(eq(trustedDevices.email, email));
+  res.json({ ok: true, message: "All sessions ended. You'll need to sign in again." });
+});
+
+router.post("/auth/logout", requireSession, async (req: any, res) => {
+  const { email, deviceId } = req.session;
+  if (deviceId) {
+    await db.delete(trustedDevices).where(and(eq(trustedDevices.email, email), eq(trustedDevices.deviceId, deviceId)));
+  }
+  res.json({ ok: true });
 });
 
 export default router;
