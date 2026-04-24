@@ -10,7 +10,7 @@ const router = Router();
 // Surface a 503 with a clear message instead of a silent 500 if no AI provider configured.
 function ensureProvider(res: any): boolean {
   if (getActiveProvider() === "missing") {
-    logger.error("Chat provider missing — set GEMINI_API_KEY or OPENAI_API_KEY");
+    logger.error("Chat provider missing — set OPENAI_API_KEY");
     res.status(503).json({ error: "AI service is not configured. Please contact support." });
     return false;
   }
@@ -197,7 +197,6 @@ You are her safe place. Be the friend she needed when she had no one. 🌹`,
         err: streamErr?.message,
         name: streamErr?.name,
         status: streamErr?.status || streamErr?.response?.status,
-        geminiBlockReason: streamErr?.geminiBlockReason,
         cause: streamErr?.cause?.message,
         stack: streamErr?.stack?.split("\n").slice(0, 5).join("\n"),
         provider: getActiveProvider(),
@@ -235,12 +234,10 @@ You are her safe place. Be the friend she needed when she had no one. 🌹`,
   } catch (err: any) {
     const status = err?.status || err?.response?.status;
     const msg = String(err?.message || "");
-    const blockReason = err?.geminiBlockReason;
     logger.error({
       err: msg,
       name: err?.name,
       status,
-      geminiBlockReason: blockReason,
       cause: err?.cause?.message,
       stack: err?.stack?.split("\n").slice(0, 8).join("\n"),
       provider: getActiveProvider(),
@@ -254,7 +251,7 @@ You are her safe place. Be the friend she needed when she had no one. 🌹`,
       // bad/expired/revoked and Aiswarya needs to rotate it. Telling users to
       // "try again shortly" makes them re-send forever and trust ROSA less.
       userMsg = "ROSA's chat is offline right now, sister 🌹 — Aiswarya has been notified. While you wait, the journal, quotes, and affirmations pages are still here for you 💝";
-    } else if (blockReason || /safety|blocked/i.test(msg)) {
+    } else if (/safety|blocked|content_filter|policy/i.test(msg)) {
       userMsg = "Let me think of a softer way to answer that, sister 🌸 — try asking it a slightly different way?";
     } else if (/empty response|no user message/i.test(msg)) {
       userMsg = "I didn't quite catch that, sister 🌹 — could you say it again?";
