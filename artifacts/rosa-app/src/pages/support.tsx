@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { apiUrl } from "@/lib/api";
 
 const SUPPORT_EMAIL = "rosainclusivelifestyle@gmail.com";
 
@@ -22,14 +23,36 @@ export default function SupportPage() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
   const [type, setType] = useState<ContactType>("support");
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const active = TYPES.find(t => t.id === type)!;
 
-  const handleSubmit = () => {
-    if (!form.name || !form.email || !form.message) return;
-    const subject = encodeURIComponent(`${active.subject} — from ${form.name}`);
-    const body = encodeURIComponent(`Type: ${active.label}\nName: ${form.name}\nEmail: ${form.email}\n\nMessage:\n${form.message}`);
-    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
-    setSent(true);
+  const handleSubmit = async () => {
+    if (!form.name || !form.email || !form.message || sending) return;
+    setError(null);
+    setSending(true);
+    try {
+      const res = await fetch(apiUrl("/api/support/send"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type,
+          name: form.name.trim(),
+          email: form.email.trim(),
+          message: form.message.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setError(data?.error || "Couldn't send right now. Please try again, or email us directly.");
+        return;
+      }
+      setSent(true);
+    } catch {
+      setError("Network error. Please check your connection and try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -89,11 +112,14 @@ export default function SupportPage() {
               <Textarea placeholder={active.placeholder} value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
                 className="resize-none min-h-[140px]" data-testid="textarea-support-message" />
             </div>
-            <Button onClick={handleSubmit} disabled={!form.name || !form.email || !form.message}
-              className="w-full bg-rose-500 hover:bg-rose-600 text-white" data-testid="button-send-support">
-              <Send className="w-4 h-4 mr-2" /> Send to ROSA Team
+            {error && (
+              <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2" role="alert">{error}</p>
+            )}
+            <Button onClick={handleSubmit} disabled={!form.name || !form.email || !form.message || sending}
+              className="w-full bg-rose-500 hover:bg-rose-600 text-white disabled:opacity-60" data-testid="button-send-support">
+              <Send className="w-4 h-4 mr-2" /> {sending ? "Sending…" : "Send to ROSA Team"}
             </Button>
-            <p className="text-xs text-muted-foreground text-center">Opens your email app, pre-filled with your message.</p>
+            <p className="text-xs text-muted-foreground text-center">Sent directly to the ROSA team — we read every message.</p>
           </CardContent>
         </Card>
       ) : (
@@ -102,8 +128,8 @@ export default function SupportPage() {
             <CardContent>
               <div className="text-4xl mb-3">💌</div>
               <h3 className="font-serif text-xl mb-2">Sent with love, sister 🌹</h3>
-              <p className="text-muted-foreground text-sm">Your email app should have opened. We'll reply within 48 hours.</p>
-              <Button variant="outline" className="mt-4" onClick={() => { setSent(false); setForm({ name: "", email: "", message: "" }); }} data-testid="button-send-another">Send Another</Button>
+              <p className="text-muted-foreground text-sm">Your message landed safely with the ROSA team. We'll reply to <strong>{form.email}</strong> within 48 hours 🌹</p>
+              <Button variant="outline" className="mt-4" onClick={() => { setSent(false); setForm({ name: "", email: "", message: "" }); setError(null); }} data-testid="button-send-another">Send Another</Button>
             </CardContent>
           </Card>
         </motion.div>

@@ -95,7 +95,10 @@ function buildHtml(code: string, name: string): string {
 async function sendEmailViaSendGrid(to: string, code: string, name: string): Promise<{ ok: boolean; error?: string }> {
   const key = process.env.SENDGRID_API_KEY;
   const from = process.env.SENDGRID_FROM_EMAIL;
-  if (!key || !from) return { ok: false, error: "missing_config" };
+  if (!key || !from) {
+    console.error("[SendGrid] Skipped: SENDGRID_API_KEY or SENDGRID_FROM_EMAIL not set on server.");
+    return { ok: false, error: "missing_config" };
+  }
   try {
     const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
@@ -110,13 +113,38 @@ async function sendEmailViaSendGrid(to: string, code: string, name: string): Pro
         ],
       }),
     });
-    if (res.ok) return { ok: true };
+    if (res.ok) {
+      console.log(`[SendGrid] Verification code sent to ${to} (status ${res.status}, from ${from})`);
+      return { ok: true };
+    }
     const errText = await res.text();
+    // The #1 cause of "email never arrives" is an unverified sender — log it loudly.
+    console.error(`[SendGrid] FAILED ${res.status} sending to ${to} from ${from}: ${errText.slice(0, 500)}`);
+    if (res.status === 401 || res.status === 403) {
+      console.error(`[SendGrid] HINT: Your SENDGRID_FROM_EMAIL "${from}" is probably not verified as a Single Sender in SendGrid. Go to SendGrid → Sender Authentication → Single Sender Verification.`);
+    }
     return { ok: false, error: `sendgrid_${res.status}: ${errText.slice(0, 200)}` };
   } catch (e: any) {
+    console.error(`[SendGrid] Network error sending to ${to}:`, e?.message || e);
     return { ok: false, error: e?.message || "fetch_failed" };
   }
 }
+
+// Diagnostic endpoint: tells you whether SendGrid env vars are set on the server.
+// Safe to expose — it never reveals the key itself, only whether it's configured.
+router.get("/auth/sendgrid-status", (_req, res) => {
+  const key = process.env.SENDGRID_API_KEY;
+  const from = process.env.SENDGRID_FROM_EMAIL;
+  res.json({
+    configured: !!(key && from),
+    hasApiKey: !!key,
+    apiKeyPrefix: key ? `${key.slice(0, 7)}…` : null,
+    fromEmail: from || null,
+    note: !key || !from
+      ? "Set SENDGRID_API_KEY and SENDGRID_FROM_EMAIL in your hosting environment."
+      : "Configured. If emails don't arrive, verify the FROM address as a Single Sender in your SendGrid dashboard.",
+  });
+});
 
 router.post("/auth/send-code", async (req, res) => {
   const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown";

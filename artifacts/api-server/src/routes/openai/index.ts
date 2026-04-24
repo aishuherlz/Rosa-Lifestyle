@@ -196,8 +196,17 @@ Keep responses warm, conversational, and concise unless the user wants more dept
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
     res.end();
   } catch (err: any) {
-    logger.error({ err: err?.message, stack: err?.stack }, "Chatbot route failed");
-    try { res.write(`data: ${JSON.stringify({ content: "I'm having a moment, sister 🌹 — please try again in a bit." })}\n\n`); res.write(`data: ${JSON.stringify({ done: true })}\n\n`); } catch {}
+    logger.error({ err: err?.message, stack: err?.stack, status: err?.status }, "Chatbot route failed");
+    // Friendly, specific message based on the actual failure mode.
+    let userMsg = "I'm having a moment, sister 🌹 — please try again in a bit.";
+    const status = err?.status || err?.response?.status;
+    const msg = String(err?.message || "");
+    if (status === 429 || /quota|rate limit|insufficient_quota/i.test(msg)) {
+      userMsg = "ROSA's chat is taking a little break 🌸 — our AI quota is full right now. Aiswarya has been notified and we'll be back soon. In the meantime, try the journal or quotes pages 💝";
+    } else if (status === 401 || /api key|authentication/i.test(msg)) {
+      userMsg = "ROSA's chat needs a moment to wake up 🌹 — please try again shortly.";
+    }
+    try { res.write(`data: ${JSON.stringify({ content: userMsg })}\n\n`); res.write(`data: ${JSON.stringify({ done: true })}\n\n`); } catch {}
     res.end();
   }
 });
