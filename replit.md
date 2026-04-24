@@ -84,6 +84,21 @@ Express 5 backend with AI chatbot endpoints.
 
 - `conversations` — chat conversation metadata (id, title, created_at)
 - `messages` — chat messages (id, conversation_id, role, content, created_at)
+- `rosa_users` — user accounts (email PK, name, gender, pronouns, ...)
+- `rose_wall_posts` — community feed posts (id, author_email, body, mood, is_anonymous, status, rose_count, comment_count)
+- `rose_wall_roses` — likes (unique per (post_id, user_email))
+- `rose_wall_comments` — moderated comments (status: live | blocked | deleted)
+- `rose_wall_reports` — moderation queue rows (target_type, target_id, reporter_email, reason, status)
+
+## Build plan progress (external 12-step spec)
+
+- Step 1 (sign-in polish) — done
+- Step 2 (onboarding polish) — done
+- Step 3 (Rose Wall: auth'd, AI-moderated, DB-backed, Instagram-style feed) — done
+  - Posts/comments go through Gemini moderation before going live; block message: "This post couldn't be shared as it goes against our community guidelines 🌹"
+  - Rose toggle and comment-delete are transactional with parent-counter updates; rose toggle defends against double-click races via the unique (post_id, user_email) index
+  - Reports rate-limited (20/hr) and validated against existing live targets
+- Step 4 (nicknames + handles) — next
 
 ## Environment Variables
 

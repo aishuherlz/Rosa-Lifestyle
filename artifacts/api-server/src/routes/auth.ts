@@ -326,16 +326,24 @@ function cleanMarketingPref(v: unknown): "yes" | "later" | "never" {
 async function ensureUserRow(
   email: string,
   marketingOptIn?: "yes" | "later" | "never",
+  name?: string,
 ): Promise<{ tokenVersion: number }> {
+  const cleanName = (name || "").trim().slice(0, 80);
   const existing = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
   if (existing[0]) {
-    // Existing user: only OVERWRITE the marketing pref if a value was sent
-    // explicitly (so re-verifying without sending the field never silently
-    // resets a previously-set preference).
-    if (marketingOptIn) {
-      await db.update(rosaUsers)
-        .set({ marketingOptIn })
-        .where(eq(rosaUsers.emailOrPhone, email));
+    // Build a partial update so we only touch the fields the client actually sent.
+    // - marketingOptIn: only overwrite if explicitly provided (so re-verify never resets pref).
+    // - name: only overwrite if a real name was provided AND the existing name is the
+    //   email-prefix placeholder we wrote on first insert. This way a user's
+    //   intentionally chosen display name is never silently clobbered on re-login.
+    const patch: Partial<{ marketingOptIn: "yes" | "later" | "never"; name: string }> = {};
+    if (marketingOptIn) patch.marketingOptIn = marketingOptIn;
+    const placeholder = email.split("@")[0] || "Friend";
+    if (cleanName && (existing[0].name === placeholder || !existing[0].name)) {
+      patch.name = cleanName;
+    }
+    if (Object.keys(patch).length > 0) {
+      await db.update(rosaUsers).set(patch).where(eq(rosaUsers.emailOrPhone, email));
     }
     return { tokenVersion: existing[0].tokenVersion ?? 1 };
   }
@@ -343,7 +351,7 @@ async function ensureUserRow(
     .insert(rosaUsers)
     .values({
       emailOrPhone: email,
-      name: email.split("@")[0] || "Friend",
+      name: cleanName || (email.split("@")[0] || "Friend"),
       marketingOptIn: marketingOptIn ?? "later",
     })
     .onConflictDoNothing({ target: rosaUsers.emailOrPhone })
@@ -355,7 +363,7 @@ async function ensureUserRow(
 }
 
 router.post("/auth/verify-code", async (req, res) => {
-  const { destination, code, rememberMe, deviceName, marketingOptIn } = req.body || {};
+  const { destination, code, rememberMe, deviceName, marketingOptIn, name } = req.body || {};
   if (!destination || !code) return res.status(400).json({ ok: false, error: "Missing fields" });
   const dest = normalize(destination);
   const entry = codes.get(dest);
@@ -382,6 +390,7 @@ router.post("/auth/verify-code", async (req, res) => {
     const { tokenVersion } = await ensureUserRow(
       dest,
       marketingOptIn !== undefined ? cleanMarketingPref(marketingOptIn) : undefined,
+      typeof name === "string" ? name : undefined,
     );
     await db.insert(trustedDevices).values({
       email: dest,
@@ -410,7 +419,10 @@ router.post("/auth/verify-code", async (req, res) => {
 });
 
 // Bearer-token middleware. Attaches { email, deviceId, legacy } to req on success.
-async function requireSession(req: any, res: any, next: any): Promise<void> {
+// Exported so other route files (rose-wall, etc.) can mount auth-protected
+// endpoints without duplicating the token-verification + tokenVersion +
+// trusted-device check logic.
+export async function requireSession(req: any, res: any, next: any): Promise<void> {
   const auth = (req.headers.authorization || "").trim();
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   if (!token) return res.status(401).json({ ok: false, error: "Not signed in" });

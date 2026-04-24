@@ -1,57 +1,430 @@
+// Rose Wall — community feed.
+//
+// Step 3 of the build plan: replace the JSON-file prototype with a proper
+// auth'd, DB-backed, AI-moderated feed. Posts and comments are scanned by
+// `moderateText()` BEFORE they go live; failures show the spec block message
+// to the user. Likes (one rose per user per post) are toggle-able.
+//
+// All endpoints require a valid session — anonymity in this product means
+// "the public can't see who you are" not "no account is tied to this post".
+// Every row carries `authorEmail` for accountability + abuse handling, and
+// the frontend is responsible for hiding name/email when `isAnonymous` is set.
+
 import { Router } from "express";
 import express from "express";
-import fs from "fs";
-import path from "path";
+import { db, rosaUsers, roseWallPosts, roseWallRoses, roseWallComments, roseWallReports } from "@workspace/db";
+import { and, desc, eq, sql, inArray, lt } from "drizzle-orm";
+import { requireSession } from "./auth";
+import { moderateText, BLOCK_MESSAGE } from "../lib/moderation";
 
 const router = Router();
 router.use(express.json({ limit: "10kb" }));
 
-const FILE = path.join(process.cwd(), ".rosa-rose-wall.json");
-const MAX_POSTS = 500;
-const RATE_PER_HOUR = 5;
+const MAX_POST_LEN = 600;
+const MAX_COMMENT_LEN = 400;
+const RATE_PER_HOUR_POSTS = 5;
+const RATE_PER_HOUR_COMMENTS = 30;
+const RATE_PER_HOUR_REPORTS = 20;
+const ALLOWED_MOODS = ["happy", "loved", "calm", "tired", "sad", "anxious", "angry", "grateful", "hopeful", "proud"];
 
-type Post = { id: string; text: string; emoji: string; ts: number; roses: number };
-type State = { posts: Post[]; ipRate: Record<string, number[]> };
+// Tiny in-process rate limiter (per-process; fine until we shard the API server).
+const recentPosts: Map<string, number[]> = new Map();
+const recentComments: Map<string, number[]> = new Map();
+const recentReports: Map<string, number[]> = new Map();
 
-function load(): State {
-  try {
-    if (fs.existsSync(FILE)) return JSON.parse(fs.readFileSync(FILE, "utf-8"));
-  } catch {}
-  return { posts: [], ipRate: {} };
-}
-function save(s: State) { try { fs.writeFileSync(FILE, JSON.stringify(s)); } catch {} }
-let state = load();
-
-function ip(req: any) { return (req.headers["x-forwarded-for"]?.split(",")[0] || req.ip || "0").toString(); }
-
-router.get("/rose-wall", (_req, res) => {
-  res.json({ posts: state.posts.slice(0, 50) });
-});
-
-router.post("/rose-wall", (req, res) => {
-  const { text, emoji } = req.body || {};
-  if (!text || typeof text !== "string") return res.status(400).json({ error: "text required" });
-  const trimmed = text.trim().slice(0, 280);
-  if (!trimmed) return res.status(400).json({ error: "empty" });
-  const key = ip(req);
+function rateOk(map: Map<string, number[]>, key: string, perHour: number): boolean {
   const now = Date.now();
   const oneHour = 60 * 60 * 1000;
-  state.ipRate[key] = (state.ipRate[key] || []).filter(t => now - t < oneHour);
-  if (state.ipRate[key].length >= RATE_PER_HOUR) return res.status(429).json({ error: "Slow down sister 🌹 — try again later" });
-  state.ipRate[key].push(now);
-  const post: Post = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), text: trimmed, emoji: (emoji || "🌹").slice(0, 4), ts: now, roses: 0 };
-  state.posts.unshift(post);
-  if (state.posts.length > MAX_POSTS) state.posts = state.posts.slice(0, MAX_POSTS);
-  save(state);
-  res.json({ post });
+  const arr = (map.get(key) || []).filter((t) => now - t < oneHour);
+  if (arr.length >= perHour) {
+    map.set(key, arr);
+    return false;
+  }
+  arr.push(now);
+  map.set(key, arr);
+  return true;
+}
+
+async function getDisplayName(email: string): Promise<string> {
+  const [u] = await db.select({ name: rosaUsers.name }).from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
+  return (u?.name || "Rose").trim() || "Rose";
+}
+
+// Shape sent to the client. Strips authorEmail when anonymous so the client
+// can never accidentally render it.
+function shapePost(p: typeof roseWallPosts.$inferSelect, viewerHasRosed: boolean, isOwn: boolean) {
+  return {
+    id: p.id,
+    text: p.text,
+    mood: p.mood,
+    isAnonymous: p.isAnonymous,
+    displayName: p.isAnonymous ? "Anonymous Rose" : p.displayName,
+    roseCount: p.roseCount,
+    commentCount: p.commentCount,
+    createdAt: p.createdAt,
+    viewerHasRosed,
+    isOwn,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GET /rose-wall — paginated feed of live posts.
+// ---------------------------------------------------------------------------
+router.get("/rose-wall", requireSession, async (req: any, res) => {
+  try {
+    const limit = Math.min(50, Math.max(1, parseInt((req.query.limit as string) || "30", 10) || 30));
+    const beforeId = parseInt((req.query.beforeId as string) || "0", 10) || 0;
+    const me = req.session.email as string;
+
+    const rows = beforeId > 0
+      ? await db.select().from(roseWallPosts)
+          .where(and(eq(roseWallPosts.status, "live"), lt(roseWallPosts.id, beforeId)))
+          .orderBy(desc(roseWallPosts.id))
+          .limit(limit)
+      : await db.select().from(roseWallPosts)
+          .where(eq(roseWallPosts.status, "live"))
+          .orderBy(desc(roseWallPosts.id))
+          .limit(limit);
+
+    if (rows.length === 0) return res.json({ posts: [] });
+
+    // Which of these has the viewer rose'd?
+    const ids = rows.map((r) => r.id);
+    const myRoses = await db.select({ postId: roseWallRoses.postId })
+      .from(roseWallRoses)
+      .where(and(eq(roseWallRoses.userEmail, me), inArray(roseWallRoses.postId, ids)));
+    const rosedSet = new Set(myRoses.map((r) => r.postId));
+
+    res.json({ posts: rows.map((r) => shapePost(r, rosedSet.has(r.id), r.authorEmail === me)) });
+  } catch (err: any) {
+    // eslint-disable-next-line no-console
+    console.error("[rose-wall] feed error:", err?.message || err);
+    res.status(500).json({ error: "Could not load the wall right now. Try again in a moment 🌹" });
+  }
 });
 
-router.post("/rose-wall/:id/rose", (req, res) => {
-  const post = state.posts.find(p => p.id === req.params.id);
-  if (!post) return res.status(404).json({ error: "not found" });
-  post.roses += 1;
-  save(state);
-  res.json({ roses: post.roses });
+// ---------------------------------------------------------------------------
+// POST /rose-wall — create a post (moderated).
+// ---------------------------------------------------------------------------
+router.post("/rose-wall", requireSession, async (req: any, res) => {
+  try {
+    const me = req.session.email as string;
+    const body = req.body || {};
+    const text = typeof body.text === "string" ? body.text.trim() : "";
+    const mood = typeof body.mood === "string" && ALLOWED_MOODS.includes(body.mood) ? body.mood : null;
+    const isAnonymous = !!body.isAnonymous;
+
+    if (!text) return res.status(400).json({ error: "Write something first 🌹" });
+    if (text.length > MAX_POST_LEN) {
+      return res.status(400).json({ error: `Posts are limited to ${MAX_POST_LEN} characters.` });
+    }
+    if (!rateOk(recentPosts, me, RATE_PER_HOUR_POSTS)) {
+      return res.status(429).json({ error: "Slow down sister 🌹 — try again in a bit." });
+    }
+
+    // Moderate BEFORE the row exists. We still log blocked attempts as rows
+    // with status='blocked' so we have an audit trail for repeat offenders.
+    const verdict = await moderateText(text, { context: "post" });
+    const displayName = await getDisplayName(me);
+
+    if (!verdict.allow) {
+      await db.insert(roseWallPosts).values({
+        authorEmail: me,
+        isAnonymous,
+        displayName,
+        text,
+        mood,
+        status: "blocked",
+        moderationReason: verdict.reason,
+      });
+      return res.status(422).json({ blocked: true, error: BLOCK_MESSAGE });
+    }
+
+    const [row] = await db.insert(roseWallPosts).values({
+      authorEmail: me,
+      isAnonymous,
+      displayName,
+      text,
+      mood,
+      status: "live",
+      moderationReason: verdict.severity === "warn" ? verdict.reason : null,
+    }).returning();
+
+    res.json({ post: shapePost(row, false, true) });
+  } catch (err: any) {
+    // eslint-disable-next-line no-console
+    console.error("[rose-wall] post error:", err?.message || err);
+    res.status(500).json({ error: "Could not post right now. Try again 🌹" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /rose-wall/:id — delete OWN post (soft delete so audit survives).
+// ---------------------------------------------------------------------------
+router.delete("/rose-wall/:id", requireSession, async (req: any, res) => {
+  try {
+    const me = req.session.email as string;
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad id" });
+
+    const [row] = await db.select().from(roseWallPosts).where(eq(roseWallPosts.id, id)).limit(1);
+    if (!row || row.status === "deleted") return res.status(404).json({ error: "Post not found" });
+    if (row.authorEmail !== me) return res.status(403).json({ error: "You can only delete your own posts." });
+
+    await db.update(roseWallPosts).set({ status: "deleted" }).where(eq(roseWallPosts.id, id));
+    res.json({ ok: true });
+  } catch (err: any) {
+    // eslint-disable-next-line no-console
+    console.error("[rose-wall] delete error:", err?.message || err);
+    res.status(500).json({ error: "Could not delete that post. Try again 🌹" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /rose-wall/:id/rose — toggle a rose (like). Returns new state.
+// Wrapped in a transaction so the rose row + parent counter stay in sync,
+// and we use the unique (post_id, user_email) constraint to defend against
+// concurrent double-likes (race winners get the row, losers get a no-op).
+// ---------------------------------------------------------------------------
+router.post("/rose-wall/:id/rose", requireSession, async (req: any, res) => {
+  try {
+    const me = req.session.email as string;
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad id" });
+
+    const result = await db.transaction(async (tx) => {
+      const [post] = await tx.select().from(roseWallPosts).where(eq(roseWallPosts.id, id)).limit(1);
+      if (!post || post.status !== "live") return { notFound: true as const };
+
+      const [existing] = await tx.select().from(roseWallRoses)
+        .where(and(eq(roseWallRoses.postId, id), eq(roseWallRoses.userEmail, me)))
+        .limit(1);
+
+      if (existing) {
+        const deleted = await tx.delete(roseWallRoses)
+          .where(eq(roseWallRoses.id, existing.id))
+          .returning({ id: roseWallRoses.id });
+        // Only decrement when we actually deleted a row (race: someone else may have raced us).
+        if (deleted.length > 0) {
+          const [u] = await tx.update(roseWallPosts)
+            .set({ roseCount: sql`GREATEST(${roseWallPosts.roseCount} - 1, 0)` })
+            .where(eq(roseWallPosts.id, id))
+            .returning({ roseCount: roseWallPosts.roseCount });
+          return { rosed: false, roseCount: u?.roseCount ?? 0 };
+        }
+        const [u] = await tx.select({ roseCount: roseWallPosts.roseCount })
+          .from(roseWallPosts).where(eq(roseWallPosts.id, id)).limit(1);
+        return { rosed: false, roseCount: u?.roseCount ?? 0 };
+      }
+
+      // Insert with onConflictDoNothing to swallow concurrent double-clicks
+      // (the unique index on (post_id, user_email) is what makes this safe).
+      const inserted = await tx.insert(roseWallRoses)
+        .values({ postId: id, userEmail: me })
+        .onConflictDoNothing()
+        .returning({ id: roseWallRoses.id });
+      if (inserted.length === 0) {
+        // Another concurrent request already added the rose — read current count.
+        const [u] = await tx.select({ roseCount: roseWallPosts.roseCount })
+          .from(roseWallPosts).where(eq(roseWallPosts.id, id)).limit(1);
+        return { rosed: true, roseCount: u?.roseCount ?? 0 };
+      }
+      const [u] = await tx.update(roseWallPosts)
+        .set({ roseCount: sql`${roseWallPosts.roseCount} + 1` })
+        .where(eq(roseWallPosts.id, id))
+        .returning({ roseCount: roseWallPosts.roseCount });
+      return { rosed: true, roseCount: u?.roseCount ?? 1 };
+    });
+
+    if ("notFound" in result) return res.status(404).json({ error: "Post not found" });
+    res.json(result);
+  } catch (err: any) {
+    // eslint-disable-next-line no-console
+    console.error("[rose-wall] rose error:", err?.message || err);
+    res.status(500).json({ error: "Could not register that rose. Try again 🌹" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /rose-wall/:id/comments — list comments on a post.
+// ---------------------------------------------------------------------------
+router.get("/rose-wall/:id/comments", requireSession, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad id" });
+    const me = req.session.email as string;
+
+    const rows = await db.select().from(roseWallComments)
+      .where(and(eq(roseWallComments.postId, id), eq(roseWallComments.status, "live")))
+      .orderBy(desc(roseWallComments.id))
+      .limit(100);
+
+    res.json({
+      comments: rows.map((c) => ({
+        id: c.id,
+        text: c.text,
+        isAnonymous: c.isAnonymous,
+        displayName: c.isAnonymous ? "Anonymous Rose" : c.displayName,
+        createdAt: c.createdAt,
+        isOwn: c.authorEmail === me,
+      })),
+    });
+  } catch (err: any) {
+    // eslint-disable-next-line no-console
+    console.error("[rose-wall] comments error:", err?.message || err);
+    res.status(500).json({ error: "Could not load comments. Try again 🌹" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /rose-wall/:id/comments — add a comment (moderated).
+// ---------------------------------------------------------------------------
+router.post("/rose-wall/:id/comments", requireSession, async (req: any, res) => {
+  try {
+    const me = req.session.email as string;
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad id" });
+
+    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+    const isAnonymous = !!req.body?.isAnonymous;
+    if (!text) return res.status(400).json({ error: "Write something first 🌹" });
+    if (text.length > MAX_COMMENT_LEN) return res.status(400).json({ error: `Comments are limited to ${MAX_COMMENT_LEN} characters.` });
+
+    const [post] = await db.select().from(roseWallPosts).where(eq(roseWallPosts.id, id)).limit(1);
+    if (!post || post.status !== "live") return res.status(404).json({ error: "Post not found" });
+
+    if (!rateOk(recentComments, me, RATE_PER_HOUR_COMMENTS)) {
+      return res.status(429).json({ error: "Easy now 🌹 — too many comments in a short time." });
+    }
+
+    const verdict = await moderateText(text, { context: "comment" });
+    const displayName = await getDisplayName(me);
+
+    if (!verdict.allow) {
+      await db.insert(roseWallComments).values({
+        postId: id, authorEmail: me, isAnonymous, displayName,
+        text, status: "blocked", moderationReason: verdict.reason,
+      });
+      return res.status(422).json({ blocked: true, error: BLOCK_MESSAGE });
+    }
+
+    const [row] = await db.insert(roseWallComments).values({
+      postId: id, authorEmail: me, isAnonymous, displayName,
+      text, status: "live",
+      moderationReason: verdict.severity === "warn" ? verdict.reason : null,
+    }).returning();
+
+    await db.update(roseWallPosts)
+      .set({ commentCount: sql`${roseWallPosts.commentCount} + 1` })
+      .where(eq(roseWallPosts.id, id));
+
+    res.json({
+      comment: {
+        id: row.id,
+        text: row.text,
+        isAnonymous: row.isAnonymous,
+        displayName: row.isAnonymous ? "Anonymous Rose" : row.displayName,
+        createdAt: row.createdAt,
+        isOwn: true,
+      },
+    });
+  } catch (err: any) {
+    // eslint-disable-next-line no-console
+    console.error("[rose-wall] comment error:", err?.message || err);
+    res.status(500).json({ error: "Could not post that comment. Try again 🌹" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /rose-wall/:postId/comments/:cid — delete OWN comment.
+// We require the URL :postId to match the comment's actual postId so a user
+// can't decrement the count of an unrelated post by passing a wrong path id.
+// Status flip + count decrement happen in one transaction so a half-update
+// can't leave the count drifting.
+// ---------------------------------------------------------------------------
+router.delete("/rose-wall/:postId/comments/:cid", requireSession, async (req: any, res) => {
+  try {
+    const me = req.session.email as string;
+    const cid = parseInt(req.params.cid, 10);
+    const pid = parseInt(req.params.postId, 10);
+    if (!Number.isFinite(cid) || !Number.isFinite(pid)) return res.status(400).json({ error: "bad id" });
+
+    const outcome = await db.transaction(async (tx) => {
+      const [row] = await tx.select().from(roseWallComments).where(eq(roseWallComments.id, cid)).limit(1);
+      if (!row || row.status === "deleted") return { code: 404 as const };
+      if (row.postId !== pid) return { code: 404 as const }; // path mismatch — treat as not found
+      if (row.authorEmail !== me) return { code: 403 as const };
+
+      await tx.update(roseWallComments).set({ status: "deleted" }).where(eq(roseWallComments.id, cid));
+      await tx.update(roseWallPosts)
+        .set({ commentCount: sql`GREATEST(${roseWallPosts.commentCount} - 1, 0)` })
+        .where(eq(roseWallPosts.id, row.postId));
+      return { code: 200 as const };
+    });
+
+    if (outcome.code === 404) return res.status(404).json({ error: "Comment not found" });
+    if (outcome.code === 403) return res.status(403).json({ error: "You can only delete your own comments." });
+    res.json({ ok: true });
+  } catch (err: any) {
+    // eslint-disable-next-line no-console
+    console.error("[rose-wall] delete comment error:", err?.message || err);
+    res.status(500).json({ error: "Could not delete that comment. Try again 🌹" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /rose-wall/:id/report — report a post (queued for human review).
+// Body: { reason?: string, commentId?: number }
+// ---------------------------------------------------------------------------
+router.post("/rose-wall/:id/report", requireSession, async (req: any, res) => {
+  try {
+    const me = req.session.email as string;
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad id" });
+
+    // Throttle reports so a single user can't spam-fill the moderation queue.
+    if (!rateOk(recentReports, me, RATE_PER_HOUR_REPORTS)) {
+      return res.status(429).json({ error: "You're reporting a lot — give us a moment to review 🌹" });
+    }
+
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.slice(0, 200) : null;
+    const rawCommentId = req.body?.commentId != null ? parseInt(req.body.commentId, 10) : null;
+    const commentId = Number.isFinite(rawCommentId as number) ? (rawCommentId as number) : null;
+
+    const targetType = commentId ? "comment" : "post";
+    const targetId = commentId || id;
+
+    // Validate the target actually exists & isn't deleted, so junk IDs don't
+    // bloat the moderation queue. Anyone who can see the wall can report;
+    // we don't restrict to live-only because reporting a still-blocked post
+    // (e.g. for an admin to confirm) is fine, but it must exist.
+    if (commentId) {
+      const [c] = await db.select({ id: roseWallComments.id, status: roseWallComments.status })
+        .from(roseWallComments).where(eq(roseWallComments.id, commentId)).limit(1);
+      if (!c || c.status === "deleted") return res.status(404).json({ error: "Comment not found" });
+    } else {
+      const [p] = await db.select({ id: roseWallPosts.id, status: roseWallPosts.status })
+        .from(roseWallPosts).where(eq(roseWallPosts.id, id)).limit(1);
+      if (!p || p.status === "deleted") return res.status(404).json({ error: "Post not found" });
+    }
+
+    try {
+      await db.insert(roseWallReports).values({
+        targetType, targetId, reporterEmail: me, reason, status: "pending",
+      });
+    } catch (e: any) {
+      // Unique constraint on (target_type, target_id, reporter_email) — already reported.
+      if (String(e?.message || e).includes("rose_wall_reports_reporter_target_uniq")) {
+        return res.json({ ok: true, alreadyReported: true });
+      }
+      throw e;
+    }
+    res.json({ ok: true });
+  } catch (err: any) {
+    // eslint-disable-next-line no-console
+    console.error("[rose-wall] report error:", err?.message || err);
+    res.status(500).json({ error: "Could not file that report. Try again 🌹" });
+  }
 });
 
 export default router;

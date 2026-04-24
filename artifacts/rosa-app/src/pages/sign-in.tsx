@@ -94,6 +94,7 @@ export default function SignIn() {
           code: code.trim(),
           rememberMe,
           marketingOptIn,
+          name: name.trim(),
         }),
       });
       const data = await res.json().catch(() => ({}));
