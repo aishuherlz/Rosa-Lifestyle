@@ -36,9 +36,12 @@ const RELAXED_SAFETY = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
 ];
 
-// Model name pinned to the stable free-tier model. `latest` alias lets Google
-// rotate the underlying snapshot without us redeploying.
-const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash-latest";
+// Model name pinned to the stable free-tier model. We previously used the
+// "-latest" alias but Google retired it from the v1beta API endpoint, so we
+// now default to the bare "gemini-1.5-flash" snapshot. The GEMINI_MODEL env
+// var lets us swap to a newer model (e.g. "gemini-2.0-flash") any time
+// without a redeploy.
+const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
 
 function detectProvider(): ChatProvider {
   if (process.env.GEMINI_API_KEY?.trim()) return "gemini";
