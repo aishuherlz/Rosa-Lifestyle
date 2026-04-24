@@ -1,6 +1,7 @@
 import { Router } from "express";
 import express from "express";
 import crypto from "crypto";
+import { requireAdmin } from "../lib/admin-auth";
 
 const router = Router();
 
@@ -92,30 +93,72 @@ function buildHtml(code: string, name: string): string {
 </body></html>`;
 }
 
-async function sendEmailViaSendGrid(to: string, code: string, name: string): Promise<{ ok: boolean; error?: string }> {
+async function sendEmailViaSendGrid(to: string, code: string, name: string): Promise<{ ok: boolean; error?: string; messageId?: string }> {
   const key = process.env.SENDGRID_API_KEY;
   const from = process.env.SENDGRID_FROM_EMAIL;
   if (!key || !from) {
     console.error("[SendGrid] Skipped: SENDGRID_API_KEY or SENDGRID_FROM_EMAIL not set on server.");
     return { ok: false, error: "missing_config" };
   }
+  // Gmail-to-Gmail via 3rd-party senders is the worst-case for deliverability.
+  // Adding List-Unsubscribe + Reply-To + a stable Message-ID and tagging the
+  // category lifts spam-folder placement noticeably.
+  const fromGmail = /@gmail\.com$/i.test(from);
+  const toGmail = /@gmail\.com$/i.test(to);
+  const fromName = "ROSA — Aiswarya";
   try {
     const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
       headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        personalizations: [{ to: [{ email: to }] }],
-        from: { email: from, name: "ROSA 🌹" },
-        subject: `Your ROSA verification code: ${code}`,
+        personalizations: [{
+          to: [{ email: to, name: name || undefined }],
+          headers: {
+            // Gmail/Outlook prioritise messages with a working unsubscribe.
+            "List-Unsubscribe": `<mailto:${from}?subject=unsubscribe>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          },
+        }],
+        from: { email: from, name: fromName },
+        reply_to: { email: from, name: fromName },
+        subject: `Your ROSA verification code 🌹 — ${code}`,
+        // Custom_args show up in the Activity Feed so we can correlate failures.
+        custom_args: { kind: "verification", to_domain: to.split("@")[1] || "" },
+        categories: ["rosa-verification"],
+        // mail_settings.sandbox_mode would silently swallow mail — make absolutely sure it's off.
+        mail_settings: { sandbox_mode: { enable: false } },
+        // tracking_settings: keep open/click tracking off so the email stays clean and snappy.
+        tracking_settings: {
+          click_tracking: { enable: false, enable_text: false },
+          open_tracking: { enable: false },
+          subscription_tracking: { enable: false },
+        },
         content: [
-          { type: "text/plain", value: `Hello ${name},\n\nYour ROSA verification code is: ${code}\n\nIt expires in 10 minutes.\n\nWith love,\nROSA 🌹` },
+          { type: "text/plain", value:
+`Hi ${name || "beautiful"},
+
+Welcome to ROSA. Your verification code is:
+
+  ${code}
+
+It expires in 10 minutes. If you didn't request this, you can safely ignore this email.
+
+With love,
+Aiswarya
+ROSA — an app made for women, by women 🌹
+
+To unsubscribe, reply with "unsubscribe".` },
           { type: "text/html", value: buildHtml(code, name) },
         ],
       }),
     });
     if (res.ok) {
-      console.log(`[SendGrid] Verification code sent to ${to} (status ${res.status}, from ${from})`);
-      return { ok: true };
+      const messageId = res.headers.get("x-message-id") || undefined;
+      console.log(`[SendGrid] Verification code accepted for ${to} (status ${res.status}, from ${from}, x-message-id ${messageId || "n/a"})`);
+      if (fromGmail && toGmail) {
+        console.warn(`[SendGrid] WARNING: gmail.com→gmail.com via SendGrid often lands in spam due to DKIM/DMARC. Consider verifying a custom domain (e.g. noreply@rosainclusive.lifestyle) for production.`);
+      }
+      return { ok: true, messageId };
     }
     const errText = await res.text();
     // The #1 cause of "email never arrives" is an unverified sender — log it loudly.
@@ -129,6 +172,48 @@ async function sendEmailViaSendGrid(to: string, code: string, name: string): Pro
     return { ok: false, error: e?.message || "fetch_failed" };
   }
 }
+
+// Diagnostic endpoint: queries SendGrid's Activity Feed to see what actually
+// happened to recent emails (delivered? bounced? blocked? marked as spam?).
+// Usage: GET /api/auth/sendgrid-activity?email=foo@gmail.com
+// Note: Requires the SendGrid API key to have the "Email Activity Read" scope,
+// AND your SendGrid plan must include Activity Feed access (free plan: 3 days).
+router.get("/auth/sendgrid-activity", requireAdmin, async (req, res) => {
+  const key = process.env.SENDGRID_API_KEY;
+  if (!key) return res.status(503).json({ ok: false, error: "SENDGRID_API_KEY not set" });
+  const email = String(req.query.email || "").trim().toLowerCase();
+  if (!email || !isEmail(email)) return res.status(400).json({ ok: false, error: "Pass ?email=foo@bar.com" });
+  try {
+    const query = encodeURIComponent(`to_email="${email}"`);
+    const url = `https://api.sendgrid.com/v3/messages?limit=20&query=${query}`;
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${key}` } });
+    if (!r.ok) {
+      const txt = await r.text();
+      return res.status(r.status).json({
+        ok: false,
+        status: r.status,
+        error: txt.slice(0, 500),
+        hint: r.status === 401 ? "API key lacks 'Email Activity Read' scope. Create a new SendGrid API key with Full Access OR enable that scope." :
+              r.status === 403 ? "Your SendGrid plan may not include Activity Feed. Free plan keeps activity for 3 days only." :
+              undefined,
+      });
+    }
+    const body = await r.json() as { messages?: any[] };
+    const events = (body.messages || []).map((m: any) => ({
+      to_email: m.to_email,
+      from_email: m.from_email,
+      subject: m.subject,
+      status: m.status,
+      opens_count: m.opens_count,
+      clicks_count: m.clicks_count,
+      last_event_time: m.last_event_time,
+      msg_id: m.msg_id,
+    }));
+    res.json({ ok: true, count: events.length, events });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || "fetch_failed" });
+  }
+});
 
 // Diagnostic endpoint: tells you whether SendGrid env vars are set on the server.
 // Safe to expose — it never reveals the key itself, only whether it's configured.

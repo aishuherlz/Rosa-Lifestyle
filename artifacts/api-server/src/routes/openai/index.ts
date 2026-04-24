@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { db, conversations, messages } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { streamChat, chatOnce, getActiveProvider } from "../../lib/chat-client";
+import { streamChat, chatOnce, getActiveProvider, diagnoseChat } from "../../lib/chat-client";
 import { logger } from "../../lib/logger";
+import { requireAdmin } from "../../lib/admin-auth";
 
 const router = Router();
 
@@ -21,6 +22,17 @@ function parseId(raw: string | undefined): number | null {
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
 }
+
+// Diagnostic — calls the live provider with a tiny prompt so we can see the
+// real upstream error in production logs without going through DB or SSE.
+// Visit https://<api-domain>/api/openai/diagnose to surface the actual reason
+// the chatbot is failing (auth, model name, safety block, network, etc.).
+// Admin-only — surfaces upstream errors AND consumes a real LLM call. Gate it.
+router.get("/diagnose", requireAdmin, async (_req, res) => {
+  const result = await diagnoseChat();
+  logger.info({ result }, "Chatbot diagnostic");
+  res.status(result.ok ? 200 : 503).json(result);
+});
 
 router.get("/conversations", async (_req, res) => {
   try {
@@ -155,7 +167,15 @@ Keep responses warm, conversational, and concise unless the user wants more dept
         res.write(`data: ${JSON.stringify({ content: chunkContent })}\n\n`);
       }
     } catch (streamErr: any) {
-      logger.error({ err: streamErr?.message, status: streamErr?.status, provider: getActiveProvider() }, "Chatbot stream error");
+      logger.error({
+        err: streamErr?.message,
+        name: streamErr?.name,
+        status: streamErr?.status || streamErr?.response?.status,
+        geminiBlockReason: streamErr?.geminiBlockReason,
+        cause: streamErr?.cause?.message,
+        stack: streamErr?.stack?.split("\n").slice(0, 5).join("\n"),
+        provider: getActiveProvider(),
+      }, "Chatbot stream error");
       if (emittedAny) {
         // Don't append a second answer; tell the client we cut off and persist what we have.
         const note = "\n\n(…my words got tangled, sister — please ask again 🌹)";
@@ -187,15 +207,28 @@ Keep responses warm, conversational, and concise unless the user wants more dept
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
     res.end();
   } catch (err: any) {
-    logger.error({ err: err?.message, stack: err?.stack, status: err?.status }, "Chatbot route failed");
-    // Friendly, specific message based on the actual failure mode.
-    let userMsg = "I'm having a moment, sister 🌹 — please try again in a bit.";
     const status = err?.status || err?.response?.status;
     const msg = String(err?.message || "");
+    const blockReason = err?.geminiBlockReason;
+    logger.error({
+      err: msg,
+      name: err?.name,
+      status,
+      geminiBlockReason: blockReason,
+      cause: err?.cause?.message,
+      stack: err?.stack?.split("\n").slice(0, 8).join("\n"),
+      provider: getActiveProvider(),
+    }, "Chatbot route failed");
+    // Friendly, specific message based on the actual failure mode.
+    let userMsg = "I'm having a moment, sister 🌹 — please try again in a bit.";
     if (status === 429 || /quota|rate limit|insufficient_quota/i.test(msg)) {
       userMsg = "ROSA's chat is taking a little break 🌸 — our AI quota is full right now. Aiswarya has been notified and we'll be back soon. In the meantime, try the journal or quotes pages 💝";
-    } else if (status === 401 || /api key|authentication/i.test(msg)) {
+    } else if (status === 401 || status === 403 || /api key|authentication|permission/i.test(msg)) {
       userMsg = "ROSA's chat needs a moment to wake up 🌹 — please try again shortly.";
+    } else if (blockReason || /safety|blocked/i.test(msg)) {
+      userMsg = "Let me think of a softer way to answer that, sister 🌸 — try asking it a slightly different way?";
+    } else if (/empty response|no user message/i.test(msg)) {
+      userMsg = "I didn't quite catch that, sister 🌹 — could you say it again?";
     }
     try { res.write(`data: ${JSON.stringify({ content: userMsg })}\n\n`); res.write(`data: ${JSON.stringify({ done: true })}\n\n`); } catch {}
     res.end();
