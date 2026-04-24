@@ -72,13 +72,25 @@ export function FloatingChat() {
   async function initConversation() {
     setInitializing(true);
     try {
+      // Try to resume an existing conversation, but only if the stored id is a real positive number.
+      // (Old/corrupt entries with id === undefined / null / NaN used to produce
+      //  /api/openai/conversations/undefined and 404. Validate before using.)
       const stored = localStorage.getItem("rosa_chatbot_conversation");
+      let storedId: number | null = null;
       if (stored) {
-        const { id } = JSON.parse(stored);
-        const res = await fetch(apiUrl(`/api/openai/conversations/${id}`));
+        try {
+          const parsed = JSON.parse(stored);
+          const n = Number(parsed?.id);
+          if (Number.isFinite(n) && n > 0) storedId = n;
+        } catch {}
+        // Wipe corrupt entries so we never try them again.
+        if (storedId === null) localStorage.removeItem("rosa_chatbot_conversation");
+      }
+      if (storedId !== null) {
+        const res = await fetch(apiUrl(`/api/openai/conversations/${storedId}`));
         if (res.ok) {
           const data = await res.json();
-          setConversationId(id);
+          setConversationId(storedId);
           setMessages(
             (data.messages || []).map((m: any) => ({
               id: String(m.id),
@@ -89,15 +101,23 @@ export function FloatingChat() {
           setInitializing(false);
           return;
         }
+        // Conversation no longer exists on the server — drop the stale id and create a fresh one.
+        localStorage.removeItem("rosa_chatbot_conversation");
       }
+      // Create a brand-new conversation. Validate the response before storing the id.
       const res = await fetch(apiUrl(`/api/openai/conversations`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: "ROSA Chat" }),
       });
+      if (!res.ok) throw new Error(`Failed to create conversation (${res.status})`);
       const conv = await res.json();
-      setConversationId(conv.id);
-      localStorage.setItem("rosa_chatbot_conversation", JSON.stringify({ id: conv.id }));
+      const newId = Number(conv?.id);
+      if (!Number.isFinite(newId) || newId <= 0) {
+        throw new Error("Server returned invalid conversation id");
+      }
+      setConversationId(newId);
+      localStorage.setItem("rosa_chatbot_conversation", JSON.stringify({ id: newId }));
       setMessages([
         {
           id: "welcome",
