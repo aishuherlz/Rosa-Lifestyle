@@ -10,6 +10,7 @@ import foodVisionRouter from "./food-vision";
 import outfitVisionRouter from "./outfit-vision";
 import roseWallRouter from "./rose-wall";
 import supportRouter from "./support";
+import friendsRouter from "./friends";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(foodVisionRouter);
 router.use(outfitVisionRouter);
 router.use(roseWallRouter);
 router.use(supportRouter);
+router.use("/friends", friendsRouter);
 
 export default router;
