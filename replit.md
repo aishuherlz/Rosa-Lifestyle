@@ -98,6 +98,7 @@ Express 5 backend with AI chatbot endpoints.
   - Posts/comments go through Gemini moderation before going live; block message: "This post couldn't be shared as it goes against our community guidelines 🌹"
   - Rose toggle and comment-delete are transactional with parent-counter updates; rose toggle defends against double-click races via the unique (post_id, user_email) index
   - Reports rate-limited (20/hr) and validated against existing live targets
+- Stripe payment fix (out-of-band): replaced the Replit-only `stripe-replit-sync` package with the standard Stripe SDK so payments work on Railway. Checkout/portal now require auth; customer email comes from `req.session.email` (never from a body field), so Stripe never sees "guest@rosa.app". Customer resolution is retrieve → list-by-email → create with idempotent rosa_users linkage. Webhook signatures return 400 (no Stripe retry); downstream errors return 500 (Stripe retries). Webhook handler maps stripeCustomerId / stripeSubscriptionId / subscriptionStatus / trialEndsAt onto rosa_users; falls back to subscription metadata to recover the user when customer linkage drifts. Webhooks are now configured manually in the Stripe dashboard at /api/stripe/webhook.
 - Step 4 (nicknames + handles) — next
 
 ## Environment Variables

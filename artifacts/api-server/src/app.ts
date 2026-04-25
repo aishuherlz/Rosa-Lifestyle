@@ -5,7 +5,7 @@ import helmet from "helmet";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
 import router from "./routes";
-import { WebhookHandlers } from "./webhookHandlers";
+import { WebhookHandlers, StripeWebhookSignatureError } from "./webhookHandlers";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
@@ -33,8 +33,17 @@ app.post(
       await WebhookHandlers.processWebhook(req.body as Buffer, sig);
       res.status(200).json({ received: true });
     } catch (error: any) {
-      logger.error({ err: error }, 'Webhook error');
-      res.status(400).json({ error: 'Webhook processing error' });
+      // Distinguish bad signatures (Stripe must NOT retry — return 400) from
+      // downstream processing/DB errors (Stripe SHOULD retry — return 5xx).
+      // Returning 4xx for everything would silently drop subscription state
+      // updates whenever our DB has a transient hiccup.
+      if (error instanceof StripeWebhookSignatureError) {
+        logger.warn({ err: error.message }, 'Stripe webhook signature invalid');
+        res.status(400).json({ error: 'Invalid signature' });
+        return;
+      }
+      logger.error({ err: error?.message || error }, 'Stripe webhook processing failed (returning 500 so Stripe retries)');
+      res.status(500).json({ error: 'Webhook processing error' });
     }
   }
 );

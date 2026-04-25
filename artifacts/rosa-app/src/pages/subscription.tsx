@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { useSubscription } from "@/lib/subscription-context";
 import { useState, useEffect } from "react";
 import { apiUrl } from "@/lib/api";
+import { getAuthHeader, loadSession } from "@/lib/auth-storage";
+import { useLocation } from "wouter";
 
 const FREE_FEATURES = [
   "Period & cycle tracking",
@@ -42,6 +44,7 @@ function formatPrice(amount: number, currency: string): string {
 
 export default function Subscription() {
   const { plan, isPremium, daysLeftInTrial, trialEndsAt, subscribedAt, renewsAt, subscribe, cancelSubscription } = useSubscription();
+  const [, setLocation] = useLocation();
   const [selectedPlan, setSelectedPlan] = useState<"monthly" | "yearly">("yearly");
   const [prices, setPrices] = useState<PriceInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -59,11 +62,17 @@ export default function Subscription() {
   }, []);
 
   const handleStripeCheckout = async () => {
-    setLoading(true);
     setCheckoutError("");
+    // Stripe MUST receive a real signed-in email. If the user isn't signed in,
+    // bounce them through sign-in first instead of falling back to "guest".
+    const session = loadSession();
+    if (!session) {
+      setLocation("/sign-in?next=/subscription");
+      return;
+    }
+
+    setLoading(true);
     try {
-      const emailOrPhone = localStorage.getItem("rosa_email") || localStorage.getItem("rosa_phone") || "guest@rosa.app";
-      const name = localStorage.getItem("rosa_name") || "ROSA User";
       const priceId = selectedPlan === "monthly" ? prices?.monthly.id : prices?.yearly.id;
 
       let gardenRoses = 0;
@@ -71,24 +80,38 @@ export default function Subscription() {
         const g = JSON.parse(localStorage.getItem("rosa_garden") || "{}");
         gardenRoses = g.roses || 0;
       } catch {}
+
       const resp = await fetch(apiUrl("/api/stripe/checkout"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailOrPhone, name, priceId, planType: selectedPlan, gardenRoses }),
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeader(),
+        },
+        body: JSON.stringify({ priceId, planType: selectedPlan, gardenRoses }),
       });
 
-      if (!resp.ok) throw new Error("Could not create checkout session");
-      const { url, isFoundingMember, foundingMemberType } = await resp.json();
+      if (resp.status === 401) {
+        setLocation("/sign-in?next=/subscription");
+        return;
+      }
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        throw new Error(body.error || "Could not create checkout session");
+      }
+      const { url } = await resp.json();
 
       if (url) {
         window.location.href = url;
       } else {
-        // Fallback to local simulation if Stripe not connected
+        // Stripe responded but with no URL — fall back to local simulation so
+        // dev/demo flows still work without a real Stripe key.
         subscribe(selectedPlan);
         setShowPortalBtn(true);
       }
-    } catch {
-      // Stripe not connected — use local simulation
+    } catch (err: any) {
+      // Network or Stripe failure — keep the user moving with local sim,
+      // but surface what happened so it's not silent in dev.
+      setCheckoutError(err?.message || "Checkout unavailable — using local trial.");
       subscribe(selectedPlan);
       setShowPortalBtn(true);
     } finally {
@@ -97,16 +120,27 @@ export default function Subscription() {
   };
 
   const handlePortal = async () => {
+    const session = loadSession();
+    if (!session) {
+      setLocation("/sign-in?next=/subscription");
+      return;
+    }
     setLoading(true);
     try {
-      const emailOrPhone = localStorage.getItem("rosa_email") || localStorage.getItem("rosa_phone") || "guest@rosa.app";
       const resp = await fetch(apiUrl("/api/stripe/portal"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailOrPhone }),
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeader(),
+        },
       });
-      const { url } = await resp.json();
+      if (resp.status === 401) {
+        setLocation("/sign-in?next=/subscription");
+        return;
+      }
+      const { url, error } = await resp.json();
       if (url) window.open(url, "_blank");
+      else setCheckoutError(error || "Billing portal unavailable. Please try again.");
     } catch {
       setCheckoutError("Billing portal unavailable. Please try again.");
     } finally {

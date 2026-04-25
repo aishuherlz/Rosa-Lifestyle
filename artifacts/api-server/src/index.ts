@@ -8,8 +8,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { logChatProviderConfig } from "./lib/chat-client";
 import { db, conversations } from "@workspace/db";
-import { runMigrations } from "stripe-replit-sync";
-import { getStripeSync } from "./stripeClient";
+import { getUncachableStripeClient } from "./stripeClient";
 
 // Boot diagnostics — surface config problems immediately in Railway/Replit logs.
 logChatProviderConfig();
@@ -48,73 +47,39 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-// Stripe is optional. The server MUST start even if Stripe is missing,
-// misconfigured, under review, or its DB schema can't be created.
-// Every call below is wrapped so one failure can never crash boot.
+// Stripe is optional. The server MUST start even if Stripe is missing or
+// misconfigured. We just verify connectivity so a missing/typo'd key shows up
+// in the boot logs instead of failing silently on the first checkout.
+//
+// Webhooks are no longer auto-registered. Configure them manually in the
+// Stripe dashboard pointing at https://<your-domain>/api/stripe/webhook and
+// set STRIPE_WEBHOOK_SECRET in env.
 async function initStripe() {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    logger.warn("Stripe init skipped: DATABASE_URL not set.");
-    return;
-  }
-
-  // Short-circuit BEFORE touching the DB if there's no Stripe key at all.
-  // This avoids the "relation stripe.accounts does not exist" path entirely
-  // when Stripe is not connected yet.
-  const hasReplitConnector = !!process.env.REPLIT_CONNECTORS_HOSTNAME &&
+  const hasReplitConnector =
+    !!process.env.REPLIT_CONNECTORS_HOSTNAME &&
     (!!process.env.REPL_IDENTITY || !!process.env.WEB_REPL_RENEWAL);
   const hasDirectKey = !!process.env.STRIPE_SECRET_KEY?.trim();
   if (!hasReplitConnector && !hasDirectKey) {
-    logger.warn("Stripe init skipped: no STRIPE_SECRET_KEY and no Replit Stripe connector. Payments disabled until configured.");
+    logger.warn(
+      "Stripe init skipped: no STRIPE_SECRET_KEY env var. Payments disabled until configured.",
+    );
     return;
   }
-
-  // 1. Stripe schema migrations — safe-wrapped.
   try {
-    logger.info("Initializing Stripe schema...");
-    await runMigrations({ databaseUrl, schema: "stripe" });
-    logger.info("Stripe schema ready");
-  } catch (error: any) {
-    logger.warn({ err: error?.message }, "Stripe schema migration failed — payments disabled until resolved.");
-    return; // No point continuing if the schema isn't there.
-  }
-
-  // 2. Stripe client + webhook — safe-wrapped.
-  let stripeSync: Awaited<ReturnType<typeof getStripeSync>> | null = null;
-  try {
-    stripeSync = await getStripeSync();
-  } catch (error: any) {
-    logger.warn({ err: error?.message }, "Stripe client init failed — payments disabled.");
-    return;
-  }
-
-  try {
-    const domain = process.env.REPLIT_DOMAINS?.split(",")[0]?.trim()
-      || process.env.RAILWAY_PUBLIC_DOMAIN?.trim()
-      || process.env.PUBLIC_DOMAIN?.trim();
-    if (!domain) {
-      logger.warn("Stripe webhook skipped: no public domain env var (REPLIT_DOMAINS / RAILWAY_PUBLIC_DOMAIN / PUBLIC_DOMAIN).");
-    } else {
-      await stripeSync.findOrCreateManagedWebhook(`https://${domain}/api/stripe/webhook`);
-      logger.info("Stripe webhook configured");
+    const stripe = await getUncachableStripeClient();
+    // Cheapest read-only call to confirm the key works.
+    await stripe.products.list({ limit: 1 });
+    logger.info("Stripe client OK");
+    if (!process.env.STRIPE_WEBHOOK_SECRET?.trim()) {
+      logger.warn(
+        "STRIPE_WEBHOOK_SECRET not set — webhooks will fail signature verification. Set it once you've created the webhook in the Stripe dashboard.",
+      );
     }
   } catch (error: any) {
-    logger.warn({ err: error?.message }, "Stripe webhook registration failed — webhook may need manual setup.");
-  }
-
-  // 3. Background backfill — already fire-and-forget, but harden the .catch.
-  try {
-    stripeSync.syncBackfill()
-      .then(() => logger.info("Stripe data synced"))
-      .catch((err: any) => logger.warn({ err: err?.message }, "Stripe backfill failed (non-fatal)"));
-  } catch (error: any) {
-    logger.warn({ err: error?.message }, "Stripe backfill could not be started (non-fatal)");
+    logger.warn({ err: error?.message }, "Stripe init failed — payments disabled until resolved.");
   }
 }
 
-// Fire-and-forget: do NOT block server startup on Stripe under any circumstance.
-// Even if the entire initStripe() function somehow threw synchronously, this
-// .catch guarantees we still start the HTTP listener below.
 initStripe().catch((err: any) =>
   logger.warn({ err: err?.message }, "Stripe init crashed (non-fatal, server continues)")
 );
