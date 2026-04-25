@@ -5,6 +5,30 @@ import { eq, and, desc, isNull } from "drizzle-orm";
 import { db, rosaUsers, trustedDevices } from "@workspace/db";
 import { generateUniqueAnonymousName } from "../lib/anonymous-name";
 import { requireAdmin } from "../lib/admin-auth";
+// ─── ROSA ID generation ────────────────────────────────────────────────────
+async function generateUniqueRosaId(): Promise<string> {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  for (let attempt = 0; attempt < 10; attempt++) {
+    let id = "ROSA-";
+    for (let i = 0; i < 5; i++) {
+      id += chars[Math.floor(Math.random() * chars.length)];
+    }
+    const existing = await db.select({ rosaId: rosaUsers.rosaId })
+      .from(rosaUsers)
+      .where(eq(rosaUsers.rosaId, id))
+      .limit(1);
+    if (!existing[0]) return id;
+  }
+  // fallback with timestamp to guarantee uniqueness
+  return "ROSA-" + Date.now().toString(36).toUpperCase().slice(-5);
+}
+
+async function backfillRosaIdIfNull(email: string): Promise<void> {
+  const rosaId = await generateUniqueRosaId();
+  await db.update(rosaUsers)
+    .set({ rosaId })
+    .where(and(eq(rosaUsers.emailOrPhone, email), isNull(rosaUsers.rosaId)));
+}
 
 const router = Router();
 
@@ -392,6 +416,9 @@ async function ensureUserRow(
     if (!existing[0].anonymousName) {
       await backfillAnonymousNameIfNull(email);
     }
+    if (!existing[0].rosaId) {
+      await backfillRosaIdIfNull(email);
+    }
     return { tokenVersion: existing[0].tokenVersion ?? 1 };
   }
 
@@ -400,6 +427,7 @@ async function ensureUserRow(
   // and retry; we don't want signup to fail just because the dice were unlucky.
   for (let attempt = 0; attempt < 5; attempt++) {
     const anonymousName = await generateUniqueAnonymousName();
+    const rosaId = await generateUniqueRosaId();
     try {
       const [row] = await db
         .insert(rosaUsers)
@@ -408,6 +436,7 @@ async function ensureUserRow(
           name: cleanName || (email.split("@")[0] || "Friend"),
           marketingOptIn: marketingOptIn ?? "later",
           anonymousName,
+          rosaId,
         })
         .onConflictDoNothing({ target: rosaUsers.emailOrPhone })
         .returning();
