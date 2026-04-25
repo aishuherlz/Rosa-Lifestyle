@@ -11,8 +11,26 @@ type Message = {
   streaming?: boolean;
 };
 
+// Other parts of the app (the mobile bottom nav, for example) drive the
+// chat through these DOM events. `open` opens it; `toggle` flips state so a
+// second tap closes it. Keeps FloatingChat self-contained — no context
+// refactor needed.
+export const ROSA_OPEN_CHAT_EVENT = "rosa:open-chat";
+export const ROSA_TOGGLE_CHAT_EVENT = "rosa:toggle-chat";
+
 export function FloatingChat() {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const openHandler = () => setOpen(true);
+    const toggleHandler = () => setOpen((o) => !o);
+    window.addEventListener(ROSA_OPEN_CHAT_EVENT, openHandler);
+    window.addEventListener(ROSA_TOGGLE_CHAT_EVENT, toggleHandler);
+    return () => {
+      window.removeEventListener(ROSA_OPEN_CHAT_EVENT, openHandler);
+      window.removeEventListener(ROSA_TOGGLE_CHAT_EVENT, toggleHandler);
+    };
+  }, []);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -26,6 +44,28 @@ export function FloatingChat() {
   const speechSupported = typeof window !== "undefined" && (("SpeechRecognition" in window) || ("webkitSpeechRecognition" in window));
   const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
 
+  // Tracks lifetime so async callbacks (fetch streams, deferred reopens, speech
+  // events) don't call setState after the component is gone. Strict-mode and
+  // route changes both unmount this component, so without this guard React
+  // warns and we risk leaking the SSE reader.
+  const mountedRef = useRef(true);
+  const reopenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (reopenTimerRef.current) clearTimeout(reopenTimerRef.current);
+      abortRef.current?.abort();
+      // Stop any in-flight speech recognition so callbacks don't fire after unmount.
+      try { recognitionRef.current?.stop(); } catch {}
+      // Cancel any TTS in progress.
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        try { window.speechSynthesis.cancel(); } catch {}
+      }
+    };
+  }, []);
+
   const toggleListen = () => {
     if (!speechSupported) return;
     if (listening) { recognitionRef.current?.stop(); setListening(false); return; }
@@ -33,12 +73,13 @@ export function FloatingChat() {
     const rec = new SR();
     rec.lang = "en-US"; rec.interimResults = true; rec.continuous = false;
     rec.onresult = (e: any) => {
+      if (!mountedRef.current) return;
       const transcript = Array.from(e.results).map((r: any) => r[0].transcript).join("");
       setInput(transcript);
-      if (e.results[e.results.length - 1].isFinal) { rec.stop(); }
+      if (e.results[e.results.length - 1].isFinal) { try { rec.stop(); } catch {} }
     };
-    rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
+    rec.onerror = () => { if (mountedRef.current) setListening(false); };
+    rec.onend = () => { if (mountedRef.current) setListening(false); };
     recognitionRef.current = rec;
     rec.start();
     setListening(true);
@@ -59,6 +100,11 @@ export function FloatingChat() {
     if (open && !conversationId) {
       initConversation();
     }
+    // When the user closes the panel, abort any in-flight stream so the
+    // SSE reader doesn't keep running in the background.
+    if (!open) {
+      abortRef.current?.abort();
+    }
   }, [open]);
 
   useEffect(() => {
@@ -66,11 +112,21 @@ export function FloatingChat() {
   }, [messages]);
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 300);
+    if (!open) return;
+    const t = setTimeout(() => inputRef.current?.focus(), 300);
+    return () => clearTimeout(t);
   }, [open]);
 
   async function initConversation() {
     setInitializing(true);
+    // Dedicated abort controller for the init lifecycle so unmount tears
+    // down any in-flight resume/create fetch and we never call setState after.
+    const ac = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = ac;
+    const safeSet = <T,>(setter: (v: T) => void, v: T) => {
+      if (mountedRef.current && !ac.signal.aborted) setter(v);
+    };
     try {
       // Try to resume an existing conversation, but only if the stored id is a real positive number.
       // (Old/corrupt entries with id === undefined / null / NaN used to produce
@@ -87,18 +143,17 @@ export function FloatingChat() {
         if (storedId === null) localStorage.removeItem("rosa_chatbot_conversation");
       }
       if (storedId !== null) {
-        const res = await fetch(apiUrl(`/api/openai/conversations/${storedId}`));
+        const res = await fetch(apiUrl(`/api/openai/conversations/${storedId}`), { signal: ac.signal });
         if (res.ok) {
           const data = await res.json();
-          setConversationId(storedId);
-          setMessages(
+          safeSet(setConversationId, storedId);
+          safeSet(setMessages,
             (data.messages || []).map((m: any) => ({
               id: String(m.id),
               role: m.role,
               content: m.content,
             }))
           );
-          setInitializing(false);
           return;
         }
         // Conversation no longer exists on the server — drop the stale id and create a fresh one.
@@ -109,6 +164,7 @@ export function FloatingChat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: "ROSA Chat" }),
+        signal: ac.signal,
       });
       if (!res.ok) throw new Error(`Failed to create conversation (${res.status})`);
       const conv = await res.json();
@@ -116,25 +172,29 @@ export function FloatingChat() {
       if (!Number.isFinite(newId) || newId <= 0) {
         throw new Error("Server returned invalid conversation id");
       }
-      setConversationId(newId);
+      safeSet(setConversationId, newId);
       localStorage.setItem("rosa_chatbot_conversation", JSON.stringify({ id: newId }));
-      setMessages([
+      safeSet(setMessages, [
         {
           id: "welcome",
           role: "assistant",
           content: "Hi, I'm ROSA. I'm here for you — whether you need to talk, get advice, or just feel less alone. What's on your mind today?",
         },
       ]);
-    } catch {
-      setMessages([
+    } catch (err: any) {
+      // Aborted init (panel closed or unmount) is a no-op, not an error.
+      const aborted = ac.signal.aborted || err?.name === "AbortError";
+      if (aborted) return;
+      safeSet(setMessages, [
         {
           id: "welcome",
           role: "assistant",
           content: "Hi, I'm ROSA. I'm here for you. What's on your mind today?",
         },
       ]);
+    } finally {
+      if (mountedRef.current && !ac.signal.aborted) setInitializing(false);
     }
-    setInitializing(false);
   }
 
   async function sendMessage() {
@@ -145,11 +205,18 @@ export function FloatingChat() {
     setInput("");
     setLoading(true);
 
+    // Cancel any prior in-flight stream and arm a fresh AbortController so
+    // unmount (or a rapid second send) tears down the SSE reader cleanly.
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
     try {
       const res = await fetch(apiUrl(`/api/openai/conversations/${conversationId}/messages`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: userMsg.content }),
+        signal: ac.signal,
       });
       if (!res.body) throw new Error("No stream");
       const reader = res.body.getReader();
@@ -159,6 +226,10 @@ export function FloatingChat() {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
+        if (!mountedRef.current || ac.signal.aborted) {
+          try { await reader.cancel(); } catch {}
+          return;
+        }
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
@@ -167,7 +238,7 @@ export function FloatingChat() {
             try {
               const parsed = JSON.parse(line.slice(6));
               if (parsed.done) break;
-              if (parsed.content) {
+              if (parsed.content && mountedRef.current) {
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantId ? { ...m, content: m.content + parsed.content } : m
@@ -178,13 +249,19 @@ export function FloatingChat() {
           }
         }
       }
+      if (!mountedRef.current) return;
       setMessages((prev) => {
         const next = prev.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m));
         const finished = next.find(m => m.id === assistantId);
         if (finished) speak(finished.content);
         return next;
       });
-    } catch {
+    } catch (err: any) {
+      // Aborted streams (user closed the panel, navigated away, or sent a new
+      // message that superseded this one) are NOT failures — silently bail
+      // without surfacing the "I'm having a moment" error to the user.
+      const aborted = ac.signal.aborted || err?.name === "AbortError";
+      if (aborted || !mountedRef.current) return;
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
@@ -192,8 +269,11 @@ export function FloatingChat() {
             : m
         )
       );
+    } finally {
+      // Guard the loading reset too — without this, an unmount-driven abort
+      // could call setState on a dead component.
+      if (mountedRef.current) setLoading(false);
     }
-    setLoading(false);
   }
 
   async function clearChat() {
@@ -203,10 +283,14 @@ export function FloatingChat() {
       } catch {}
     }
     localStorage.removeItem("rosa_chatbot_conversation");
+    if (!mountedRef.current) return;
     setConversationId(null);
     setMessages([]);
     setOpen(false);
-    setTimeout(() => setOpen(true), 100);
+    if (reopenTimerRef.current) clearTimeout(reopenTimerRef.current);
+    reopenTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) setOpen(true);
+    }, 100);
   }
 
   return (
@@ -215,7 +299,10 @@ export function FloatingChat() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setOpen(!open)}
-        className="fixed bottom-24 right-4 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 shadow-xl flex items-center justify-center text-white"
+        // The `floating-chat-fab` class lets the layout hide just the button
+        // on mobile (where the bottom-nav Chat tab opens the same chat).
+        className="floating-chat-fab hidden md:flex fixed bottom-6 right-4 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 shadow-xl items-center justify-center text-white"
+        aria-label="Open ROSA chat"
       >
         <AnimatePresence mode="wait">
           {open ? (
@@ -246,9 +333,28 @@ export function FloatingChat() {
                 <span className="font-serif text-base font-medium">ROSA</span>
                 <span className="text-white/70 text-xs">your companion</span>
               </div>
-              <button onClick={clearChat} className="text-white/70 hover:text-white">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {/* Two icon buttons. The X is critical on mobile where the FAB
+                  toggle is hidden — without it the chat had no close affordance. */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={clearChat}
+                  className="text-white/70 hover:text-white p-1.5 rounded-lg"
+                  aria-label="Clear conversation"
+                  title="Clear conversation"
+                  data-testid="chat-clear"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="text-white/70 hover:text-white p-1.5 rounded-lg"
+                  aria-label="Close chat"
+                  title="Close chat"
+                  data-testid="chat-close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
@@ -286,7 +392,9 @@ export function FloatingChat() {
                 {speechSupported && (
                   <Button onClick={toggleListen} size="icon" variant={listening ? "default" : "outline"}
                     className={`rounded-2xl shrink-0 ${listening ? "bg-rose-500 hover:bg-rose-600 text-white animate-pulse" : ""}`}
-                    title={listening ? "Stop listening" : "Voice input"} data-testid="button-mic">
+                    title={listening ? "Stop listening" : "Voice input"}
+                    aria-label={listening ? "Stop listening" : "Voice input"}
+                    data-testid="button-mic">
                     {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                   </Button>
                 )}
@@ -303,7 +411,9 @@ export function FloatingChat() {
                   <Button onClick={() => { setSpeakReplies(s => !s); if (speakReplies) window.speechSynthesis.cancel(); }}
                     size="icon" variant={speakReplies ? "default" : "outline"}
                     className={`rounded-2xl shrink-0 ${speakReplies ? "bg-violet-500 hover:bg-violet-600 text-white" : ""}`}
-                    title={speakReplies ? "Mute voice replies" : "Hear ROSA's voice"} data-testid="button-tts">
+                    title={speakReplies ? "Mute voice replies" : "Hear ROSA's voice"}
+                    aria-label={speakReplies ? "Mute voice replies" : "Hear ROSA's voice"}
+                    data-testid="button-tts">
                     {speakReplies ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
                   </Button>
                 )}
@@ -312,6 +422,9 @@ export function FloatingChat() {
                   disabled={!input.trim() || loading}
                   size="icon"
                   className="rounded-2xl bg-rose-500 hover:bg-rose-600 text-white shrink-0"
+                  aria-label={loading ? "Sending message" : "Send message"}
+                  title="Send message"
+                  data-testid="button-send"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </Button>

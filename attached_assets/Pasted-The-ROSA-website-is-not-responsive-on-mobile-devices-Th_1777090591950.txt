@@ -1,0 +1,73 @@
+The ROSA website is not responsive on mobile devices.
+The left sidebar navigation is not visible on mobile.
+Fix the entire site to work perfectly on all screen sizes:
+mobile, tablet, laptop, and desktop.
+
+Please fix ALL of these:
+
+1. NAVIGATION / SIDEBAR
+- On mobile (below 768px): hide the left sidebar
+- Add a hamburger menu icon (☰) in the top header
+- Clicking hamburger opens a slide-in drawer from 
+  the left with all navigation items
+- Clicking outside the drawer closes it
+- On tablet (768px-1024px): collapsed sidebar with 
+  just icons, hover shows labels
+- On desktop (1024px+): full sidebar visible as normal
+
+2. LAYOUT FIXES
+- All pages must use responsive grid layouts
+- No horizontal scrolling on any page on mobile
+- Text must be readable without zooming
+- Buttons must be large enough to tap (min 44px height)
+- Images must scale down properly on small screens
+- Cards must stack vertically on mobile instead of 
+  side by side
+
+3. ROSE WALL on mobile
+- Full width feed on mobile
+- Post button easily accessible
+- Like and comment buttons big enough to tap
+
+4. HOME SCREEN on mobile
+- ROSA Garden rose animation works on mobile
+- Streak counter visible
+- Quick action buttons accessible
+
+5. NAVIGATION BAR on mobile
+- Add a bottom navigation bar on mobile with 
+  icons for: Home, Rose Wall, Chat, Profile, Menu
+- This is standard mobile UX — much better than 
+  a hamburger menu alone
+
+6. TYPOGRAPHY
+- Font sizes scale down gracefully on mobile
+- Headings use clamp() for fluid sizing
+- Line heights comfortable for mobile reading
+
+7. FORMS AND INPUTS
+- Input fields full width on mobile
+- Keyboard doesn't break layout when it opens
+- Forms scroll properly on mobile
+
+8. TOUCH INTERACTIONS
+- All hover effects have touch equivalents
+- No elements that require hover to access on mobile
+- Swipe gestures where appropriate
+
+9. TEST ON THESE SIZES:
+- 375px (iPhone SE)
+- 390px (iPhone 14)
+- 768px (iPad)
+- 1024px (iPad Pro / small laptop)
+- 1280px (desktop)
+- 1920px (large desktop)
+
+10. PERFORMANCE ON MOBILE
+- Images lazy loaded
+- Animations reduced on low-power devices
+- Fast load time on mobile networks
+
+After fixing push to GitHub. The site must feel 
+like a native app on mobile — smooth, beautiful, 
+and fully functional on every screen size.
