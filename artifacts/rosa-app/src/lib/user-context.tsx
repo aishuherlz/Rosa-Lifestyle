@@ -18,6 +18,10 @@ export type User = {
   deviceId?: string | null;
   rememberMe?: boolean;
   expiresAt?: string | null;
+  // Permanent pen name shown on the Rose Wall when the user posts anonymously.
+  // Backfilled by the server on every sign-in so older accounts still get one.
+  // Surfaced here so the Settings screen can show "your anonymous name is …".
+  anonymousName?: string | null;
 };
 
 type UserContextType = {
@@ -81,6 +85,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     if (introSeen === "true") setHasSeenIntroState(true);
 
     // If we loaded a session, ping /api/auth/me to confirm it's still valid.
+    // We also use this round trip to opportunistically refresh server-owned
+    // fields on the cached profile (e.g. the permanent anonymousName, which
+    // may have been backfilled by the server for a user who signed in before
+    // the column existed).
     if (session) {
       fetch(apiUrl("/api/auth/me"), { headers: { Authorization: `Bearer ${session.token}` } })
         .then(async (r) => {
@@ -92,7 +100,24 @@ export function UserProvider({ children }: { children: ReactNode }) {
               sessionStorage.removeItem(PROFILE_KEY);
             } catch {}
             setUserState(null);
+            return;
           }
+          if (!r.ok) return;
+          const body = await r.json().catch(() => null) as { user?: { anonymousName?: string | null } | null } | null;
+          const serverAnon = body?.user?.anonymousName ?? null;
+          if (!serverAnon) return;
+          // Merge into the in-memory profile and re-persist so subsequent
+          // boots (and anywhere that reads useUser().user) see the value.
+          setUserState((prev) => {
+            if (!prev) return prev;
+            if (prev.anonymousName === serverAnon) return prev;
+            const next = { ...prev, anonymousName: serverAnon };
+            try {
+              const target = next.rememberMe ? localStorage : sessionStorage;
+              target.setItem(PROFILE_KEY, JSON.stringify(next));
+            } catch {}
+            return next;
+          });
         })
         .catch(() => { /* network blip — keep current state */ });
     }

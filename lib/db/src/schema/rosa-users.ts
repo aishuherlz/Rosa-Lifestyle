@@ -21,6 +21,13 @@ export const rosaUsers = pgTable("rosa_users", {
   // Default "later" so a fresh signup is treated as "ask me again from settings"
   // — this keeps us GDPR/CAN-SPAM friendly (no implicit opt-in).
   marketingOptIn: text("marketing_opt_in").notNull().default("later"),
+  // Permanent, single-blind pen name used everywhere the user posts
+  // anonymously (Rose Wall today; future communities later). It NEVER changes
+  // for a given user, so they can build reputation without exposing identity.
+  // Format is one of: "RosePetal_<4 digits>" or "Rose_<Adjective><Flower>".
+  // Nullable so the column can be added without a migration step; the auth
+  // layer backfills any NULL on next sign-in.
+  anonymousName: text("anonymous_name").unique(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

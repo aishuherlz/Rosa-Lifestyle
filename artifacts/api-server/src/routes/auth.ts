@@ -1,8 +1,9 @@
 import { Router } from "express";
 import express from "express";
 import crypto from "crypto";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNull } from "drizzle-orm";
 import { db, rosaUsers, trustedDevices } from "@workspace/db";
+import { generateUniqueAnonymousName } from "../lib/anonymous-name";
 import { requireAdmin } from "../lib/admin-auth";
 
 const router = Router();
@@ -323,6 +324,46 @@ function cleanMarketingPref(v: unknown): "yes" | "later" | "never" {
   return v === "yes" || v === "never" ? v : "later";
 }
 
+// Best-effort backfill of `anonymous_name` for an existing user that doesn't
+// have one yet. Defends against three concurrency hazards at once:
+//
+//  1. Same-row race — two simultaneous sign-ins for the same email both see
+//     anonymousName=NULL, both generate candidates, and both UPDATE. The
+//     second write would overwrite the first, breaking the *permanence*
+//     guarantee. We avoid that by adding `WHERE anonymous_name IS NULL` to
+//     every UPDATE so the loser is a no-op.
+//  2. Cross-row collision — generated candidate is already used by a
+//     different user. Postgres raises 23505; we catch and retry with a fresh
+//     candidate (up to a few attempts).
+//  3. Generator exhaustion — generateUniqueAnonymousName returns null when
+//     it can't find a free slot in 20 tries. We bail without writing
+//     anything; the next sign-in will try again. Never a hard failure.
+//
+// Returns true if the row now (definitely) has an anonymous_name, false if
+// we couldn't get one this time around.
+async function backfillAnonymousNameIfNull(email: string): Promise<boolean> {
+  for (let i = 0; i < 5; i++) {
+    const candidate = await generateUniqueAnonymousName();
+    if (!candidate) return false;
+    try {
+      const updated = await db
+        .update(rosaUsers)
+        .set({ anonymousName: candidate })
+        .where(and(eq(rosaUsers.emailOrPhone, email), isNull(rosaUsers.anonymousName)))
+        .returning({ id: rosaUsers.id });
+      // updated.length === 0 means a sibling sign-in already won the
+      // backfill race for this row. That's fine — the row already has a
+      // permanent name; we just stop trying.
+      return true;
+    } catch (err: any) {
+      // 23505 on anonymous_name_unique → cross-row collision; pick a new
+      // name and retry. Any other error escapes to the caller.
+      if (err?.code !== "23505") throw err;
+    }
+  }
+  return false;
+}
+
 async function ensureUserRow(
   email: string,
   marketingOptIn?: "yes" | "later" | "never",
@@ -345,8 +386,57 @@ async function ensureUserRow(
     if (Object.keys(patch).length > 0) {
       await db.update(rosaUsers).set(patch).where(eq(rosaUsers.emailOrPhone, email));
     }
+    // Backfill anonymous_name in a separate, race-safe statement so the
+    // permanence guarantee is preserved even under concurrent sign-ins (see
+    // `backfillAnonymousNameIfNull` for the exact protections).
+    if (!existing[0].anonymousName) {
+      await backfillAnonymousNameIfNull(email);
+    }
     return { tokenVersion: existing[0].tokenVersion ?? 1 };
   }
+
+  // New user: try to insert with a freshly minted anonymous name. If the
+  // unique constraint on `anonymous_name` collides (vanishingly rare), regenerate
+  // and retry; we don't want signup to fail just because the dice were unlucky.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const anonymousName = await generateUniqueAnonymousName();
+    try {
+      const [row] = await db
+        .insert(rosaUsers)
+        .values({
+          emailOrPhone: email,
+          name: cleanName || (email.split("@")[0] || "Friend"),
+          marketingOptIn: marketingOptIn ?? "later",
+          anonymousName,
+        })
+        .onConflictDoNothing({ target: rosaUsers.emailOrPhone })
+        .returning();
+      if (row) return { tokenVersion: row.tokenVersion ?? 1 };
+      // emailOrPhone race: another request created it; re-read and try a
+      // best-effort backfill in case that other writer ran out of attempts.
+      const again = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
+      if (again[0] && !again[0].anonymousName) {
+        await backfillAnonymousNameIfNull(email);
+      }
+      return { tokenVersion: again[0]?.tokenVersion ?? 1 };
+    } catch (err: any) {
+      // 23505 on anonymous_name unique → regenerate + retry. Anything else bubbles.
+      if (err?.code !== "23505") throw err;
+      // If it's the email unique that fired (shouldn't, since we used onConflictDoNothing),
+      // re-read and exit gracefully.
+      const detail = String(err?.constraint || err?.detail || "");
+      if (detail.includes("email")) {
+        const again = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
+        return { tokenVersion: again[0]?.tokenVersion ?? 1 };
+      }
+      // Else: anonymous_name collision — loop and try a different one.
+    }
+  }
+  // Last-ditch: insert without an anonymousName so signup never hard-fails.
+  // We then immediately attempt one more backfill so the user doesn't have
+  // to wait for the *next* sign-in just because the namespace had a brief
+  // hot streak. Both the new row and any sibling email-race winner get the
+  // opportunistic backfill treatment.
   const [row] = await db
     .insert(rosaUsers)
     .values({
@@ -356,9 +446,14 @@ async function ensureUserRow(
     })
     .onConflictDoNothing({ target: rosaUsers.emailOrPhone })
     .returning();
-  if (row) return { tokenVersion: row.tokenVersion ?? 1 };
-  // Race: another request created it; re-read.
+  if (row) {
+    if (!row.anonymousName) await backfillAnonymousNameIfNull(email);
+    return { tokenVersion: row.tokenVersion ?? 1 };
+  }
   const again = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
+  if (again[0] && !again[0].anonymousName) {
+    await backfillAnonymousNameIfNull(email);
+  }
   return { tokenVersion: again[0]?.tokenVersion ?? 1 };
 }
 
@@ -402,6 +497,13 @@ router.post("/auth/verify-code", async (req, res) => {
       expiresAt: new Date(exp * 1000),
     });
     const token = signSessionToken({ e: dest, exp, v: tokenVersion, d: deviceId, r: remember ? 1 : 0 });
+    // Read back the now-guaranteed anonymous_name so the client can stash it
+    // alongside the rest of the profile during sign-in (no extra round trip).
+    const [profile] = await db
+      .select({ anonymousName: rosaUsers.anonymousName })
+      .from(rosaUsers)
+      .where(eq(rosaUsers.emailOrPhone, dest))
+      .limit(1);
     res.json({
       ok: true,
       verified: true,
@@ -411,6 +513,7 @@ router.post("/auth/verify-code", async (req, res) => {
       deviceName: label,
       expiresAt: new Date(exp * 1000).toISOString(),
       rememberMe: remember,
+      anonymousName: profile?.anonymousName ?? null,
     });
   } catch (e: any) {
     console.error("[Auth] verify-code failed to register device:", e?.message || e);
@@ -473,6 +576,11 @@ router.get("/auth/me", requireSession, async (req: any, res) => {
       subscriptionStatus: user.subscriptionStatus,
       trialEndsAt: user.trialEndsAt,
       marketingOptIn: user.marketingOptIn ?? "later",
+      // Permanent pen name shown on Rose Wall when the user posts anonymously.
+      // Surfaced here (and only to the authenticated owner) so Settings can show
+      // "your anonymous name is …". Never linkable back to the real account by
+      // anyone but the user themselves.
+      anonymousName: user.anonymousName ?? null,
     } : null,
   });
 });

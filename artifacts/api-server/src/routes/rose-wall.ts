@@ -50,15 +50,54 @@ async function getDisplayName(email: string): Promise<string> {
   return (u?.name || "Rose").trim() || "Rose";
 }
 
-// Shape sent to the client. Strips authorEmail when anonymous so the client
-// can never accidentally render it.
-function shapePost(p: typeof roseWallPosts.$inferSelect, viewerHasRosed: boolean, isOwn: boolean) {
+// Look up the permanent anonymous pen name for one user. Falls back to the
+// generic "Anonymous Rose" label so that legacy rows (or the brief window
+// between schema-add and first sign-in) never break the wall UI.
+async function getAnonymousName(email: string): Promise<string> {
+  const [u] = await db
+    .select({ anonymousName: rosaUsers.anonymousName })
+    .from(rosaUsers)
+    .where(eq(rosaUsers.emailOrPhone, email))
+    .limit(1);
+  return (u?.anonymousName || "Anonymous Rose").trim() || "Anonymous Rose";
+}
+
+// Batch version used by the feed/comment-list endpoints. One round-trip per
+// page instead of one per row. Returns a Map keyed by author email so callers
+// can look up names while shaping the response.
+async function getAnonymousNameMap(emails: string[]): Promise<Map<string, string>> {
+  const unique = Array.from(new Set(emails)).filter(Boolean);
+  if (unique.length === 0) return new Map();
+  const rows = await db
+    .select({ email: rosaUsers.emailOrPhone, anonymousName: rosaUsers.anonymousName })
+    .from(rosaUsers)
+    .where(inArray(rosaUsers.emailOrPhone, unique));
+  const map = new Map<string, string>();
+  for (const r of rows) {
+    if (r.anonymousName) map.set(r.email, r.anonymousName);
+  }
+  return map;
+}
+
+// Shape sent to the client. When the post is marked anonymous we substitute
+// the author's permanent pen name (e.g. "RosePetal_0042" or
+// "Rose_GoldenLily") for their real display name. Falls back to the generic
+// "Anonymous Rose" label only if the author somehow doesn't have a pen name
+// yet — which shouldn't happen post-backfill but keeps the UI safe.
+function shapePost(
+  p: typeof roseWallPosts.$inferSelect,
+  viewerHasRosed: boolean,
+  isOwn: boolean,
+  anonNameByEmail: Map<string, string>,
+) {
   return {
     id: p.id,
     text: p.text,
     mood: p.mood,
     isAnonymous: p.isAnonymous,
-    displayName: p.isAnonymous ? "Anonymous Rose" : p.displayName,
+    displayName: p.isAnonymous
+      ? (anonNameByEmail.get(p.authorEmail) || "Anonymous Rose")
+      : p.displayName,
     roseCount: p.roseCount,
     commentCount: p.commentCount,
     createdAt: p.createdAt,
@@ -95,7 +134,12 @@ router.get("/rose-wall", requireSession, async (req: any, res) => {
       .where(and(eq(roseWallRoses.userEmail, me), inArray(roseWallRoses.postId, ids)));
     const rosedSet = new Set(myRoses.map((r) => r.postId));
 
-    res.json({ posts: rows.map((r) => shapePost(r, rosedSet.has(r.id), r.authorEmail === me)) });
+    // Batch-fetch the permanent anonymous pen names for any author whose post
+    // on this page is marked anonymous, so shapePost can substitute them in.
+    const anonAuthors = rows.filter((r) => r.isAnonymous).map((r) => r.authorEmail);
+    const anonNameByEmail = await getAnonymousNameMap(anonAuthors);
+
+    res.json({ posts: rows.map((r) => shapePost(r, rosedSet.has(r.id), r.authorEmail === me, anonNameByEmail)) });
   } catch (err: any) {
     // eslint-disable-next-line no-console
     console.error("[rose-wall] feed error:", err?.message || err);
@@ -150,7 +194,12 @@ router.post("/rose-wall", requireSession, async (req: any, res) => {
       moderationReason: verdict.severity === "warn" ? verdict.reason : null,
     }).returning();
 
-    res.json({ post: shapePost(row, false, true) });
+    // For the create response we only need the author's own anon name, so a
+    // single-row lookup is fine — and we only do it when actually anonymous.
+    const ownAnonMap = new Map<string, string>();
+    if (isAnonymous) ownAnonMap.set(me, await getAnonymousName(me));
+
+    res.json({ post: shapePost(row, false, true, ownAnonMap) });
   } catch (err: any) {
     // eslint-disable-next-line no-console
     console.error("[rose-wall] post error:", err?.message || err);
@@ -259,12 +308,19 @@ router.get("/rose-wall/:id/comments", requireSession, async (req: any, res) => {
       .orderBy(desc(roseWallComments.id))
       .limit(100);
 
+    // Same batched lookup pattern as the feed: collect anon authors on this
+    // page and fetch their permanent pen names in one query.
+    const anonAuthors = rows.filter((r) => r.isAnonymous).map((r) => r.authorEmail);
+    const anonNameByEmail = await getAnonymousNameMap(anonAuthors);
+
     res.json({
       comments: rows.map((c) => ({
         id: c.id,
         text: c.text,
         isAnonymous: c.isAnonymous,
-        displayName: c.isAnonymous ? "Anonymous Rose" : c.displayName,
+        displayName: c.isAnonymous
+          ? (anonNameByEmail.get(c.authorEmail) || "Anonymous Rose")
+          : c.displayName,
         createdAt: c.createdAt,
         isOwn: c.authorEmail === me,
       })),
@@ -318,12 +374,16 @@ router.post("/rose-wall/:id/comments", requireSession, async (req: any, res) => 
       .set({ commentCount: sql`${roseWallPosts.commentCount} + 1` })
       .where(eq(roseWallPosts.id, id));
 
+    // Single-row anon-name lookup (only when actually anonymous) so the new
+    // comment shows the author's pen name in-place without a refresh.
+    const ownAnon = isAnonymous ? await getAnonymousName(me) : null;
+
     res.json({
       comment: {
         id: row.id,
         text: row.text,
         isAnonymous: row.isAnonymous,
-        displayName: row.isAnonymous ? "Anonymous Rose" : row.displayName,
+        displayName: row.isAnonymous ? (ownAnon || "Anonymous Rose") : row.displayName,
         createdAt: row.createdAt,
         isOwn: true,
       },

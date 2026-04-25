@@ -176,6 +176,23 @@ export default function SettingsPage() {
             <Label>Account</Label>
             <p className="text-sm text-muted-foreground mt-1">{user?.guestMode ? "Guest Mode" : `Signed in as ${user?.emailOrPhone}`}</p>
           </div>
+          {/*
+            Permanent Rose Wall pen name. We only show this for verified
+            (non-guest) accounts because guests don't have a backing rosa_users
+            row and therefore no anonymous_name to display. The copy
+            intentionally explains *what it is* and that it's permanent — that
+            transparency is core to the trust model of the wall.
+          */}
+          {!user?.guestMode && user?.anonymousName ? (
+            <div data-testid="settings-anonymous-name">
+              <Label>Your Rose Wall pen name</Label>
+              <p className="text-sm font-medium mt-1">{user.anonymousName}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Shown when you post anonymously on the Rose Wall. It's permanent and
+                only ever linkable to you by you 🌹
+              </p>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

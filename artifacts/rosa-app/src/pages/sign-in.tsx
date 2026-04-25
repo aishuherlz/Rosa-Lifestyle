@@ -30,6 +30,10 @@ export default function SignIn() {
   // Verification step state
   const [code, setCode] = useState("");
   const [pendingSession, setPendingSession] = useState<StoredSession | null>(null);
+  // The server-minted permanent Rose Wall pen name; held between the verify
+  // step and the final signInWith() call so it lands in the user profile in
+  // one atomic write (no flicker, no extra fetch).
+  const [pendingAnonymousName, setPendingAnonymousName] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,6 +119,14 @@ export default function SignIn() {
       } else {
         setPendingSession(null);
       }
+      // Capture the permanent Rose Wall pen name the server minted (or
+      // backfilled) for this account, so we can persist it alongside the
+      // profile when the user finishes onboarding.
+      if (typeof data.anonymousName === "string") {
+        setPendingAnonymousName(data.anonymousName);
+      } else {
+        setPendingAnonymousName(null);
+      }
       setStep("gender");
     } catch {
       setError("Network error. Please try again.");
@@ -160,6 +172,7 @@ export default function SignIn() {
       guestMode: false,
       joinedAt: new Date().toISOString(),
       personalityTags: [],
+      anonymousName: pendingAnonymousName,
     }, pendingSession);
     setStep("onboarding");
   };
