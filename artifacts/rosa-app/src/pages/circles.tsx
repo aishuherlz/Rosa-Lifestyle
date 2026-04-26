@@ -16,7 +16,7 @@ import { format } from "date-fns";
 import { ShareButton } from "@/components/share-button";
 import { apiUrl } from "@/lib/api";
 
-type CircleMessage = { id: string; author: string; text: string; ts: number; reactions: number };
+type CircleMessage = { id: string; author: string; text: string; ts: number; reactions: number; mediaUrl?: string; mediaType?: "image" | "video"; };
 type Circle = { id: string; name: string; code: string; createdBy: string; members: string[]; messages: CircleMessage[]; createdAt: number };
 
 type PublicSummary = { id: string; name: string; topic: string; emoji: string; memberCount: number; messageCount: number; lastActivity: number; gameOfTheDay?: string };
@@ -158,11 +158,18 @@ export default function CirclesPage() {
     setCircles([placeholder, ...circles]); setActiveId(placeholder.id); setJoinCode(""); setJoinOpen(false);
     toast({ title: "Circle saved", description: "Cross-device sync needs the upcoming ROSA cloud — share this device or invite locally." });
   }
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
+  const [pubMediaPreview, setPubMediaPreview] = useState<string | null>(null);
+  const [pubMediaType, setPubMediaType] = useState<"image" | "video" | null>(null);
+
   function send() {
     if (!active || !draft.trim()) return;
-    const msg: CircleMessage = { id: Date.now().toString(), author: me, text: draft.trim(), ts: Date.now(), reactions: 0 };
+    const msg: CircleMessage = { id: Date.now().toString(), author: me, text: draft.trim(), ts: Date.now(), reactions: 0, mediaUrl: mediaPreview || undefined, mediaType: mediaType || undefined };
     setCircles(circles.map(c => c.id === active.id ? { ...c, messages: [...c.messages, msg] } : c));
     setDraft("");
+    setMediaPreview(null);
+    setMediaType(null);
   }
   function react(msgId: string) {
     if (!active) return;
@@ -357,7 +364,27 @@ export default function CirclesPage() {
                         💝 Two Truths & a Rose
                       </Button>
                     </div>
+                    {pubMediaPreview && (
+                      <div className="rounded-xl overflow-hidden border border-rose-200">
+                        {pubMediaType === "video" ? (
+                          <video src={pubMediaPreview} controls className="w-full max-h-40 object-cover" />
+                        ) : (
+                          <img src={pubMediaPreview} alt="Preview" className="w-full max-h-40 object-cover" />
+                        )}
+                        <button onClick={() => { setPubMediaPreview(null); setPubMediaType(null); }} className="text-xs text-red-500 p-1">✕ Remove</button>
+                      </div>
+                    )}
                     <div className="flex gap-2">
+                      <label className="cursor-pointer flex items-center text-rose-500 hover:text-rose-700 border border-rose-200 rounded-lg px-2 py-2 bg-white/70">
+                        📷
+                        <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => { setPubMediaPreview(reader.result as string); setPubMediaType(file.type.startsWith("video") ? "video" : "image"); };
+                          reader.readAsDataURL(file);
+                        }} />
+                      </label>
                       <Input value={publicDraft} onChange={e => setPublicDraft(e.target.value)} placeholder="Share with the lounge..." onKeyDown={e => { if (e.key === "Enter") sendPublic(); }} />
                       <Button onClick={sendPublic} className="bg-rose-500 hover:bg-rose-600 text-white"><Send className="w-4 h-4" /></Button>
                     </div>
