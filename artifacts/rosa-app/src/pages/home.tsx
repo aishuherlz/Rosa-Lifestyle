@@ -59,16 +59,20 @@ export default function Home() {
   const alreadyCheckedIn = garden.lastCheckIn === todayStr;
 
   useEffect(() => {
+    const fetchWeather = async (lat: number, lon: number) => {
+      try {
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode`);
+        const data = await res.json();
+        if (data.current) setWeather({ temp: Math.round(data.current.temperature_2m), code: data.current.weathercode });
+      } catch {}
+    };
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          try {
-            const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&current=temperature_2m,weathercode`);
-            const data = await res.json();
-            if (data.current) setWeather({ temp: Math.round(data.current.temperature_2m), code: data.current.weathercode });
-          } catch {}
-        }, () => {}
+        (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+        () => fetchWeather(43.6532, -79.3832) // fallback: Toronto
       );
+    } else {
+      fetchWeather(43.6532, -79.3832); // fallback: Toronto
     }
   }, []);
 
