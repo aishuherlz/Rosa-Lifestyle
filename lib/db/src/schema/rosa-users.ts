@@ -22,6 +22,7 @@ export const rosaUsers = pgTable("rosa_users", {
   nicknameChanges: integer("nickname_changes").notNull().default(0),
   bio: text("bio"),
   profilePhotoUrl: text("profile_photo_url"),
+  accountType: text("account_type").default("public"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -27,6 +27,7 @@ export type User = {
   nicknameChanges?: number;
   bio?: string | null;
   profilePhotoUrl?: string | null;
+  accountType?: string | null;
 };
 
 type UserContextType = {

@@ -20,6 +20,19 @@ export default function FriendsPage() {
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<"friends" | "search" | "requests">("friends");
+  const [suggested, setSuggested] = useState<Friend[]>([]);
+
+  const toggleAccountType = async () => {
+    const newType = user?.accountType === "private" ? "public" : "private";
+    try {
+      await fetch(apiUrl("/api/profile"), {
+        method: "PUT",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ accountType: newType }),
+      });
+      if (user) setUser({ ...user, accountType: newType });
+    } catch {}
+  };
 
   useEffect(() => {
     if (!user?.authToken) return;
@@ -101,6 +114,32 @@ export default function FriendsPage() {
           </Button>
         ))}
       </div>
+
+      {/* Account Type Toggle */}
+      <Card className="border-[#E8C4B8]">
+        <CardContent className="pt-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-[#6B3050]">Account Type</p>
+              <p className="text-sm text-[#9E7B8A]">
+                {user?.accountType === "private" 
+                  ? "Private — only people with your ROSA ID can add you" 
+                  : "Public — you appear in suggested friends"}
+              </p>
+            </div>
+            <button
+              onClick={toggleAccountType}
+              className={`w-12 h-6 rounded-full transition-colors ${
+                user?.accountType === "private" ? "bg-[#8B4F6E]" : "bg-[#D4A574]"
+              }`}
+            >
+              <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${
+                user?.accountType === "private" ? "translate-x-6" : "translate-x-0"
+              }`} />
+            </button>
+          </div>
+        </CardContent>
+      </Card>
 
       {tab === "search" && (
         <Card className="border-[#E8C4B8]">
