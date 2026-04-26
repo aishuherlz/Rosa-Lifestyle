@@ -33,7 +33,7 @@ export function RosaProfileCard() {
     if (val.length < 3) { setAvailable(null); return; }
     setChecking(true);
     try {
-      const res = await fetch(apiUrl(`/api/auth/check-nickname?nickname=${val}`));
+      const res = await fetch(apiUrl(`/api/check-nickname?nickname=${val}`));
       const data = await res.json();
       setAvailable(data.available);
     } catch { setAvailable(null); }
@@ -43,7 +43,7 @@ export function RosaProfileCard() {
   const saveNickname = async () => {
     setSaving(true);
     try {
-      const res = await fetch(apiUrl("/api/auth/set-nickname"), {
+      const res = await fetch(apiUrl("/api/set-nickname"), {
         method: "POST",
         headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ nickname }),
@@ -64,7 +64,7 @@ export function RosaProfileCard() {
 
   const saveBio = async () => {
     try {
-      await fetch(apiUrl("/api/auth/profile"), {
+      await fetch(apiUrl("/api/profile"), {
         method: "PUT",
         headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ bio }),
