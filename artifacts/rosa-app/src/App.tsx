@@ -34,6 +34,7 @@ import ChallengesPage from "@/pages/challenges";
 import SkinPage from "@/pages/skin";
 import LettersPage from "@/pages/letters";
 import CirclesPage from "@/pages/circles";
+import FriendsPage from "@/pages/friends";
 import HealthSyncPage from "@/pages/health-sync";
 import ReportPage from "@/pages/report";
 import SanctuaryPage from "@/pages/sanctuary";
@@ -97,6 +98,7 @@ function Router() {
       <Route path="/skin">{() => <ProtectedRoute component={SkinPage} />}</Route>
       <Route path="/letters">{() => <ProtectedRoute component={LettersPage} />}</Route>
       <Route path="/circles">{() => <ProtectedRoute component={CirclesPage} />}</Route>
+      <Route path="/friends">{() => <ProtectedRoute component={FriendsPage} />}</Route>
       <Route path="/health-sync">{() => <ProtectedRoute component={HealthSyncPage} />}</Route>
       <Route path="/report">{() => <ProtectedRoute component={ReportPage} />}</Route>
       <Route path="/sanctuary">{() => <ProtectedRoute component={SanctuaryPage} />}</Route>

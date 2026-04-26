@@ -33,7 +33,7 @@ router.get("/search", requireSession, async (req, res) => {
 
 // Send friend request
 router.post("/request", requireSession, async (req, res) => {
-  const fromEmail = req.session.email;
+  const fromEmail = req.rosaUser?.emailOrPhone;
   const { toRosaId } = req.body;
   try {
     const target = await db.select().from(rosaUsers).where(eq(rosaUsers.rosaId, toRosaId)).limit(1);
@@ -49,7 +49,7 @@ router.post("/request", requireSession, async (req, res) => {
 
 // Accept friend request
 router.post("/accept/:id", requireSession, async (req, res) => {
-  const email = req.session.email;
+  const email = req.rosaUser?.emailOrPhone;
   try {
     const [request] = await db.select().from(friendRequests)
       .where(and(eq(friendRequests.id, req.params.id), eq(friendRequests.toEmail, email))).limit(1);
@@ -65,7 +65,7 @@ router.post("/accept/:id", requireSession, async (req, res) => {
 
 // Decline friend request
 router.post("/decline/:id", requireSession, async (req, res) => {
-  const email = req.session.email;
+  const email = req.rosaUser?.emailOrPhone;
   try {
     await db.update(friendRequests).set({ status: "declined" })
       .where(and(eq(friendRequests.id, req.params.id), eq(friendRequests.toEmail, email)));
@@ -77,7 +77,7 @@ router.post("/decline/:id", requireSession, async (req, res) => {
 
 // Get friends list
 router.get("/", requireSession, async (req, res) => {
-  const email = req.session.email;
+  const email = req.rosaUser?.emailOrPhone;
   try {
     const friends = await db.select({
       rosaId: rosaUsers.rosaId,
@@ -96,7 +96,7 @@ router.get("/", requireSession, async (req, res) => {
 
 // Get pending requests
 router.get("/requests", requireSession, async (req, res) => {
-  const email = req.session.email;
+  const email = req.rosaUser?.emailOrPhone;
   try {
     const requests = await db.select({
       id: friendRequests.id,
@@ -118,7 +118,7 @@ router.get("/requests", requireSession, async (req, res) => {
 
 // Remove friend
 router.delete("/:friendEmail", requireSession, async (req, res) => {
-  const email = req.session.email;
+  const email = req.rosaUser?.emailOrPhone;
   const friendEmail = req.params.friendEmail;
   try {
     await db.delete(friendships).where(
@@ -135,7 +135,7 @@ router.delete("/:friendEmail", requireSession, async (req, res) => {
 
 // Block user
 router.post("/block/:blockEmail", requireSession, async (req, res) => {
-  const email = req.session.email;
+  const email = req.rosaUser?.emailOrPhone;
   const blockedEmail = req.params.blockEmail;
   try {
     await db.insert(blockedUsers).values({ blockerEmail: email, blockedEmail });
