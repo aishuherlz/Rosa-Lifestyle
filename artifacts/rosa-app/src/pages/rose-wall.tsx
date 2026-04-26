@@ -51,6 +51,8 @@ type Post = {
   createdAt: string;
   viewerHasRosed: boolean;
   isOwn: boolean;
+  mediaUrl?: string | null;
+  mediaType?: "image" | "video" | null;
 };
 
 type Comment = {
@@ -80,6 +82,8 @@ export default function RoseWallPage() {
   const [draft, setDraft] = useState("");
   const [draftMood, setDraftMood] = useState<string>("");
   const [draftAnon, setDraftAnon] = useState(false);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [openComments, setOpenComments] = useState<Record<number, boolean>>({});
   const [comments, setComments] = useState<Record<number, Comment[]>>({});
@@ -128,6 +132,8 @@ export default function RoseWallPage() {
           text,
           mood: draftMood || undefined,
           isAnonymous: draftAnon,
+          mediaUrl: mediaPreview || undefined,
+          mediaType: mediaType || undefined,
         }),
       });
       const d = await r.json();
@@ -150,6 +156,8 @@ export default function RoseWallPage() {
       setDraft("");
       setDraftMood("");
       setDraftAnon(false);
+      setMediaPreview(null);
+      setMediaType(null);
       toast({
         title: "Posted to the wall 🌹",
         description: "Your light just reached every sister.",
@@ -377,6 +385,46 @@ export default function RoseWallPage() {
             placeholder="Share something kind, ask for support, or send love..."
             className="min-h-[96px] bg-white/80 border-rose-200"
           />
+          {/* Media upload */}
+          <div className="flex items-center gap-2">
+            <label className="cursor-pointer flex items-center gap-1 text-xs text-rose-600 hover:text-rose-800 border border-rose-200 rounded-lg px-3 py-1.5 bg-white/70 hover:bg-rose-50 transition">
+              <span>📷</span> Add Photo/Video
+              <input
+                type="file"
+                accept="image/*,video/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 10 * 1024 * 1024) {
+                    toast({ title: "File too large", description: "Max 10MB allowed", variant: "destructive" });
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    setMediaPreview(reader.result as string);
+                    setMediaType(file.type.startsWith("video") ? "video" : "image");
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+            {mediaPreview && (
+              <button onClick={() => { setMediaPreview(null); setMediaType(null); }}
+                className="text-xs text-red-500 hover:text-red-700">
+                ✕ Remove
+              </button>
+            )}
+          </div>
+          {mediaPreview && (
+            <div className="rounded-xl overflow-hidden border border-rose-200">
+              {mediaType === "video" ? (
+                <video src={mediaPreview} controls className="w-full max-h-48 object-cover" />
+              ) : (
+                <img src={mediaPreview} alt="Preview" className="w-full max-h-48 object-cover" />
+              )}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground mr-1">Mood (optional):</span>
             {MOODS.slice(0, 6).map((m) => (
@@ -504,6 +552,12 @@ export default function RoseWallPage() {
                       </div>
 
                       <p className="text-foreground whitespace-pre-wrap">{post.text}</p>
+                      {post.mediaUrl && post.mediaType === "video" && (
+                        <video src={post.mediaUrl} controls className="w-full max-h-64 rounded-xl object-cover border border-rose-100 mt-2" />
+                      )}
+                      {post.mediaUrl && post.mediaType === "image" && (
+                        <img src={post.mediaUrl} alt="Post media" className="w-full max-h-64 rounded-xl object-cover border border-rose-100 mt-2" />
+                      )}
 
                       <div className="flex items-center gap-4 pt-1 text-sm">
                         <button
