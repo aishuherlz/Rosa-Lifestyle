@@ -726,7 +726,7 @@ router.post("/set-nickname", requireSession, async (req: any, res) => {
     const isFirstTime = !user.nickname;
     await db.update(rosaUsers).set({ nickname: nickname.toLowerCase(), nicknameChanges: isFirstTime ? 0 : (user.nicknameChanges || 0) + 1, updatedAt: new Date() }).where(eq(rosaUsers.emailOrPhone, email));
     return res.json({ success: true, nickname: nickname.toLowerCase() });
-  } catch { return res.status(500).json({ error: "Server error" }); }
+  } catch (err: any) { console.error("set-nickname error:", err?.message); return res.status(500).json({ error: err?.message || "Server error" }); }
 });
 
 router.put("/profile", requireSession, async (req: any, res) => {
