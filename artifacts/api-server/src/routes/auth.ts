@@ -584,6 +584,7 @@ export async function requireSession(req: any, res: any, next: any): Promise<voi
     .where(eq(trustedDevices.deviceId, payload.d))
     .catch(() => {});
   req.session = { email: payload.e, deviceId: payload.d, legacy: false };
+  req.rosaUser = user;
   next();
 }
 
