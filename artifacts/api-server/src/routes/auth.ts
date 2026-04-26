@@ -711,23 +711,25 @@ router.get("/check-nickname", async (req, res) => {
 
 router.post("/set-nickname", requireSession, async (req: any, res) => {
   try {
-    const user = req.rosaUser;
+    const email = req.session.email;
+    const [user] = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
+    if (!user) return res.status(404).json({ error: "User not found" });
     const { nickname } = req.body;
     if (!nickname || nickname.length < 3 || nickname.length > 20) return res.status(400).json({ error: "Invalid nickname" });
     const existing = await db.select({ id: rosaUsers.id }).from(rosaUsers).where(eq(rosaUsers.nickname, nickname.toLowerCase())).limit(1);
     if (existing.length > 0 && existing[0].id !== user.id) return res.status(409).json({ error: "Nickname already taken" });
     const isFirstTime = !user.nickname;
-    await db.update(rosaUsers).set({ nickname: nickname.toLowerCase(), nicknameChanges: isFirstTime ? 0 : (user.nicknameChanges || 0) + 1, updatedAt: new Date() }).where(eq(rosaUsers.id, user.id));
+    await db.update(rosaUsers).set({ nickname: nickname.toLowerCase(), nicknameChanges: isFirstTime ? 0 : (user.nicknameChanges || 0) + 1, updatedAt: new Date() }).where(eq(rosaUsers.emailOrPhone, email));
     return res.json({ success: true, nickname: nickname.toLowerCase() });
   } catch { return res.status(500).json({ error: "Server error" }); }
 });
 
 router.put("/profile", requireSession, async (req: any, res) => {
   try {
-    const user = req.rosaUser;
+    const email = req.session.email;
     const { bio, name } = req.body;
     if (bio && bio.length > 150) return res.status(400).json({ error: "Bio max 150 chars" });
-    await db.update(rosaUsers).set({ ...(bio !== undefined && { bio }), ...(name !== undefined && { name }), updatedAt: new Date() }).where(eq(rosaUsers.id, user.id));
+    await db.update(rosaUsers).set({ ...(bio !== undefined && { bio }), ...(name !== undefined && { name }), updatedAt: new Date() }).where(eq(rosaUsers.emailOrPhone, email));
     return res.json({ success: true });
   } catch { return res.status(500).json({ error: "Server error" }); }
 });

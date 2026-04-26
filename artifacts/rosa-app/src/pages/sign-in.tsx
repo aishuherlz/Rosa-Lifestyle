@@ -174,7 +174,8 @@ export default function SignIn() {
       personalityTags: [],
       anonymousName: pendingAnonymousName,
     }, pendingSession);
-    setStep("onboarding");
+    const existingOnboarding = JSON.parse(localStorage.getItem("rosa_onboarding") || "{}"); 
+    if (existingOnboarding?.completed) { setLocation("/"); } else { setStep("onboarding"); }
   };
 
   const GENDERS = [
