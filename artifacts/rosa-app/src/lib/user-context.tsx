@@ -108,15 +108,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
             return;
           }
           if (!r.ok) return;
-          const body = await r.json().catch(() => null) as { user?: { anonymousName?: string | null } | null } | null;
-          const serverAnon = body?.user?.anonymousName ?? null;
-          if (!serverAnon) return;
-          // Merge into the in-memory profile and re-persist so subsequent
-          // boots (and anywhere that reads useUser().user) see the value.
+          const body = await r.json().catch(() => null) as { user?: { anonymousName?: string | null; rosaId?: string | null; nickname?: string | null; nicknameChanges?: number; bio?: string | null; profilePhotoUrl?: string | null } | null } | null;
+          const serverUser = body?.user;
+          if (!serverUser) return;
           setUserState((prev) => {
             if (!prev) return prev;
-            if (prev.anonymousName === serverAnon) return prev;
-            const next = { ...prev, anonymousName: serverAnon };
+            const next = {
+              ...prev,
+              anonymousName: serverUser.anonymousName ?? prev.anonymousName,
+              rosaId: serverUser.rosaId ?? prev.rosaId,
+              nickname: serverUser.nickname ?? prev.nickname,
+              nicknameChanges: serverUser.nicknameChanges ?? prev.nicknameChanges,
+              bio: serverUser.bio ?? prev.bio,
+              profilePhotoUrl: serverUser.profilePhotoUrl ?? prev.profilePhotoUrl,
+            };
             try {
               const target = next.rememberMe ? localStorage : sessionStorage;
               target.setItem(PROFILE_KEY, JSON.stringify(next));
