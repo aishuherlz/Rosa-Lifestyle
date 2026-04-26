@@ -610,6 +610,13 @@ router.get("/auth/me", requireSession, async (req: any, res) => {
       // "your anonymous name is …". Never linkable back to the real account by
       // anyone but the user themselves.
       anonymousName: user.anonymousName ?? null,
+      rosaId: user.rosaId ?? null,
+      nickname: user.nickname ?? null,
+      nicknameChanges: user.nicknameChanges ?? 0,
+      bio: user.bio ?? null,
+      profilePhotoUrl: user.profilePhotoUrl ?? null,
+      gender: user.gender ?? null,
+      pronouns: user.pronouns ?? null,
     } : null,
   });
 });
