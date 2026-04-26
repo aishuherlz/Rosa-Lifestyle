@@ -12,6 +12,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { cn } from "@/lib/utils";
 import { PartnerShareToggle } from "@/components/partner-share-toggle";
+import { CycleHealthQuestionnaire } from "@/components/cycle-health-questionnaire";
+
+type CycleProfile = {
+  avgCycleLength: number;
+  avgPeriodLength: number;
+  isIrregular: boolean;
+  conditions: string[];
+  contraception: string;
+  symptoms: string[];
+  stressLevel: string;
+  exerciseLevel: string;
+  completed: boolean;
+};
 
 type CycleLog = {
   id: string;
@@ -125,6 +138,7 @@ function getPhaseKey(cycleDay: number): keyof typeof PHASE_INFO {
 }
 
 export default function PeriodPage() {
+  const [cycleProfile, setCycleProfile] = useLocalStorage<CycleProfile | null>("rosa_cycle_profile", null);
   const [cycleLogs, setCycleLogs] = useLocalStorage<CycleLog[]>("rosa_cycle_logs", []);
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"tracker" | "passport" | "guide">("tracker");
@@ -133,6 +147,16 @@ export default function PeriodPage() {
     periodStart: "", periodEnd: "", cycleLength: "28",
     symptoms: [] as string[], notes: "", flow: "medium" as CycleLog["flow"], mood: "",
   });
+
+  // Show questionnaire if not completed yet — AFTER all hooks
+  if (!cycleProfile?.completed) {
+    return (
+      <CycleHealthQuestionnaire
+        onComplete={(profile) => setCycleProfile(profile)}
+        existing={cycleProfile || undefined}
+      />
+    );
+  }
 
   const lastCycle = cycleLogs[0];
   const today = new Date();

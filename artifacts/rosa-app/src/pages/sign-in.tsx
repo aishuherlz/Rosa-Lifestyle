@@ -34,6 +34,7 @@ export default function SignIn() {
   // step and the final signInWith() call so it lands in the user profile in
   // one atomic write (no flicker, no extra fetch).
   const [pendingAnonymousName, setPendingAnonymousName] = useState<string | null>(null);
+  const [partnerCode, setPartnerCode] = useState("");
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -244,6 +245,17 @@ export default function SignIn() {
                       data-testid="input-signin-email"
                     />
                     <p className="text-xs text-muted-foreground">We'll send a 6-digit code to verify it's you.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="partner-code">Partner invite code (optional)</Label>
+                    <Input
+                      id="partner-code"
+                      placeholder="Enter partner's ROSA ID e.g. ROSA#1234"
+                      value={partnerCode}
+                      onChange={(e) => setPartnerCode(e.target.value)}
+                      className="bg-background/50 border-muted focus-visible:ring-primary/30"
+                    />
+                    <p className="text-xs text-muted-foreground">Have a partner on ROSA? Enter their ROSA ID to link accounts.</p>
                   </div>
                 </div>
 
