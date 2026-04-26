@@ -43,6 +43,7 @@ const NAV_ITEMS = [
   { href: "/surveys", label: "Surveys", icon: ClipboardList },
   { href: "/quotes", label: "Quotes", icon: Quote },
   { href: "/circles", label: "Circles", icon: Globe },
+  { href: "/friends", label: "Friends", icon: Users },
   { href: "/health-sync", label: "Health Sync", icon: Activity },
   { href: "/report", label: "ROSA Report", icon: FileText },
   { href: "/sanctuary", label: "Sanctuary", icon: Moon },
