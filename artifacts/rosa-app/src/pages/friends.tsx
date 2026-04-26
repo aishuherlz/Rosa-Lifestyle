@@ -12,7 +12,7 @@ type Friend = { rosaId: string; name: string; nickname: string | null; profilePh
 type Request = { id: string; name: string; nickname: string | null; rosaId: string; fromEmail: string };
 
 export default function FriendsPage() {
-  const { user, getAuthHeaders } = useUser();
+  const { user, setUser, getAuthHeaders } = useUser();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Friend[]>([]);
