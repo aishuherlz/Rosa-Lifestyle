@@ -137,3 +137,128 @@ router.get("/circles/roses/:author", (req, res) => {
 });
 
 export default router;
+
+// ─── Private Circles (DB-backed) ─────────────────────────────────────────
+import { requireSession } from "./auth";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
+
+// Create private circle
+router.post("/circles/private", requireSession, async (req: any, res) => {
+  const email = req.rosaUser?.emailOrPhone;
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: "Name required" });
+  try {
+    const result = await db.execute(sql`
+      INSERT INTO private_circles (name, created_by_email)
+      VALUES (${name}, ${email})
+      RETURNING id, name, created_at
+    `);
+    const circle = result.rows[0] as any;
+    await db.execute(sql`
+      INSERT INTO private_circle_members (circle_id, user_email)
+      VALUES (${circle.id}, ${email})
+    `);
+    res.json({ ok: true, circle });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get my private circles
+router.get("/circles/private", requireSession, async (req: any, res) => {
+  const email = req.rosaUser?.emailOrPhone;
+  try {
+    const result = await db.execute(sql`
+      SELECT pc.id, pc.name, pc.created_at, pc.created_by_email,
+        COUNT(pcm.id) as member_count
+      FROM private_circles pc
+      JOIN private_circle_members pcm ON pc.id = pcm.circle_id
+      WHERE pc.id IN (
+        SELECT circle_id FROM private_circle_members WHERE user_email = ${email}
+      )
+      GROUP BY pc.id
+      ORDER BY pc.created_at DESC
+    `);
+    res.json({ circles: result.rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Invite member by ROSA ID
+router.post("/circles/private/:id/invite", requireSession, async (req: any, res) => {
+  const email = req.rosaUser?.emailOrPhone;
+  const { rosaId } = req.body;
+  const circleId = req.params.id;
+  try {
+    const member = await db.execute(sql`
+      SELECT user_email FROM private_circle_members
+      WHERE circle_id = ${circleId} AND user_email = ${email}
+    `);
+    if (!member.rows.length) return res.status(403).json({ error: "Not a member" });
+    const target = await db.execute(sql`
+      SELECT email_or_phone FROM rosa_users WHERE rosa_id = ${rosaId}
+    `);
+    if (!target.rows.length) return res.status(404).json({ error: "User not found" });
+    const targetEmail = (target.rows[0] as any).email_or_phone;
+    await db.execute(sql`
+      INSERT INTO private_circle_members (circle_id, user_email)
+      VALUES (${circleId}, ${targetEmail})
+      ON CONFLICT DO NOTHING
+    `);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get messages in private circle
+router.get("/circles/private/:id/messages", requireSession, async (req: any, res) => {
+  const email = req.rosaUser?.emailOrPhone;
+  const circleId = req.params.id;
+  try {
+    const member = await db.execute(sql`
+      SELECT id FROM private_circle_members
+      WHERE circle_id = ${circleId} AND user_email = ${email}
+    `);
+    if (!member.rows.length) return res.status(403).json({ error: "Not a member" });
+    const messages = await db.execute(sql`
+      SELECT pcm.id, pcm.content, pcm.is_anonymous, pcm.created_at,
+        CASE WHEN pcm.is_anonymous THEN ru.anonymous_name
+             ELSE ru.name END as author,
+        ru.nickname
+      FROM private_circle_messages pcm
+      JOIN rosa_users ru ON ru.email_or_phone = pcm.user_email
+      WHERE pcm.circle_id = ${circleId}
+      ORDER BY pcm.created_at ASC
+      LIMIT 100
+    `);
+    res.json({ messages: messages.rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Send message in private circle
+router.post("/circles/private/:id/messages", requireSession, async (req: any, res) => {
+  const email = req.rosaUser?.emailOrPhone;
+  const circleId = req.params.id;
+  const { content, isAnonymous } = req.body;
+  if (!content) return res.status(400).json({ error: "Message required" });
+  try {
+    const member = await db.execute(sql`
+      SELECT id FROM private_circle_members
+      WHERE circle_id = ${circleId} AND user_email = ${email}
+    `);
+    if (!member.rows.length) return res.status(403).json({ error: "Not a member" });
+    const result = await db.execute(sql`
+      INSERT INTO private_circle_messages (circle_id, user_email, content, is_anonymous)
+      VALUES (${circleId}, ${email}, ${content}, ${!!isAnonymous})
+      RETURNING id, content, is_anonymous, created_at
+    `);
+    res.json({ ok: true, message: result.rows[0] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
