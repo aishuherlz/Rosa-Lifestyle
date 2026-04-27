@@ -142,6 +142,7 @@ export default function SignIn() {
     e.preventDefault();
     if (!email || !name) return;
     // Age verification — REQUIRED
+    if (!dob) {
       setAgeError("Please enter your date of birth to continue.");
       return;
     }
