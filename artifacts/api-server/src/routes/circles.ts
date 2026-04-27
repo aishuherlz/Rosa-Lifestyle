@@ -285,9 +285,9 @@ router.get("/partner/notifications", requireSession, async (req: any, res) => {
   const email = req.rosaUser?.emailOrPhone;
   try {
     const result = await db.execute(sql`
-      SELECT pn.*, ru.name as from_name, ru.nickname as from_nickname
+      SELECT pn.*, ru.name as from_name
       FROM partner_notifications pn
-      JOIN rosa_users ru ON ru.email_or_phone = pn.from_email
+      LEFT JOIN rosa_users ru ON ru.email_or_phone = pn.from_email
       WHERE pn.to_email = ${email}
       ORDER BY pn.created_at DESC
       LIMIT 50
