@@ -1,401 +1,327 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Users, Link as LinkIcon, Heart, Gift, MapPin, Copy, Check, Sparkles, Share2, Inbox, Trash2, Eye } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Heart, Bell, BookOpen, Gift, ChevronRight, Moon, Sun, Zap, Shield, Coffee, Music, Flower } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useUser } from "@/lib/user-context";
 import { useToast } from "@/hooks/use-toast";
-import {
-  useSharePrefs, FEATURE_LABELS, type ShareableFeature,
-  buildShareSnapshot, encodeSnapshot, decodeSnapshot,
-  saveIncomingSnapshot, useIncomingSnapshot, clearIncomingSnapshot,
-} from "@/lib/partner-share";
+import { apiUrl } from "@/lib/api";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 
-type PartnerData = {
-  myCode: string;
-  partnerCode: string;
-  linkedAt: string;
-  partnerName: string;
-  myName?: string;
-  birthday?: string;
-  anniversary?: string;
-  surpriseTrip: { destination: string; date: string; message: string } | null;
+const PHASE_GUIDE = {
+  menstrual: {
+    name: "Period Phase 🌑",
+    days: "Days 1-5",
+    goddesTitle: "Rest & Restore Queen",
+    color: "bg-rose-50 border-rose-200",
+    titleColor: "text-rose-700",
+    mood: "She may feel low energy, crampy, and emotional. This is her body working hard.",
+    doList: [
+      "Bring her a heating pad or hot water bottle 🔥",
+      "Make her favourite warm drink without being asked ☕",
+      "Handle extra chores without mentioning it 🏠",
+      "Watch her favourite show/movie with her 🎬",
+      "Give her space if she needs it — dont take it personally",
+      "Order her favourite comfort food 🍕",
+      "Gentle back or foot massage if she wants touch 💆",
+      "Tell her she is doing amazing just by existing today",
+    ],
+    dontList: [
+      "Dont say 'its just a period' — it can be genuinely painful",
+      "Dont plan big social events these days",
+      "Dont comment on her food choices",
+      "Dont take mood personally — its hormonal",
+    ],
+    essentials: ["Dark chocolate", "Heating pad", "Her favourite snacks", "Comfortable clothes", "Pain relief medication"],
+    affirmation: "You are doing amazingly by simply showing up for her today. She notices. 🌹",
+    videoTitle: "Understanding the menstrual phase",
+    videoUrl: "https://www.youtube.com/results?search_query=menstrual+phase+understanding+partners",
+  },
+  follicular: {
+    name: "Follicular Phase 🌱",
+    days: "Days 6-13",
+    goddesTitle: "Fresh Start Energy",
+    color: "bg-emerald-50 border-emerald-200",
+    titleColor: "text-emerald-700",
+    mood: "She is feeling energetic, creative, and optimistic. Great time for adventures!",
+    doList: [
+      "Plan a date or activity together — she will be up for it! 🎉",
+      "Have important conversations now — she is clear-headed",
+      "Encourage her new ideas and projects 💡",
+      "Be playful and fun — she matches that energy",
+      "Try something new together 🌍",
+      "Compliment her energy and brightness ✨",
+    ],
+    dontList: [
+      "Dont hold back on plans — she wants to do things",
+      "Dont be boring — match her energy",
+    ],
+    essentials: ["Date night plans", "New experiences", "Fresh flowers 🌸"],
+    affirmation: "This is her superpower phase — celebrate her brightness! ✨",
+    videoTitle: "Making the most of the follicular phase together",
+    videoUrl: "https://www.youtube.com/results?search_query=follicular+phase+relationship+tips",
+  },
+  ovulation: {
+    name: "Ovulation Phase ✨",
+    days: "Days 14-16",
+    goddesTitle: "In Your Power Era",
+    color: "bg-yellow-50 border-yellow-200",
+    titleColor: "text-yellow-700",
+    mood: "She is at her most confident, social, and magnetic. She glows this week.",
+    doList: [
+      "Tell her she looks amazing — she really does 😍",
+      "Be more romantic and intentional this week 💕",
+      "Show extra affection and attention",
+      "Plan something special — she will remember it",
+      "Engage in deep meaningful conversations",
+      "Be her biggest cheerleader 📣",
+    ],
+    dontList: [
+      "Dont ignore her during her peak energy",
+      "Dont be distant — she craves connection now",
+    ],
+    essentials: ["Romance", "Quality time", "Genuine compliments 💫"],
+    affirmation: "She is literally glowing right now — make sure she knows you see it. 💛",
+    videoTitle: "Connecting during the ovulation phase",
+    videoUrl: "https://www.youtube.com/results?search_query=ovulation+phase+relationship+connection",
+  },
+  luteal: {
+    name: "Luteal / PMS Phase 💜",
+    days: "Days 17-28",
+    goddesTitle: "Warrior Mode",
+    color: "bg-purple-50 border-purple-200",
+    titleColor: "text-purple-700",
+    mood: "She may feel more sensitive, anxious, or irritable. She needs extra patience and gentleness.",
+    doList: [
+      "Be extra patient — she is fighting her own hormones 💜",
+      "Ask how she is feeling without needing to fix it",
+      "Reduce her mental load — take things off her plate",
+      "Validate her feelings even if they seem intense",
+      "Offer comfort without judgment",
+      "Make sure she has her favourite snacks 🍫",
+      "Gentle check-ins: 'How can I support you today?'",
+      "Create a calm and peaceful environment at home",
+    ],
+    dontList: [
+      "Dont say 'are you PMSing?' — ever",
+      "Dont dismiss her feelings as hormonal",
+      "Dont start arguments during this phase",
+      "Dont add to her stress",
+    ],
+    essentials: ["Patience", "Dark chocolate 🍫", "Her comfort items", "Zero judgment"],
+    affirmation: "Your patience this week is one of the most loving things you can do. She sees it. 💜",
+    videoTitle: "Supporting your partner through PMS",
+    videoUrl: "https://www.youtube.com/results?search_query=supporting+partner+PMS+luteal+phase",
+  },
 };
 
-function generateCode(): string {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
-
-const FEATURE_ORDER: ShareableFeature[] = [
-  "cycle", "mood", "sleep", "wellness", "garden", "milestones", "goals",
-  "journal", "food", "fitness", "water", "outfit", "skin", "challenges", "travel",
+const ULTIMATE_GUIDE = [
+  { title: "Listen more than you speak", desc: "When she vents, she often just wants to be heard — not for you to solve it. Try: 'That sounds really hard. I am here.'", emoji: "👂" },
+  { title: "Learn her cycle", desc: "Knowing her phases is one of the most caring things you can do. It helps you show up for her at the right moments.", emoji: "📅" },
+  { title: "Acts of service speak loudly", desc: "Doing chores, cooking, or running errands without being asked shows love without words.", emoji: "🏠" },
+  { title: "Consistency over grand gestures", desc: "Showing up every day matters more than one big romantic moment.", emoji: "💪" },
+  { title: "Respect her boundaries", desc: "When she says she needs space, give it without making her feel guilty.", emoji: "🛡️" },
+  { title: "Celebrate her wins", desc: "Even small ones. Be her loudest cheerleader.", emoji: "🎉" },
+  { title: "Physical affection matters", desc: "Ask what kind of touch she needs — sometimes its a hug, sometimes just sitting close.", emoji: "🤗" },
+  { title: "Check in, not check up", desc: "'How are you feeling today?' vs 'What did you do today?' — feel the difference.", emoji: "💬" },
 ];
 
 export default function PartnerPage() {
-  const [partner, setPartner] = useLocalStorage<PartnerData | null>("rosa_partner", null);
-  const [myCode] = useLocalStorage<string>("rosa_my_code", generateCode());
-  const [inputCode, setInputCode] = useState("");
-  const [partnerName, setPartnerName] = useState("");
-  const [myName, setMyName] = useLocalStorage<string>("rosa_my_name", "");
-  const [copied, setCopied] = useState<"code" | "snap" | null>(null);
-  const [tripForm, setTripForm] = useState({ destination: "", date: "", message: "" });
-  const [snapshotPaste, setSnapshotPaste] = useState("");
-  const [generatedSnap, setGeneratedSnap] = useState<string>("");
-  const [prefs, setPref] = useSharePrefs();
-  const incoming = useIncomingSnapshot();
+  const { user, getAuthHeaders } = useUser();
   const { toast } = useToast();
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [partnerData, setPartnerData] = useLocalStorage<any>("rosa_partner", null);
+  const [activePhase, setActivePhase] = useState<keyof typeof PHASE_GUIDE>("menstrual");
+  const [tab, setTab] = useState("guide");
+  const isPartnerUser = user?.gender === "male" || user?.gender === "man";
 
-  const handleConnect = () => {
-    if (!inputCode.trim()) return;
-    setPartner({
-      myCode,
-      partnerCode: inputCode.toUpperCase(),
-      linkedAt: new Date().toISOString(),
-      partnerName: partnerName || "Your Partner",
-      myName: myName || undefined,
-      surpriseTrip: null,
-    });
-    toast({ title: "Connected 💗", description: `You're linked with ${partnerName || "your partner"}.` });
+  useEffect(() => {
+    if (user?.authToken) fetchNotifications();
+  }, [user]);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(apiUrl("/api/partner/notifications"), { headers: getAuthHeaders() });
+      const data = await res.json();
+      setNotifications(data.notifications || []);
+    } catch {}
   };
 
-  const handleDisconnect = () => {
-    setPartner(null);
-    clearIncomingSnapshot();
-    toast({ title: "Disconnected", description: "Partner link and shared data removed." });
+  const markRead = async (id: string) => {
+    try {
+      await fetch(apiUrl(`/api/partner/notifications/${id}/read`), { method: "PUT", headers: getAuthHeaders() });
+      setNotifications(n => n.map(x => x.id === id ? { ...x, is_read: true } : x));
+    } catch {}
   };
 
-  const copyCode = () => {
-    navigator.clipboard.writeText(myCode).then(() => { setCopied("code"); setTimeout(() => setCopied(null), 2000); });
-  };
-
-  const generateAndCopy = () => {
-    const snap = buildShareSnapshot({ fromName: myName || partner?.myName });
-    const encoded = encodeSnapshot(snap);
-    setGeneratedSnap(encoded);
-    navigator.clipboard.writeText(encoded).then(() => {
-      setCopied("snap"); setTimeout(() => setCopied(null), 2500);
-      toast({ title: "Snapshot copied 💗", description: `Send this to ${partner?.partnerName || "your partner"} — they'll paste it on their Partner page.` });
-    });
-  };
-
-  const enabledCount = Object.values(prefs).filter(Boolean).length;
-
-  const importSnapshot = () => {
-    const decoded = decodeSnapshot(snapshotPaste);
-    if (!decoded) { toast({ title: "Couldn't read that code", description: "Make sure you pasted the full snapshot from your partner." }); return; }
-    saveIncomingSnapshot(decoded);
-    setSnapshotPaste("");
-    toast({ title: `${decoded.from} shared with you 💗`, description: "Their snapshot is loaded — see it in the 'From them' tab." });
-  };
-
-  const saveTrip = () => {
-    if (!partner || !tripForm.destination) return;
-    setPartner({ ...partner, surpriseTrip: { ...tripForm } });
-    toast({ title: "Surprise saved!", description: "Outfit suggestions will be weather-based." });
-    setTripForm({ destination: "", date: "", message: "" });
-  };
+  const phase = PHASE_GUIDE[activePhase];
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="min-h-full p-4 md:p-8 space-y-6 max-w-4xl mx-auto pb-24">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-serif text-foreground flex items-center gap-2">
-          <Heart className="w-7 h-7 text-rose-500" /> Partner
-        </h1>
-        <p className="text-muted-foreground mt-1">Love made thoughtful — you choose what to share, always.</p>
-      </motion.div>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 max-w-2xl mx-auto space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-playfair text-[#8B4F6E] font-bold">
+            {isPartnerUser ? "Partner Dashboard 💑" : "Partner & Sharing 🌹"}
+          </h1>
+          <p className="text-sm text-[#9E7B8A]">
+            {isPartnerUser ? "Supporting her journey" : "Connect and share with your partner"}
+          </p>
+        </div>
+        {unreadCount > 0 && (
+          <Badge className="bg-[#B06B8B] text-white">{unreadCount} new</Badge>
+        )}
+      </div>
 
-      {/* Connection Code */}
-      <Card className="border-border/50 shadow-sm bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/30">
-        <CardHeader className="pb-2">
-          <CardTitle className="font-serif text-lg flex items-center gap-2">
-            <Heart className="w-5 h-5 text-rose-400" /> Your Connection Code
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="font-mono text-3xl font-bold tracking-widest text-primary bg-white dark:bg-background px-6 py-3 rounded-xl border border-rose-200 shadow-sm">
-              {myCode}
-            </div>
-            <Button size="icon" variant="outline" onClick={copyCode} data-testid="button-copy-code">
-              {copied === "code" ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">Share this code with your partner so they know it's you.</p>
-        </CardContent>
-      </Card>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="w-full bg-[#FDF6F0] border border-[#E8C4B8]">
+          <TabsTrigger value="guide" className="flex-1 text-xs">Partner Guide</TabsTrigger>
+          <TabsTrigger value="phases" className="flex-1 text-xs">Phase Tips</TabsTrigger>
+          <TabsTrigger value="notifications" className="flex-1 text-xs">
+            Notifications {unreadCount > 0 && `(${unreadCount})`}
+          </TabsTrigger>
+          {!isPartnerUser && <TabsTrigger value="sharing" className="flex-1 text-xs">Sharing</TabsTrigger>}
+        </TabsList>
 
-      {!partner ? (
-        <Card className="border-border/50 shadow-sm">
-          <CardHeader>
-            <CardTitle className="font-serif text-lg flex items-center gap-2">
-              <LinkIcon className="w-5 h-5 text-primary" /> Connect with Partner
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label>Your name (optional)</Label>
-              <Input placeholder="So they know who shared" value={myName} onChange={e => setMyName(e.target.value)} data-testid="input-my-name" />
-            </div>
-            <div>
-              <Label>Partner's name (optional)</Label>
-              <Input placeholder="e.g. Alex" value={partnerName} onChange={e => setPartnerName(e.target.value)} data-testid="input-partner-name" />
-            </div>
-            <div>
-              <Label>Partner's code</Label>
-              <Input placeholder="6 characters" value={inputCode} onChange={e => setInputCode(e.target.value.toUpperCase())} maxLength={6} className="font-mono tracking-widest text-lg" data-testid="input-partner-code" />
-            </div>
-            <Button onClick={handleConnect} disabled={inputCode.length < 6} className="w-full bg-primary hover:bg-primary/90" data-testid="button-connect-partner">
-              <Users className="w-4 h-4 mr-2" /> Connect
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <Card className="border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 shadow-sm">
-            <CardContent className="pt-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-200 dark:bg-emerald-900 flex items-center justify-center">
-                    <Heart className="w-5 h-5 text-emerald-600 dark:text-emerald-300" />
+        <TabsContent value="guide" className="space-y-3 mt-4">
+          <Card className="border-[#E8C4B8] bg-gradient-to-br from-[#FDF6F0] to-[#FBEAF0]">
+            <CardContent className="pt-4">
+              <p className="text-[#8B4F6E] font-playfair text-lg font-bold mb-1">The Ultimate Partner Guide 🌹</p>
+              <p className="text-sm text-[#9E7B8A] mb-4">Small things done consistently make all the difference.</p>
+              <div className="space-y-3">
+                {ULTIMATE_GUIDE.map((item, i) => (
+                  <div key={i} className="flex gap-3 p-3 bg-white rounded-xl border border-[#E8C4B8]">
+                    <span className="text-2xl">{item.emoji}</span>
+                    <div>
+                      <p className="font-medium text-[#6B3050] text-sm">{item.title}</p>
+                      <p className="text-xs text-[#9E7B8A] mt-0.5">{item.desc}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold">{partner.partnerName}</p>
-                    <p className="text-xs text-muted-foreground">Code: {partner.partnerCode} · Connected {new Date(partner.linkedAt).toLocaleDateString()}</p>
-                  </div>
-                </div>
-                <Badge className="bg-emerald-500 text-white">Connected</Badge>
+                ))}
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
 
-          <Tabs defaultValue="share" className="w-full">
-            <TabsList className="w-full grid grid-cols-3 h-auto">
-              <TabsTrigger value="share" className="py-2.5"><Share2 className="w-4 h-4 mr-1" /> What I share</TabsTrigger>
-              <TabsTrigger value="incoming" className="py-2.5"><Inbox className="w-4 h-4 mr-1" /> From them {incoming && <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">new</Badge>}</TabsTrigger>
-              <TabsTrigger value="extras" className="py-2.5"><Sparkles className="w-4 h-4 mr-1" /> Surprises</TabsTrigger>
-            </TabsList>
-
-            {/* WHAT I SHARE */}
-            <TabsContent value="share" className="mt-6 space-y-4">
-              <Card className="border-border/50">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="font-serif text-lg">Sharing matrix</CardTitle>
-                    <Badge variant="secondary" className="bg-rose-100 text-rose-700 dark:bg-rose-950/40">{enabledCount} of {FEATURE_ORDER.length} on</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">Everything is <strong>off by default</strong>. Flip on only what you want {partner.partnerName} to see. You can change any of these at any time.</p>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {FEATURE_ORDER.map(f => {
-                    const m = FEATURE_LABELS[f];
-                    return (
-                      <div key={f} className="flex items-center justify-between gap-3 py-2.5 border-b border-border/40 last:border-0">
-                        <div className="flex items-start gap-3 min-w-0">
-                          <span className="text-xl flex-shrink-0">{m.emoji}</span>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium">{m.label}</p>
-                            <p className="text-xs text-muted-foreground">{m.desc}</p>
-                          </div>
-                        </div>
-                        <Switch checked={!!prefs[f]} onCheckedChange={(v) => setPref(f, v)} data-testid={`pref-${f}`} />
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-
-              <Card className="border-rose-200/60 bg-gradient-to-br from-rose-50/50 to-pink-50/50 dark:from-rose-950/20 dark:to-pink-950/20">
-                <CardHeader className="pb-2">
-                  <CardTitle className="font-serif text-lg flex items-center gap-2"><Share2 className="w-5 h-5 text-rose-500" /> Send a snapshot to {partner.partnerName}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-xs text-muted-foreground">A snapshot is a one-tap bundle of everything you've turned on above. Generate it, copy the code, send it (text, WhatsApp, email — your call). Your partner pastes it on their Partner page.</p>
-                  <div className="flex items-center gap-2">
-                    <Button onClick={generateAndCopy} disabled={enabledCount === 0} className="bg-rose-500 hover:bg-rose-600 text-white" data-testid="button-generate-snapshot">
-                      <Share2 className="w-4 h-4 mr-1.5" /> {enabledCount === 0 ? "Turn something on first" : "Generate & copy snapshot"}
-                    </Button>
-                    {copied === "snap" && <span className="text-xs text-emerald-600 flex items-center gap-1"><Check className="w-3.5 h-3.5" /> copied</span>}
-                  </div>
-                  {generatedSnap && (
-                    <details className="text-xs">
-                      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Show snapshot code</summary>
-                      <textarea readOnly value={generatedSnap} rows={3} className="w-full mt-2 p-2 rounded border border-border bg-background font-mono text-[10px]" />
-                    </details>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* INCOMING */}
-            <TabsContent value="incoming" className="mt-6 space-y-4">
-              <Card className="border-border/50">
-                <CardHeader className="pb-2">
-                  <CardTitle className="font-serif text-lg flex items-center gap-2"><Inbox className="w-5 h-5 text-primary" /> Paste a snapshot from {partner.partnerName}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-xs text-muted-foreground">When they send you their snapshot code, paste it here to see what they chose to share with you.</p>
-                  <textarea value={snapshotPaste} onChange={(e) => setSnapshotPaste(e.target.value)} placeholder="Paste snapshot code…" rows={3} className="w-full p-2 rounded border border-border bg-background font-mono text-xs" data-testid="input-snapshot-paste" />
-                  <Button onClick={importSnapshot} disabled={!snapshotPaste.trim()} className="w-full bg-primary hover:bg-primary/90" data-testid="button-import-snapshot">
-                    <Inbox className="w-4 h-4 mr-1.5" /> Load snapshot
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {incoming ? (
-                <Card className="border-rose-200/60 bg-gradient-to-br from-rose-50/40 to-pink-50/40 dark:from-rose-950/20 dark:to-pink-950/20">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="font-serif text-lg flex items-center gap-2"><Eye className="w-5 h-5 text-rose-500" /> Shared by {incoming.from}</CardTitle>
-                      <button onClick={() => clearIncomingSnapshot()} className="text-muted-foreground hover:text-destructive p-1" data-testid="button-clear-snapshot"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Received {new Date(incoming.at).toLocaleString()}</p>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {Object.keys(incoming.data).length === 0 ? (
-                      <p className="text-sm text-muted-foreground italic">They haven't turned on any sharing yet.</p>
-                    ) : (
-                      <IncomingPreview data={incoming.data} />
-                    )}
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card className="border-dashed border-border">
-                  <CardContent className="pt-6 pb-6 text-center text-muted-foreground text-sm">
-                    Nothing yet — when {partner.partnerName} sends a snapshot, it'll appear here 🌹
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-
-            {/* EXTRAS */}
-            <TabsContent value="extras" className="mt-6 space-y-4">
-              <Card className="border-border/50">
-                <CardHeader className="pb-2">
-                  <CardTitle className="font-serif text-lg flex items-center gap-2"><Sparkles className="w-5 h-5 text-amber-500" /> Surprise Trip Planner</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {partner.surpriseTrip ? (
-                    <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200">
-                      <div className="flex items-start gap-3">
-                        <MapPin className="w-5 h-5 text-amber-600 mt-0.5" />
-                        <div>
-                          <p className="font-semibold">{partner.surpriseTrip.destination}</p>
-                          {partner.surpriseTrip.date && <p className="text-xs text-muted-foreground">{new Date(partner.surpriseTrip.date).toLocaleDateString()}</p>}
-                          {partner.surpriseTrip.message && <p className="text-sm italic text-muted-foreground mt-1">"{partner.surpriseTrip.message}"</p>}
-                        </div>
-                      </div>
-                      <p className="text-xs text-amber-700 mt-2">Outfit suggestions will be based on the weather at this destination — destination hidden from your partner.</p>
-                      <Button size="sm" variant="outline" className="mt-2" onClick={() => setPartner({ ...partner, surpriseTrip: null })}>Remove Trip</Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <p className="text-sm text-muted-foreground">Plan a secret surprise! Outfits suggest the right weather without revealing the destination.</p>
-                      <div><Label>Destination</Label><Input placeholder="e.g. Paris, France" value={tripForm.destination} onChange={e => setTripForm(f => ({ ...f, destination: e.target.value }))} data-testid="input-trip-destination" /></div>
-                      <div><Label>Date</Label><Input type="date" value={tripForm.date} onChange={e => setTripForm(f => ({ ...f, date: e.target.value }))} /></div>
-                      <div><Label>Secret message</Label><Input placeholder="Can't wait to take you there!" value={tripForm.message} onChange={e => setTripForm(f => ({ ...f, message: e.target.value }))} /></div>
-                      <Button onClick={saveTrip} disabled={!tripForm.destination} className="w-full" data-testid="button-save-trip">Save Surprise Trip</Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/30">
-                <CardHeader className="pb-2">
-                  <CardTitle className="font-serif text-lg flex items-center gap-2"><Gift className="w-5 h-5 text-rose-500" /> Special Dates</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-xs text-muted-foreground">Wishlist & Reminders will surface them automatically 🌹</p>
-                  <div><Label className="text-xs">{partner.partnerName}'s birthday</Label><Input type="date" value={partner.birthday || ""} onChange={e => setPartner({ ...partner, birthday: e.target.value || undefined })} data-testid="input-partner-birthday" /></div>
-                  <div><Label className="text-xs">Your anniversary</Label><Input type="date" value={partner.anniversary || ""} onChange={e => setPartner({ ...partner, anniversary: e.target.value || undefined })} data-testid="input-partner-anniversary" /></div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-
-          <Button variant="outline" className="w-full text-destructive border-destructive/30" onClick={handleDisconnect} data-testid="button-disconnect">Disconnect Partner</Button>
-        </>
-      )}
-    </div>
-  );
-}
-
-function IncomingPreview({ data }: { data: Record<string, any> }) {
-  const items: { label: string; emoji: string; render: () => React.ReactNode }[] = [];
-
-  if (data["rosa_period_data"]) {
-    const p = data["rosa_period_data"];
-    items.push({ label: "Cycle", emoji: "🌸", render: () => (
-      <p>Last period: {p.lastPeriodDate || "—"} · Cycle length: {data["rosa_cycle_length"] || p.cycleLength || 28} days</p>
-    )});
-  }
-  if (data["rosa_moods"]) {
-    const arr = Array.isArray(data["rosa_moods"]) ? data["rosa_moods"] : [];
-    const last = arr[arr.length - 1];
-    items.push({ label: "Mood", emoji: "💗", render: () => (
-      <p>{arr.length} entries{last ? ` · latest: ${last.mood || last.label || "—"} (${last.date || ""})` : ""}</p>
-    )});
-  }
-  if (data["rosa_sleep_logs"]) {
-    const arr = Array.isArray(data["rosa_sleep_logs"]) ? data["rosa_sleep_logs"] : [];
-    const last = arr[0];
-    items.push({ label: "Sleep", emoji: "🌙", render: () => (
-      <p>{arr.length} nights tracked{last ? ` · last: ${last.bedtime} → ${last.waketime}` : ""}</p>
-    )});
-  }
-  if (data["rosa_milestones"]) {
-    const arr = Array.isArray(data["rosa_milestones"]) ? data["rosa_milestones"] : [];
-    items.push({ label: "Milestones", emoji: "🏆", render: () => <p>{arr.length} milestone{arr.length === 1 ? "" : "s"}: {arr.slice(0, 3).map((m: any) => m.title || m.name).filter(Boolean).join(", ")}{arr.length > 3 ? "…" : ""}</p> });
-  }
-  if (data["rosa_goals"]) {
-    const arr = Array.isArray(data["rosa_goals"]) ? data["rosa_goals"] : [];
-    items.push({ label: "Goals", emoji: "🎯", render: () => <p>{arr.length} goal{arr.length === 1 ? "" : "s"}: {arr.slice(0, 3).map((g: any) => g.title || g.name).filter(Boolean).join(", ")}{arr.length > 3 ? "…" : ""}</p> });
-  }
-  if (data["rosa_journal_titles"]) {
-    const arr = data["rosa_journal_titles"] as Array<{ title: string; date: string }>;
-    items.push({ label: "Journal", emoji: "📓", render: () => (
-      <ul className="space-y-1">{arr.slice(0, 5).map((e, i) => <li key={i}>· {e.title} <span className="text-muted-foreground">({e.date})</span></li>)}</ul>
-    )});
-  }
-  if (data["rosa_meal_plan"]) items.push({ label: "Meal plan", emoji: "🥗", render: () => <p>Today's plan shared</p> });
-  if (data["rosa_workouts"]) {
-    const arr = Array.isArray(data["rosa_workouts"]) ? data["rosa_workouts"] : [];
-    items.push({ label: "Workouts", emoji: "💪", render: () => <p>{arr.length} session{arr.length === 1 ? "" : "s"} logged</p> });
-  }
-  if (data["rosa_outfit_today"]) items.push({ label: "Outfit", emoji: "👗", render: () => <p>Today's outfit pick shared</p> });
-  if (data["rosa_travel_trips"]) {
-    const arr = Array.isArray(data["rosa_travel_trips"]) ? data["rosa_travel_trips"] : [];
-    items.push({ label: "Travel", emoji: "✈️", render: () => <p>{arr.length} trip{arr.length === 1 ? "" : "s"}: {arr.slice(0, 3).map((t: any) => t.destination || t.name).filter(Boolean).join(", ")}</p> });
-  }
-  if (data["rosa_wellness_score"]) items.push({ label: "Wellness", emoji: "✨", render: () => <p>Score: {data["rosa_wellness_score"].score ?? data["rosa_wellness_score"]}</p> });
-  if (data["rosa_garden"]) {
-    const g = data["rosa_garden"];
-    items.push({ label: "Garden", emoji: "🌹", render: () => <p>Level {g.level ?? "—"} · {g.petals ?? 0} petals</p> });
-  }
-  if (data["rosa_water_today"]) items.push({ label: "Water", emoji: "💧", render: () => <p>{data["rosa_water_today"].cups ?? data["rosa_water_today"]} today</p> });
-  if (data["rosa_skin"]) items.push({ label: "Skin", emoji: "🪞", render: () => <p>Skin care shared</p> });
-  if (data["rosa_challenges"]) {
-    const arr = Array.isArray(data["rosa_challenges"]) ? data["rosa_challenges"] : [];
-    items.push({ label: "Challenges", emoji: "🔥", render: () => <p>{arr.length} active</p> });
-  }
-
-  if (items.length === 0) return <p className="text-sm text-muted-foreground italic">Nothing visible — check back when they share more.</p>;
-
-  return (
-    <div className="space-y-3">
-      {items.map((it, i) => (
-        <div key={i} className="flex items-start gap-3 py-2 border-b border-border/30 last:border-0">
-          <span className="text-xl flex-shrink-0">{it.emoji}</span>
-          <div className="min-w-0 text-sm">
-            <p className="font-medium">{it.label}</p>
-            <div className="text-xs text-muted-foreground mt-0.5">{it.render()}</div>
+        <TabsContent value="phases" className="space-y-3 mt-4">
+          <p className="text-sm text-[#9E7B8A]">Select her current phase to see how to support her today:</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(Object.keys(PHASE_GUIDE) as Array<keyof typeof PHASE_GUIDE>).map(p => (
+              <button key={p} onClick={() => setActivePhase(p)}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  activePhase === p ? "border-[#B06B8B] bg-[#FBEAF0]" : "border-[#E8C4B8] bg-white"
+                }`}>
+                <p className="font-medium text-[#6B3050] text-sm">{PHASE_GUIDE[p].name}</p>
+                <p className="text-xs text-[#9E7B8A]">{PHASE_GUIDE[p].days}</p>
+              </button>
+            ))}
           </div>
-        </div>
-      ))}
-    </div>
+
+          <Card className={`border ${phase.color}`}>
+            <CardHeader className="pb-2">
+              <CardTitle className={`${phase.titleColor} text-lg`}>{phase.name}</CardTitle>
+              <Badge className="w-fit bg-[#D4A574] text-[#6B3050]">{phase.goddesTitle}</Badge>
+              <p className="text-sm text-[#9E7B8A] mt-1">{phase.mood}</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="font-medium text-[#6B3050] text-sm mb-2">✅ Do this:</p>
+                <ul className="space-y-1">
+                  {phase.doList.map((item, i) => (
+                    <li key={i} className="text-sm text-[#9E7B8A] flex gap-2">
+                      <span>•</span>{item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="font-medium text-rose-600 text-sm mb-2">❌ Avoid this:</p>
+                <ul className="space-y-1">
+                  {phase.dontList.map((item, i) => (
+                    <li key={i} className="text-sm text-[#9E7B8A] flex gap-2">
+                      <span>•</span>{item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="font-medium text-[#6B3050] text-sm mb-2">🛒 Essentials to have ready:</p>
+                <div className="flex flex-wrap gap-2">
+                  {phase.essentials.map((item, i) => (
+                    <Badge key={i} className="bg-[#F5E6D3] text-[#6B3050] border border-[#E8C4B8]">{item}</Badge>
+                  ))}
+                </div>
+              </div>
+              <div className="p-3 bg-[#FDF6F0] rounded-xl border border-[#E8C4B8]">
+                <p className="text-sm text-[#8B4F6E] italic">{phase.affirmation}</p>
+              </div>
+              <a href={phase.videoUrl} target="_blank" rel="noopener noreferrer">
+                <Button className="w-full bg-[#B06B8B] text-white">
+                  📺 Watch: {phase.videoTitle}
+                </Button>
+              </a>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-3 mt-4">
+          {notifications.length === 0 && (
+            <Card className="border-[#E8C4B8]">
+              <CardContent className="pt-6 text-center">
+                <Bell className="w-8 h-8 text-[#E8C4B8] mx-auto mb-2" />
+                <p className="text-[#9E7B8A]">No notifications yet</p>
+                <p className="text-xs text-[#9E7B8A]">Partner updates will appear here</p>
+              </CardContent>
+            </Card>
+          )}
+          {notifications.map(n => (
+            <Card key={n.id} className={`border cursor-pointer transition-all ${n.is_read ? "border-[#E8C4B8] opacity-70" : "border-[#B06B8B] bg-[#FBEAF0]"}`}
+              onClick={() => markRead(n.id)}>
+              <CardContent className="pt-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-medium text-[#6B3050] text-sm">{n.title}</p>
+                    <p className="text-xs text-[#9E7B8A] mt-1">{n.message}</p>
+                    <p className="text-xs text-[#9E7B8A] mt-1">From: {n.from_name || n.from_email}</p>
+                  </div>
+                  {!n.is_read && <Badge className="bg-[#B06B8B] text-white text-xs">New</Badge>}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </TabsContent>
+
+        {!isPartnerUser && (
+          <TabsContent value="sharing" className="space-y-3 mt-4">
+            <Card className="border-[#E8C4B8]">
+              <CardHeader>
+                <CardTitle className="text-[#8B4F6E] text-base">Share with Partner</CardTitle>
+                <p className="text-xs text-[#9E7B8A]">Choose what your partner can see. Your privacy is always protected.</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {[
+                  { key: "cycle", label: "Cycle & Period data 🌸", desc: "Phase, predictions, period days" },
+                  { key: "mood", label: "Mood updates 💗", desc: "Daily mood and trends" },
+                  { key: "wishlist", label: "Wishlist 🎁", desc: "So they can plan gifts" },
+                  { key: "milestones", label: "Milestones 🏆", desc: "Anniversaries and special dates" },
+                  { key: "fitness", label: "Fitness goals 💪", desc: "Workouts and activity" },
+                ].map(item => (
+                  <div key={item.key} className="flex items-center justify-between p-3 bg-[#FDF6F0] rounded-xl border border-[#E8C4B8]">
+                    <div>
+                      <p className="text-sm font-medium text-[#6B3050]">{item.label}</p>
+                      <p className="text-xs text-[#9E7B8A]">{item.desc}</p>
+                    </div>
+                    <input type="checkbox" className="w-4 h-4 accent-[#B06B8B]" />
+                  </div>
+                ))}
+                <Button className="w-full bg-[#B06B8B] text-white mt-2">Save sharing preferences</Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
+    </motion.div>
   );
 }
