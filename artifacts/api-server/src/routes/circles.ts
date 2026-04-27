@@ -1,5 +1,6 @@
 import { Router } from "express";
 import express from "express";
+import { moderate } from "../lib/moderation";
 import fs from "fs";
 import path from "path";
 
@@ -97,12 +98,18 @@ router.post("/circles/public/:id/join", (req, res) => {
   res.json({ ok: true, memberCount: c.members.length });
 });
 
-router.post("/circles/public/:id/messages", (req, res) => {
+router.post("/circles/public/:id/messages", async (req, res) => {
   const c = state.publicCircles.find(x => x.id === req.params.id);
   if (!c) return res.status(404).json({ ok: false, error: "Not found" });
   const { author, text, anonymous } = req.body || {};
   const t = String(text || "").trim().slice(0, 1000);
   if (!t) return res.status(400).json({ ok: false, error: "Message empty" });
+  try {
+    const verdict = await moderate(t);
+    if (verdict.allow === false) {
+      return res.status(422).json({ ok: false, error: verdict.reason || "This message goes against our community guidelines 🌹" });
+    }
+  } catch {}
   const msg: Msg = {
     id: `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
     author: anonymous ? "A Sister 🌹" : (String(author || "Anonymous").slice(0, 40)),
