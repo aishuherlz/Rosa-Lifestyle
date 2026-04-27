@@ -182,6 +182,7 @@ export default function PartnerPage() {
           <TabsTrigger value="notifications" className="flex-1 text-xs">
             Notifications {unreadCount > 0 && `(${unreadCount})`}
           </TabsTrigger>
+          <TabsTrigger value="partner-shared" className="flex-1 text-xs">Their Data</TabsTrigger>
           {!isPartnerUser && <TabsTrigger value="sharing" className="flex-1 text-xs">Sharing</TabsTrigger>}
         </TabsList>
 
@@ -293,6 +294,81 @@ export default function PartnerPage() {
           ))}
         </TabsContent>
 
+        <TabsContent value="partner-shared" className="space-y-3 mt-4">
+          <Card className="border-[#E8C4B8]">
+            <CardHeader>
+              <CardTitle className="text-[#8B4F6E] text-base">What Your Partner Shared With You 💑</CardTitle>
+              <p className="text-xs text-[#9E7B8A]">Data your partner has chosen to share with you</p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {partnerData ? (
+                <div className="space-y-3">
+                  {partnerData.cycle && (
+                    <div className="p-3 bg-rose-50 rounded-xl border border-rose-200">
+                      <p className="font-medium text-rose-700 text-sm">🌸 Cycle Data</p>
+                      <p className="text-xs text-[#9E7B8A] mt-1">Last period: {partnerData.cycle.lastPeriod || "Not shared"}</p>
+                      <p className="text-xs text-[#9E7B8A]">Current phase: {partnerData.cycle.phase || "Not shared"}</p>
+                    </div>
+                  )}
+                  {partnerData.wishlist && (
+                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
+                      <p className="font-medium text-amber-700 text-sm">🎁 Their Wishlist</p>
+                      {partnerData.wishlist.map((item: any, i: number) => (
+                        <p key={i} className="text-xs text-[#9E7B8A] mt-1">• {item.name}</p>
+                      ))}
+                    </div>
+                  )}
+                  {partnerData.milestones && (
+                    <div className="p-3 bg-purple-50 rounded-xl border border-purple-200">
+                      <p className="font-medium text-purple-700 text-sm">🏆 Shared Milestones</p>
+                      {partnerData.milestones.map((m: any, i: number) => (
+                        <p key={i} className="text-xs text-[#9E7B8A] mt-1">• {m.title}: {m.date}</p>
+                      ))}
+                    </div>
+                  )}
+                  {partnerData.mood && (
+                    <div className="p-3 bg-pink-50 rounded-xl border border-pink-200">
+                      <p className="font-medium text-pink-700 text-sm">💗 Their Mood Today</p>
+                      <p className="text-xs text-[#9E7B8A] mt-1">{partnerData.mood}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-[#9E7B8A] text-sm">No shared data yet</p>
+                  <p className="text-xs text-[#9E7B8A] mt-1">Ask your partner to share their ROSA data with you 🌹</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {isPartnerUser && (
+            <Card className="border-[#E8C4B8] bg-gradient-to-br from-[#FDF6F0] to-[#FBEAF0]">
+              <CardHeader>
+                <CardTitle className="text-[#8B4F6E] text-base">For Him — Wellness Guide 💙</CardTitle>
+                <p className="text-xs text-[#9E7B8A]">Resources to help you show up as your best self</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {[
+                  { title: "How to communicate feelings", url: "https://www.youtube.com/results?search_query=men+emotional+communication+relationships", emoji: "💬" },
+                  { title: "Being a supportive partner", url: "https://www.youtube.com/results?search_query=how+to+be+supportive+partner", emoji: "🤝" },
+                  { title: "Understanding her emotions", url: "https://www.youtube.com/results?search_query=understanding+women+emotions+men+guide", emoji: "💡" },
+                  { title: "Mental health for men", url: "https://www.youtube.com/results?search_query=mens+mental+health+guide", emoji: "🧠" },
+                  { title: "How to express love better", url: "https://www.youtube.com/results?search_query=love+languages+men+guide", emoji: "❤️" },
+                ].map((video, i) => (
+                  <a key={i} href={video.url} target="_blank" rel="noopener noreferrer">
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-[#E8C4B8] hover:border-[#B06B8B] transition">
+                      <span className="text-2xl">{video.emoji}</span>
+                      <p className="text-sm text-[#6B3050] font-medium">{video.title}</p>
+                      <ChevronRight className="w-4 h-4 text-[#9E7B8A] ml-auto" />
+                    </div>
+                  </a>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
         {!isPartnerUser && (
           <TabsContent value="sharing" className="space-y-3 mt-4">
             <Card className="border-[#E8C4B8]">
@@ -307,6 +383,11 @@ export default function PartnerPage() {
                   { key: "wishlist", label: "Wishlist 🎁", desc: "So they can plan gifts" },
                   { key: "milestones", label: "Milestones 🏆", desc: "Anniversaries and special dates" },
                   { key: "fitness", label: "Fitness goals 💪", desc: "Workouts and activity" },
+                  { key: "travel", label: "Travel plans ✈️", desc: "Trip plans and bucket list" },
+                  { key: "food", label: "Food preferences 🍽️", desc: "Diet and nutrition goals" },
+                  { key: "skin", label: "Skin & wellness 🌿", desc: "Self care routine updates" },
+                  { key: "reminders", label: "Important reminders 📅", desc: "Birthdays, anniversaries, events" },
+                  { key: "weight", label: "Weight journey 🎯", desc: "Progress and goals" },
                 ].map(item => (
                   <div key={item.key} className="flex items-center justify-between p-3 bg-[#FDF6F0] rounded-xl border border-[#E8C4B8]">
                     <div>
