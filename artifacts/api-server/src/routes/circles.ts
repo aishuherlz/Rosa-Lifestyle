@@ -262,3 +262,128 @@ router.post("/circles/private/:id/messages", requireSession, async (req: any, re
     res.status(500).json({ error: err.message });
   }
 });
+
+// ─── Partner System (DB-backed) ──────────────────────────────────────────
+
+// Send notification to partner
+router.post("/partner/notify", requireSession, async (req: any, res) => {
+  const email = req.rosaUser?.emailOrPhone;
+  const { toEmail, type, title, message, data } = req.body;
+  try {
+    await db.execute(sql`
+      INSERT INTO partner_notifications (from_email, to_email, type, title, message, data)
+      VALUES (${email}, ${toEmail}, ${type}, ${title}, ${message}, ${JSON.stringify(data || {})})
+    `);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get my partner notifications
+router.get("/partner/notifications", requireSession, async (req: any, res) => {
+  const email = req.rosaUser?.emailOrPhone;
+  try {
+    const result = await db.execute(sql`
+      SELECT pn.*, ru.name as from_name, ru.nickname as from_nickname
+      FROM partner_notifications pn
+      JOIN rosa_users ru ON ru.email_or_phone = pn.from_email
+      WHERE pn.to_email = ${email}
+      ORDER BY pn.created_at DESC
+      LIMIT 50
+    `);
+    res.json({ notifications: result.rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Mark notification as read
+router.put("/partner/notifications/:id/read", requireSession, async (req: any, res) => {
+  const email = req.rosaUser?.emailOrPhone;
+  try {
+    await db.execute(sql`
+      UPDATE partner_notifications SET is_read = true
+      WHERE id = ${req.params.id} AND to_email = ${email}
+    `);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Link partner by ROSA ID
+router.post("/partner/link", requireSession, async (req: any, res) => {
+  const email = req.rosaUser?.emailOrPhone;
+  const { partnerRosaId } = req.body;
+  try {
+    const target = await db.execute(sql`
+      SELECT email_or_phone, name FROM rosa_users WHERE rosa_id = ${partnerRosaId}
+    `);
+    if (!target.rows.length) return res.status(404).json({ error: "Partner not found with that ROSA ID" });
+    const partnerEmail = (target.rows[0] as any).email_or_phone;
+    if (partnerEmail === email) return res.status(400).json({ error: "Cannot link to yourself" });
+    await db.execute(sql`
+      INSERT INTO partner_links (user_email, partner_email)
+      VALUES (${email}, ${partnerEmail})
+      ON CONFLICT (user_email, partner_email) DO NOTHING
+    `);
+    await db.execute(sql`
+      INSERT INTO partner_notifications (from_email, to_email, type, title, message)
+      VALUES (${email}, ${partnerEmail}, 'partner_request', 'Partner Request 🌹',
+        ${req.rosaUser.name + ' wants to link with you on ROSA'})
+    `);
+    res.json({ ok: true, partnerName: (target.rows[0] as any).name });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get partner shared data
+router.get("/partner/shared-data", requireSession, async (req: any, res) => {
+  const email = req.rosaUser?.emailOrPhone;
+  try {
+    const link = await db.execute(sql`
+      SELECT * FROM partner_links WHERE partner_email = ${email}
+    `);
+    if (!link.rows.length) return res.json({ linked: false });
+    const partnerLink = link.rows[0] as any;
+    const partner = await db.execute(sql`
+      SELECT name, nickname, rosa_id, profile_photo_url FROM rosa_users
+      WHERE email_or_phone = ${partnerLink.user_email}
+    `);
+    res.json({
+      linked: true,
+      partner: partner.rows[0],
+      sharePrefs: {
+        cycle: partnerLink.share_cycle,
+        mood: partnerLink.share_mood,
+        wishlist: partnerLink.share_wishlist,
+        milestones: partnerLink.share_milestones,
+        fitness: partnerLink.share_fitness,
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update partner share preferences
+router.put("/partner/share-prefs", requireSession, async (req: any, res) => {
+  const email = req.rosaUser?.emailOrPhone;
+  const { partnerEmail, shareCycle, shareMood, shareWishlist, shareMilestones, shareFitness } = req.body;
+  try {
+    await db.execute(sql`
+      UPDATE partner_links SET
+        share_cycle = ${!!shareCycle},
+        share_mood = ${!!shareMood},
+        share_wishlist = ${!!shareWishlist},
+        share_milestones = ${!!shareMilestones},
+        share_fitness = ${!!shareFitness}
+      WHERE user_email = ${email} AND partner_email = ${partnerEmail}
+    `);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
