@@ -732,10 +732,18 @@ router.post("/set-nickname", requireSession, async (req: any, res) => {
 
 router.put("/profile", requireSession, async (req: any, res) => {
   try {
-    const user = req.rosaUser; const email = user.emailOrPhone;
-    const { bio, name, accountType } = req.body;
+    const email = req.session.email;
+    const { bio, name, accountType, gender, pronouns, dateOfBirth } = req.body;
     if (bio && bio.length > 150) return res.status(400).json({ error: "Bio max 150 chars" });
-    await db.update(rosaUsers).set({ ...(bio !== undefined && { bio }), ...(name !== undefined && { name }), ...(accountType !== undefined && { accountType }), updatedAt: new Date() }).where(eq(rosaUsers.emailOrPhone, email));
+    await db.update(rosaUsers).set({
+      ...(bio !== undefined && { bio }),
+      ...(name !== undefined && { name }),
+      ...(accountType !== undefined && { accountType }),
+      ...(gender !== undefined && { gender }),
+      ...(pronouns !== undefined && { pronouns }),
+      ...(dateOfBirth !== undefined && { dateOfBirth }),
+      updatedAt: new Date()
+    }).where(eq(rosaUsers.emailOrPhone, email));
     return res.json({ success: true });
   } catch { return res.status(500).json({ error: "Server error" }); }
 });

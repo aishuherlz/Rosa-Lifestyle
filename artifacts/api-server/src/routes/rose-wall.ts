@@ -153,6 +153,20 @@ router.get("/rose-wall", requireSession, async (req: any, res) => {
 router.post("/rose-wall", requireSession, async (req: any, res) => {
   try {
     const me = req.session.email as string;
+
+    // Rose Wall is exclusive to women, non-binary, and LGBTQ+ users
+    // Males can only read, not post
+    const [poster] = await db.select({ gender: rosaUsers.gender })
+      .from(rosaUsers)
+      .where(eq(rosaUsers.emailOrPhone, me))
+      .limit(1);
+    const blockedGenders = ["male", "man", "trans-male", "transmale"];
+    if (poster?.gender && blockedGenders.includes(poster.gender.toLowerCase())) {
+      return res.status(403).json({ 
+        error: "The Rose Wall is a space for women and LGBTQ+ community members. You can read posts but not post here. 🌹" 
+      });
+    }
+
     const body = req.body || {};
     const text = typeof body.text === "string" ? body.text.trim() : "";
     const mood = typeof body.mood === "string" && ALLOWED_MOODS.includes(body.mood) ? body.mood : null;

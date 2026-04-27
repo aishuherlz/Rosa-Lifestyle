@@ -23,6 +23,10 @@ export const rosaUsers = pgTable("rosa_users", {
   bio: text("bio"),
   profilePhotoUrl: text("profile_photo_url"),
   accountType: text("account_type").default("public"),
+  gender: text("gender"),
+  pronouns: text("pronouns"),
+  partnerLinked: boolean("partner_linked").default(false),
+  dateOfBirth: text("date_of_birth"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
