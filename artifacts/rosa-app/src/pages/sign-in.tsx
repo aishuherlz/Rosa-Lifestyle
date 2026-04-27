@@ -102,6 +102,7 @@ export default function SignIn() {
           rememberMe,
           marketingOptIn,
           name: name.trim(),
+          partnerCode: partnerCode.trim() || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));

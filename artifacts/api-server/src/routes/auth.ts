@@ -1,7 +1,7 @@
 import { Router } from "express";
 import express from "express";
 import crypto from "crypto";
-import { eq, and, desc, isNull } from "drizzle-orm";
+import { eq, and, desc, isNull, sql } from "drizzle-orm";
 import { db, rosaUsers, trustedDevices } from "@workspace/db";
 import { generateUniqueAnonymousName } from "../lib/anonymous-name";
 import { requireAdmin } from "../lib/admin-auth";
@@ -487,7 +487,7 @@ async function ensureUserRow(
 }
 
 router.post("/auth/verify-code", async (req, res) => {
-  const { destination, code, rememberMe, deviceName, marketingOptIn, name } = req.body || {};
+  const { destination, code, rememberMe, deviceName, marketingOptIn, name, partnerCode } = req.body || {};
   if (!destination || !code) return res.status(400).json({ ok: false, error: "Missing fields" });
   const dest = normalize(destination);
   const entry = codes.get(dest);
@@ -516,6 +516,27 @@ router.post("/auth/verify-code", async (req, res) => {
       marketingOptIn !== undefined ? cleanMarketingPref(marketingOptIn) : undefined,
       typeof name === "string" ? name : undefined,
     );
+    // Link partner if partner code (ROSA ID) provided at signup
+    if (partnerCode && typeof partnerCode === 'string' && partnerCode.trim()) {
+      try {
+        const partnerResult = await db.select({ emailOrPhone: rosaUsers.emailOrPhone, name: rosaUsers.name })
+          .from(rosaUsers).where(eq(rosaUsers.rosaId, partnerCode.trim().toUpperCase())).limit(1);
+        if (partnerResult.length > 0) {
+          const partnerEmail = partnerResult[0].emailOrPhone;
+          await db.execute(sql`
+            INSERT INTO partner_links (user_email, partner_email)
+            VALUES (${dest}, ${partnerEmail})
+            ON CONFLICT DO NOTHING
+          `);
+          await db.execute(sql`
+            INSERT INTO partner_notifications (from_email, to_email, type, title, message)
+            VALUES (${dest}, ${partnerEmail}, 'partner_linked', 'New Partner Request 🌹',
+              ${(typeof name === "string" ? name : "Someone") + " has linked with you on ROSA using your ROSA ID"})
+          `);
+        }
+      } catch (e) { console.error("Partner link error:", e); }
+    }
+
     await db.insert(trustedDevices).values({
       email: dest,
       deviceId,

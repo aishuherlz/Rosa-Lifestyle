@@ -14,6 +14,10 @@ const UNSPLASH_IMAGES = [
   "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=1200&q=80",
   "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1200&q=80",
   "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=1200&q=80",
+  "https://images.unsplash.com/photo-1583425423977-5ae2d26a9f2c?w=1200&q=80",
+  "https://images.unsplash.com/photo-1610216705422-caa3fcb6d158?w=1200&q=80",
+  "https://images.unsplash.com/photo-1617018734927-f3a04b666903?w=1200&q=80",
+  "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=1200&q=80",
 ];
 
 // Buttery-soft cubic-bezier — no abrupt motion anywhere.
