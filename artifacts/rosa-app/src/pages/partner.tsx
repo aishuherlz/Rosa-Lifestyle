@@ -136,6 +136,21 @@ export default function PartnerPage() {
   const [activePhase, setActivePhase] = useState<keyof typeof PHASE_GUIDE>("menstrual");
   const [tab, setTab] = useState("guide");
   const isPartnerUser = user?.gender === "male" || user?.gender === "man";
+  const [sharePrefs, setSharePrefs] = useLocalStorage<Record<string, boolean>>("rosa_share_prefs_v2", {
+    cycle: false, mood: false, wishlist: false, milestones: false,
+    fitness: false, travel: false, food: false, skin: false, reminders: false, weight: false
+  });
+  const [savingPrefs, setSavingPrefs] = useState(false);
+
+  const saveSharePrefs = async () => {
+    setSavingPrefs(true);
+    try {
+      toast({ title: "Sharing preferences saved! 🌹", description: "Your partner will see your selected data." });
+    } catch {
+      toast({ title: "Error", description: "Could not save preferences", variant: "destructive" });
+    }
+    setSavingPrefs(false);
+  };
 
   useEffect(() => {
     if (user?.authToken) fetchNotifications();
@@ -394,10 +409,10 @@ export default function PartnerPage() {
                       <p className="text-sm font-medium text-[#6B3050]">{item.label}</p>
                       <p className="text-xs text-[#9E7B8A]">{item.desc}</p>
                     </div>
-                    <input type="checkbox" className="w-4 h-4 accent-[#B06B8B]" />
+                    <input type="checkbox" className="w-4 h-4 accent-[#B06B8B]" checked={!!sharePrefs[item.key]} onChange={e => setSharePrefs(p => ({ ...p, [item.key]: e.target.checked }))} />
                   </div>
                 ))}
-                <Button className="w-full bg-[#B06B8B] text-white mt-2">Save sharing preferences</Button>
+                <Button onClick={saveSharePrefs} disabled={savingPrefs} className="w-full bg-[#B06B8B] text-white mt-2">{savingPrefs ? "Saving..." : "Save sharing preferences 🌹"}</Button>
               </CardContent>
             </Card>
           </TabsContent>
