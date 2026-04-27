@@ -141,21 +141,30 @@ export default function SignIn() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !name) return;
-    // Age verification
-    if (dob) {
-      const birthDate = new Date(dob);
-      const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear();
-      const m = today.getMonth() - birthDate.getMonth();
-      const actualAge = m < 0 || (m === 0 && today.getDate() < birthDate.getDate()) ? age - 1 : age;
-      // Detect region from email domain or default to international rules
-      const minAge = 15; // default
-      if (actualAge < minAge) {
-        setAgeError(`You must be at least ${minAge} years old to use ROSA.`);
-        return;
-      }
-      setAgeError(null);
+    // Age verification — REQUIRED
+      setAgeError("Please enter your date of birth to continue.");
+      return;
     }
+    const birthDate = new Date(dob);
+    const today = new Date();
+    const age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    const actualAge = m < 0 || (m === 0 && today.getDate() < birthDate.getDate()) ? age - 1 : age;
+    // Regional age rules
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const isIndia = tz.startsWith("Asia/Kolkata") || tz.startsWith("Asia/Calcutta");
+    const isAsia = tz.startsWith("Asia/");
+    const isAfrica = tz.startsWith("Africa/");
+    const minAge = (isIndia || isAsia || isAfrica) ? 18 : 15;
+    if (actualAge < minAge) {
+      setAgeError(`You must be at least ${minAge} years old to use ROSA in your region.`);
+      return;
+    }
+    if (actualAge > 120) {
+      setAgeError("Please enter a valid date of birth.");
+      return;
+    }
+    setAgeError(null);
     const ok = await sendCode();
     if (ok) setStep("verify");
   };
