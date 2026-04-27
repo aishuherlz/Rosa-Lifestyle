@@ -82,6 +82,7 @@ export default function RoseWallPage() {
   const [draft, setDraft] = useState("");
   const [draftMood, setDraftMood] = useState<string>("");
   const [draftAnon, setDraftAnon] = useState(false);
+  const [postPrivacy, setPostPrivacy] = useState<"public" | "private" | "anonymous">("public");
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -131,7 +132,8 @@ export default function RoseWallPage() {
         body: JSON.stringify({
           text,
           mood: draftMood || undefined,
-          isAnonymous: draftAnon,
+          isAnonymous: postPrivacy === "anonymous",
+          privacy: postPrivacy,
           mediaUrl: mediaPreview || undefined,
           mediaType: mediaType || undefined,
         }),
@@ -443,16 +445,20 @@ export default function RoseWallPage() {
             ))}
           </div>
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="anon"
-                checked={draftAnon}
-                onCheckedChange={setDraftAnon}
-                data-testid="rose-wall-anon-toggle"
-              />
-              <Label htmlFor="anon" className="text-sm text-foreground cursor-pointer">
-                Post as Anonymous Rose
-              </Label>
+            <div className="flex items-center gap-1 bg-rose-50 rounded-full p-1 border border-rose-200">
+              {(["public", "private", "anonymous"] as const).map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => { setPostPrivacy(opt); setDraftAnon(opt === "anonymous"); }}
+                  className={`text-xs px-3 py-1 rounded-full transition-all ${
+                    postPrivacy === opt
+                      ? "bg-rose-500 text-white"
+                      : "text-rose-600 hover:bg-rose-100"
+                  }`}
+                >
+                  {opt === "public" ? "🌍 Public" : opt === "private" ? "🔒 Private" : "🌹 Anonymous"}
+                </button>
+              ))}
             </div>
             <div className="flex items-center gap-3">
               <span

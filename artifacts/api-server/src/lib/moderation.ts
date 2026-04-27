@@ -121,3 +121,38 @@ export async function moderateText(
 // Exported copy of the user-facing block message so the route layer and tests
 // stay in sync with the spec wording from Step 3.
 export const BLOCK_MESSAGE = "This post couldn't be shared as it goes against our community guidelines 🌹";
+
+// Moderate image using OpenAI vision API
+export async function moderateImage(base64Image: string): Promise<{ allowed: boolean; reason?: string }> {
+  try {
+    const OpenAI = (await import("openai")).default;
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 100,
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `You are a content moderator for ROSA, a women's wellness app. 
+            Analyze this image and respond with JSON only: {"allowed": true/false, "reason": "explanation if blocked"}
+            BLOCK if image contains: nudity, sexual content, graphic violence, hate symbols, explicit content.
+            ALLOW if image contains: selfies, nature, food, fashion, wellness content, text posts, art.`
+          },
+          {
+            type: "image_url",
+            image_url: { url: base64Image }
+          }
+        ]
+      }]
+    });
+    const raw = response.choices[0]?.message?.content || "";
+    const clean = raw.replace(/\`\`\`json|\`\`\`/g, "").trim();
+    const result = JSON.parse(clean);
+    return { allowed: result.allowed, reason: result.reason };
+  } catch (err: any) {
+    console.warn("[image-moderation] error, allowing:", err?.message);
+    return { allowed: true }; // fail open
+  }
+}

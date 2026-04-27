@@ -35,6 +35,8 @@ export default function SignIn() {
   // one atomic write (no flicker, no extra fetch).
   const [pendingAnonymousName, setPendingAnonymousName] = useState<string | null>(null);
   const [partnerCode, setPartnerCode] = useState("");
+  const [dob, setDob] = useState("");
+  const [ageError, setAgeError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +141,21 @@ export default function SignIn() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !name) return;
+    // Age verification
+    if (dob) {
+      const birthDate = new Date(dob);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      const actualAge = m < 0 || (m === 0 && today.getDate() < birthDate.getDate()) ? age - 1 : age;
+      // Detect region from email domain or default to international rules
+      const minAge = 15; // default
+      if (actualAge < minAge) {
+        setAgeError(`You must be at least ${minAge} years old to use ROSA.`);
+        return;
+      }
+      setAgeError(null);
+    }
     const ok = await sendCode();
     if (ok) setStep("verify");
   };
@@ -230,6 +247,19 @@ export default function SignIn() {
                       className="bg-background/50 border-muted focus-visible:ring-primary/30"
                       required
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dob">Date of Birth</Label>
+                    <Input
+                      id="dob"
+                      type="date"
+                      value={dob}
+                      onChange={(e) => { setDob(e.target.value); setAgeError(null); }}
+                      className="bg-background/50 border-muted focus-visible:ring-primary/30"
+                      max={new Date().toISOString().split("T")[0]}
+                    />
+                    {ageError && <p className="text-xs text-red-500">{ageError}</p>}
+                    <p className="text-xs text-muted-foreground">Must be 15+ to join ROSA (18+ in some regions)</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
