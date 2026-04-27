@@ -1,6 +1,6 @@
 import { Router } from "express";
 import express from "express";
-import { moderate } from "../lib/moderation";
+import { moderateText } from "../lib/moderation";
 import fs from "fs";
 import path from "path";
 
@@ -105,7 +105,7 @@ router.post("/circles/public/:id/messages", async (req, res) => {
   const t = String(text || "").trim().slice(0, 1000);
   if (!t) return res.status(400).json({ ok: false, error: "Message empty" });
   try {
-    const verdict = await moderate(t);
+    const verdict = await moderateText(t);
     if (verdict.allow === false) {
       return res.status(422).json({ ok: false, error: verdict.reason || "This message goes against our community guidelines 🌹" });
     }
