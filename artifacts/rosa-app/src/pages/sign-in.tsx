@@ -131,7 +131,29 @@ export default function SignIn() {
       } else {
         setPendingAnonymousName(null);
       }
-      setStep("gender");
+      // If returning user (already has gender set), skip gender/pronouns/onboarding
+      if (data.isReturningUser && data.gender) {
+        // Sign them in directly
+        signInWith({
+          name: data.name || name.trim(),
+          emailOrPhone: email.trim().toLowerCase(),
+          gender: data.gender,
+          pronouns: data.pronouns || "",
+          guestMode: false,
+          joinedAt: data.joinedAt || new Date().toISOString(),
+          personalityTags: [],
+          anonymousName: data.anonymousName || null,
+        }, {
+          token: data.token,
+          email: email.trim().toLowerCase(),
+          deviceId: data.deviceId,
+          expiresAt: data.expiresAt,
+          rememberMe: !!data.rememberMe,
+        });
+        setLocation("/");
+      } else {
+        setStep("gender");
+      }
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -191,7 +213,7 @@ export default function SignIn() {
     setStep("pronouns");
   };
 
-  const handleSavePronouns = () => {
+  const handleSavePronouns = async () => {
     const finalPronouns = pronouns === "custom" ? (customPronouns.trim() || "she/her") : (pronouns || "she/her");
     signInWith({
       name,
@@ -203,6 +225,28 @@ export default function SignIn() {
       personalityTags: [],
       anonymousName: pendingAnonymousName,
     }, pendingSession);
+
+    // Save gender and pronouns to database
+    try {
+      if (pendingSession?.token) {
+        await fetch(apiUrl("/api/auth/profile"), {
+          method: "PUT",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${pendingSession.token}`
+          },
+          body: JSON.stringify({ gender, pronouns: finalPronouns, name }),
+        });
+      }
+    } catch {}
+
+    // Check if male/transman without partner — redirect to partner linking
+    const blockedGenders = ["male", "man"];
+    if (blockedGenders.includes(gender.toLowerCase())) {
+      setLocation("/partner");
+      return;
+    }
+
     const existingOnboarding = JSON.parse(localStorage.getItem("rosa_onboarding") || "{}"); 
     if (existingOnboarding?.completed) { setLocation("/"); } else { setStep("onboarding"); }
   };

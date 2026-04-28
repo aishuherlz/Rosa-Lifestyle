@@ -550,10 +550,21 @@ router.post("/auth/verify-code", async (req, res) => {
     // Read back the now-guaranteed anonymous_name so the client can stash it
     // alongside the rest of the profile during sign-in (no extra round trip).
     const [profile] = await db
-      .select({ anonymousName: rosaUsers.anonymousName })
+      .select({
+        anonymousName: rosaUsers.anonymousName,
+        gender: rosaUsers.gender,
+        pronouns: rosaUsers.pronouns,
+        name: rosaUsers.name,
+        rosaId: rosaUsers.rosaId,
+        nickname: rosaUsers.nickname,
+        joinedAt: rosaUsers.createdAt,
+      })
       .from(rosaUsers)
       .where(eq(rosaUsers.emailOrPhone, dest))
       .limit(1);
+
+    const isReturningUser = !!(profile?.gender);
+
     res.json({
       ok: true,
       verified: true,
@@ -564,6 +575,13 @@ router.post("/auth/verify-code", async (req, res) => {
       expiresAt: new Date(exp * 1000).toISOString(),
       rememberMe: remember,
       anonymousName: profile?.anonymousName ?? null,
+      isReturningUser,
+      gender: profile?.gender ?? null,
+      pronouns: profile?.pronouns ?? null,
+      name: profile?.name ?? null,
+      rosaId: profile?.rosaId ?? null,
+      nickname: profile?.nickname ?? null,
+      joinedAt: profile?.joinedAt?.toISOString() ?? null,
     });
   } catch (e: any) {
     console.error("[Auth] verify-code failed to register device:", e?.message || e);
