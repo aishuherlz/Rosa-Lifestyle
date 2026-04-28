@@ -12,7 +12,13 @@ import type { StoredSession } from "@/lib/auth-storage";
 
 export default function SignIn() {
   const [, setLocation] = useLocation();
-  const { setUser, signInWith } = useUser();
+  const { user, setUser, signInWith } = useUser();
+
+  // If already logged in redirect to home
+  useEffect(() => {
+      setLocation("/");
+    }
+  }, [user]);
   const [step, setStep] = useState<"auth" | "verify" | "gender" | "pronouns" | "onboarding">("auth");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -181,7 +187,8 @@ export default function SignIn() {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !name) return;
+    if (!email) return;
+    if (!isExistingUser && !name) return;
     // Age verification — REQUIRED
     if (!dob) {
       setAgeError("Please enter your date of birth to continue.");
