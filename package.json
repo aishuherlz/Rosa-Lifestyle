@@ -17,5 +17,6 @@
   "dependencies": {
     "canvas-confetti": "^1.9.4",
     "stripe": "^22.0.2"
-  }
+  },
+  "packageManager": "pnpm@9.15.9"
 }
