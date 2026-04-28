@@ -431,7 +431,7 @@ export default function SignIn() {
                       </label>
                     ))}
                   </div>
-                </div>
+                </div>}
 
                 {error && step === "auth" && (
                   <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2" role="alert">{error}</p>
