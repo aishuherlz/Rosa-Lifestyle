@@ -32,7 +32,9 @@ export default function SignIn() {
   // Marketing email consent. Default "later" so we don't auto-opt anyone in
   // (CAN-SPAM/GDPR friendly) and so users who don't notice the choice can be
   // gently re-asked from the Settings page.
-  const [marketingOptIn, setMarketingOptIn] = useState<"yes" | "later" | "never">("later");
+  const savedMarketing = localStorage.getItem("rosa_marketing_pref") as "yes" | "later" | "never" | null;
+  const [marketingOptIn, setMarketingOptIn] = useState<"yes" | "later" | "never">(savedMarketing || "later");
+  const hasAnsweredMarketing = savedMarketing === "yes" || savedMarketing === "never";
 
   // Verification step state
   const [code, setCode] = useState("");
@@ -192,6 +194,10 @@ export default function SignIn() {
     if (!isExistingUser && !name) return;
     // Age verification — only for new users
     if (!isExistingUser && !dob) {
+      setAgeError("Please enter your date of birth to continue.");
+      return;
+    }
+    if (!isExistingUser && dob) {
       setAgeError("Please enter your date of birth to continue.");
       return;
     }
@@ -392,7 +398,7 @@ export default function SignIn() {
                 {/* Marketing email opt-in — three explicit choices so we have
                     real consent (not a pre-checked dark pattern). "Later" is
                     default so the Settings page can re-ask gently. */}
-                {!isExistingUser && <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-4 space-y-2">
+                {(!isExistingUser && !hasAnsweredMarketing) && <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-4 space-y-2">
                   <Label className="text-sm font-medium text-foreground">
                     Stay in the loop?
                   </Label>
@@ -420,7 +426,10 @@ export default function SignIn() {
                           name="marketing-opt-in"
                           value={opt.v}
                           checked={marketingOptIn === opt.v}
-                          onChange={() => setMarketingOptIn(opt.v)}
+                          onChange={() => {
+                            setMarketingOptIn(opt.v);
+                            localStorage.setItem("rosa_marketing_pref", opt.v);
+                          }}
                           data-testid={`radio-marketing-${opt.v}`}
                           className="mt-1 accent-primary"
                         />
