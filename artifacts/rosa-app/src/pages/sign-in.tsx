@@ -16,6 +16,7 @@ export default function SignIn() {
 
   // If already logged in redirect to home
   useEffect(() => {
+    if (user && user.authToken && !user.guestMode) {
       setLocation("/");
     }
   }, [user]);
