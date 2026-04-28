@@ -190,8 +190,8 @@ export default function SignIn() {
     e.preventDefault();
     if (!email) return;
     if (!isExistingUser && !name) return;
-    // Age verification — REQUIRED
-    if (!dob) {
+    // Age verification — only for new users
+    if (!isExistingUser && !dob) {
       setAgeError("Please enter your date of birth to continue.");
       return;
     }
@@ -392,7 +392,7 @@ export default function SignIn() {
                 {/* Marketing email opt-in — three explicit choices so we have
                     real consent (not a pre-checked dark pattern). "Later" is
                     default so the Settings page can re-ask gently. */}
-                <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-4 space-y-2">
+                {!isExistingUser && <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-4 space-y-2">
                   <Label className="text-sm font-medium text-foreground">
                     Stay in the loop?
                   </Label>
@@ -440,11 +440,11 @@ export default function SignIn() {
                 <div className="space-y-3 pt-2">
                   <Button
                     type="submit"
-                    disabled={sending || !email || !name}
+                    disabled={sending || !email}
                     className="w-full bg-primary hover:bg-primary/90 text-white rounded-full py-6 text-lg shadow-sm hover:shadow transition-all disabled:opacity-60"
                     data-testid="button-signin-send-code"
                   >
-                    {sending ? "Sending code…" : "Send verification code"}
+                    {sending ? "Sending..." : isExistingUser ? "Log in to ROSA" : "Send verification code"}
                   </Button>
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
