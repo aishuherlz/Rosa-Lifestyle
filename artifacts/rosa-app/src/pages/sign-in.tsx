@@ -9,14 +9,22 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { OnboardingQuiz } from "@/components/onboarding/onboarding-quiz";
 import { apiUrl } from "@/lib/api";
 import type { StoredSession } from "@/lib/auth-storage";
+import { loadSession } from "@/lib/auth-storage";
 
 export default function SignIn() {
   const [, setLocation] = useLocation();
   const { user, setUser, signInWith } = useUser();
 
-  // If already logged in redirect to home
+  // If already logged in OR valid remembered session exists, redirect to home
   useEffect(() => {
     if (user && user.authToken && !user.guestMode) {
+      setLocation("/");
+      return;
+    }
+    // Check for valid remembered session even if user state not loaded yet
+    const session = loadSession();
+    if (session && session.rememberMe) {
+      // Valid remembered session — redirect to home, user-context will validate it
       setLocation("/");
     }
   }, [user]);
