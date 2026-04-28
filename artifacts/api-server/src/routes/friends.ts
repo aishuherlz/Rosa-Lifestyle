@@ -7,7 +7,7 @@ import { requireSession } from "./auth";
 const router = Router();
 
 // Search users by ROSA ID or nickname
-router.get("/search", requireSession, async (req, res) => {
+router.get("/search", requireSession, async (req: any, res) => {
   const q = String(req.query.q || "").trim().toUpperCase();
   if (!q || q.length < 3) return res.json({ users: [] });
   try {
@@ -18,22 +18,17 @@ router.get("/search", requireSession, async (req, res) => {
       profilePhotoUrl: rosaUsers.profilePhotoUrl,
     })
     .from(rosaUsers)
-    .where(
-      or(
-        eq(rosaUsers.rosaId, q),
-        eq(rosaUsers.nickname, q.toLowerCase())
-      )
-    )
+    .where(or(eq(rosaUsers.rosaId, q), eq(rosaUsers.nickname, q.toLowerCase())))
     .limit(10);
-    res.json({ users });
+    return res.json({ users });
   } catch (err) {
-    res.status(500).json({ error: "Search failed" });
+    return res.status(500).json({ error: "Search failed" });
   }
 });
 
 // Send friend request
-router.post("/request", requireSession, async (req, res) => {
-  const fromEmail = req.rosaUser?.emailOrPhone;
+router.post("/request", requireSession, async (req: any, res) => {
+  const fromEmail = req.session.email;
   const { toRosaId } = req.body;
   try {
     const target = await db.select().from(rosaUsers).where(eq(rosaUsers.rosaId, toRosaId)).limit(1);
@@ -41,15 +36,15 @@ router.post("/request", requireSession, async (req, res) => {
     const toEmail = target[0].emailOrPhone;
     if (toEmail === fromEmail) return res.status(400).json({ error: "Cannot add yourself" });
     await db.insert(friendRequests).values({ fromEmail, toEmail, status: "pending" });
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: "Failed to send request" });
+    return res.status(500).json({ error: "Failed to send request" });
   }
 });
 
 // Accept friend request
-router.post("/accept/:id", requireSession, async (req, res) => {
-  const email = req.rosaUser?.emailOrPhone;
+router.post("/accept/:id", requireSession, async (req: any, res) => {
+  const email = req.session.email;
   try {
     const [request] = await db.select().from(friendRequests)
       .where(and(eq(friendRequests.id, req.params.id), eq(friendRequests.toEmail, email))).limit(1);
@@ -57,27 +52,27 @@ router.post("/accept/:id", requireSession, async (req, res) => {
     await db.update(friendRequests).set({ status: "accepted" }).where(eq(friendRequests.id, req.params.id));
     await db.insert(friendships).values({ userEmail: email, friendEmail: request.fromEmail });
     await db.insert(friendships).values({ userEmail: request.fromEmail, friendEmail: email });
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: "Failed to accept request" });
+    return res.status(500).json({ error: "Failed to accept request" });
   }
 });
 
 // Decline friend request
-router.post("/decline/:id", requireSession, async (req, res) => {
-  const email = req.rosaUser?.emailOrPhone;
+router.post("/decline/:id", requireSession, async (req: any, res) => {
+  const email = req.session.email;
   try {
-    await db.update(friendRequests).set({ status: "declined" })
+    await db.update(friedRequests).set({ status: "declined" })
       .where(and(eq(friendRequests.id, req.params.id), eq(friendRequests.toEmail, email)));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: "Failed to decline request" });
+    return res.status(500).json({ error: "Failed to decline request" });
   }
 });
 
 // Get friends list
-router.get("/", requireSession, async (req, res) => {
-  const email = req.rosaUser?.emailOrPhone;
+router.get("/", requireSession, async (req: any, res) => {
+  const email = req.session.email;
   try {
     const friends = await db.select({
       rosaId: rosaUsers.rosaId,
@@ -88,15 +83,15 @@ router.get("/", requireSession, async (req, res) => {
     .from(friendships)
     .innerJoin(rosaUsers, eq(rosaUsers.emailOrPhone, friendships.friendEmail))
     .where(eq(friendships.userEmail, email));
-    res.json({ friends });
+    return res.json({ friends });
   } catch (err) {
-    res.status(500).json({ error: "Failed to get friends" });
+    return res.status(500).json({ error: "Failed to get friends" });
   }
 });
 
 // Get pending requests
-router.get("/requests", requireSession, async (req, res) => {
-  const email = req.rosaUser?.emailOrPhone;
+router.get("/requests", requireSession, async (req: any, res) => {
+  const email = req.session.email;
   try {
     const requests = await db.select({
       id: friendRequests.id,
@@ -110,15 +105,15 @@ router.get("/requests", requireSession, async (req, res) => {
     .from(friendRequests)
     .innerJoin(rosaUsers, eq(rosaUsers.emailOrPhone, friendRequests.fromEmail))
     .where(and(eq(friendRequests.toEmail, email), eq(friendRequests.status, "pending")));
-    res.json({ requests });
+    return res.json({ requests });
   } catch (err) {
-    res.status(500).json({ error: "Failed to get requests" });
+    return res.status(500).json({ error: "Failed to get requests" });
   }
 });
 
 // Remove friend
-router.delete("/:friendEmail", requireSession, async (req, res) => {
-  const email = req.rosaUser?.emailOrPhone;
+router.delete("/:friendEmail", requireSession, async (req: any, res) => {
+  const email = req.session.email;
   const friendEmail = req.params.friendEmail;
   try {
     await db.delete(friendships).where(
@@ -127,21 +122,21 @@ router.delete("/:friendEmail", requireSession, async (req, res) => {
         and(eq(friendships.userEmail, friendEmail), eq(friendships.friendEmail, email))
       )
     );
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: "Failed to remove friend" });
+    return res.status(500).json({ error: "Failed to remove friend" });
   }
 });
 
 // Block user
-router.post("/block/:blockEmail", requireSession, async (req, res) => {
-  const email = req.rosaUser?.emailOrPhone;
+router.post("/block/:blockEmail", requireSession, async (req: any, res) => {
+  const email = req.session.email;
   const blockedEmail = req.params.blockEmail;
   try {
     await db.insert(blockedUsers).values({ blockerEmail: email, blockedEmail });
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: "Failed to block user" });
+    return res.status(500).json({ error: "Failed to block user" });
   }
 });
 
