@@ -30,13 +30,18 @@ export function MarketingPreferences() {
 
   useEffect(() => {
     if (isGuest) { setLoading(false); return; }
+    // Check localStorage first for instant display
+    const saved = localStorage.getItem("rosa_marketing_pref") as Pref | null;
+    if (saved) setPref(saved);
     let alive = true;
     (async () => {
       try {
         const res = await fetch(apiUrl("/api/auth/me"), { headers: getAuthHeaders() });
         const data = await res.json().catch(() => ({}));
         if (alive && data?.user?.marketingOptIn) {
-          setPref(data.user.marketingOptIn as Pref);
+          const serverPref = data.user.marketingOptIn as Pref;
+          setPref(serverPref);
+          localStorage.setItem("rosa_marketing_pref", serverPref);
         }
       } catch {
         // Network error — leave default; user can still pick a value.
@@ -59,6 +64,7 @@ export function MarketingPreferences() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data?.error || "Could not save preference");
       setPref(next);
+      localStorage.setItem("rosa_marketing_pref", next);
       setSavedAt(Date.now());
       toast({
         title: "Saved 🌹",

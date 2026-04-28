@@ -36,7 +36,9 @@ export default function SignIn() {
   const [customPronouns, setCustomPronouns] = useState("");
   // Persistent-session opt-in. Default true because the most common ROSA use
   // case is the user's own phone/laptop and re-verifying every visit is friction.
-  const [rememberMe, setRememberMe] = useState(true);
+  const _savedSession = typeof window !== "undefined" ? (() => { try { const raw = localStorage.getItem("rosa_auth_session"); if (!raw) return null; return JSON.parse(atob(raw)); } catch { return null; } })() : null;
+  const [rememberMe, setRememberMe] = useState(_savedSession?.rememberMe ?? true);
+  const isDeviceRemembered = !!_savedSession?.rememberMe;
   // Marketing email consent. Default "later" so we don't auto-opt anyone in
   // (CAN-SPAM/GDPR friendly) and so users who don't notice the choice can be
   // gently re-asked from the Settings page.
@@ -387,7 +389,7 @@ export default function SignIn() {
                   </>}
                 </div>
 
-                <div className="flex items-start gap-2 pt-1">
+                {!isDeviceRemembered && <div className="flex items-start gap-2 pt-1">
                   <Checkbox
                     id="remember-me"
                     checked={rememberMe}
@@ -401,7 +403,7 @@ export default function SignIn() {
                       {rememberMe ? "Stay signed in for 30 days." : "Sign me out when I close my browser."}
                     </p>
                   </div>
-                </div>
+                </div>}
 
                 {/* Marketing email opt-in — three explicit choices so we have
                     real consent (not a pre-checked dark pattern). "Later" is
