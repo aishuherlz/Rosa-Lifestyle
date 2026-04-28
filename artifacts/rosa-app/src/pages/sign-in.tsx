@@ -35,6 +35,8 @@ export default function SignIn() {
   // one atomic write (no flicker, no extra fetch).
   const [pendingAnonymousName, setPendingAnonymousName] = useState<string | null>(null);
   const [partnerCode, setPartnerCode] = useState("");
+  const [isExistingUser, setIsExistingUser] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const [dob, setDob] = useState("");
   const [ageError, setAgeError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -54,6 +56,22 @@ export default function SignIn() {
   function isEmail(s: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
   }
+
+  // Check if email belongs to existing user
+  const checkIfExisting = async (emailVal: string) => {
+    if (!emailVal || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal.trim())) return;
+    setCheckingEmail(true);
+    try {
+      const res = await fetch(apiUrl("/api/auth/check-existing"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailVal.trim().toLowerCase() }),
+      });
+      const data = await res.json();
+      setIsExistingUser(!!data.exists);
+    } catch {}
+    setCheckingEmail(false);
+  };
 
   async function sendCode(): Promise<boolean> {
     setError(null); setInfo(null); setDevCode(null);
@@ -293,30 +311,6 @@ export default function SignIn() {
               <form onSubmit={handleSignIn} className="space-y-6 bg-card p-8 rounded-2xl shadow-sm border border-border/50">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">How should we call you?</Label>
-                    <Input
-                      id="name"
-                      placeholder="Your beautiful name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="bg-background/50 border-muted focus-visible:ring-primary/30"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="dob">Date of Birth</Label>
-                    <Input
-                      id="dob"
-                      type="date"
-                      value={dob}
-                      onChange={(e) => { setDob(e.target.value); setAgeError(null); }}
-                      className="bg-background/50 border-muted focus-visible:ring-primary/30"
-                      max={new Date().toISOString().split("T")[0]}
-                    />
-                    {ageError && <p className="text-xs text-red-500">{ageError}</p>}
-                    <p className="text-xs text-muted-foreground">Must be 15+ to join ROSA (18+ in some regions)</p>
-                  </div>
-                  <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
@@ -324,24 +318,51 @@ export default function SignIn() {
                       autoComplete="email"
                       placeholder="hello@example.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => { setEmail(e.target.value); checkIfExisting(e.target.value); }}
                       className="bg-background/50 border-muted focus-visible:ring-primary/30"
                       required
                       data-testid="input-signin-email"
                     />
-                    <p className="text-xs text-muted-foreground">We'll send a 6-digit code to verify it's you.</p>
+                    {checkingEmail && <p className="text-xs text-muted-foreground">Checking...</p>}
+                    {isExistingUser && <p className="text-xs text-green-600">Welcome back! 🌹 Just enter your email to get a code.</p>}
+                    <p className="text-xs text-muted-foreground">We will send a 6-digit code to verify it is you.</p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="partner-code">Partner invite code (optional)</Label>
-                    <Input
-                      id="partner-code"
-                      placeholder="Enter partner's ROSA ID e.g. ROSA#1234"
-                      value={partnerCode}
-                      onChange={(e) => setPartnerCode(e.target.value)}
-                      className="bg-background/50 border-muted focus-visible:ring-primary/30"
-                    />
-                    <p className="text-xs text-muted-foreground">Have a partner on ROSA? Enter their ROSA ID to link accounts.</p>
-                  </div>
+                  {!isExistingUser && <>
+                    <div className="space-y-2">
+                      <Label htmlFor="name">How should we call you?</Label>
+                      <Input
+                        id="name"
+                        placeholder="Your beautiful name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="bg-background/50 border-muted focus-visible:ring-primary/30"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dob">Date of Birth</Label>
+                      <Input
+                        id="dob"
+                        type="date"
+                        value={dob}
+                        onChange={(e) => { setDob(e.target.value); setAgeError(null); }}
+                        className="bg-background/50 border-muted focus-visible:ring-primary/30"
+                        max={new Date().toISOString().split("T")[0]}
+                      />
+                      {ageError && <p className="text-xs text-red-500">{ageError}</p>}
+                      <p className="text-xs text-muted-foreground">Must be 15+ to join ROSA (18+ in some regions)</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="partner-code">Partner invite code (optional)</Label>
+                      <Input
+                        id="partner-code"
+                        placeholder="Enter partner ROSA ID e.g. ROSA#1234"
+                        value={partnerCode}
+                        onChange={(e) => setPartnerCode(e.target.value)}
+                        className="bg-background/50 border-muted focus-visible:ring-primary/30"
+                      />
+                      <p className="text-xs text-muted-foreground">Have a partner on ROSA? Enter their ROSA ID to link accounts.</p>
+                    </div>
+                  </>}
                 </div>
 
                 <div className="flex items-start gap-2 pt-1">

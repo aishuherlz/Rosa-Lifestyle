@@ -747,6 +747,15 @@ export default router;
 
 
 // ROSA ID routes
+router.post("/auth/check-existing", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.json({ exists: false });
+    const existing = await db.select({ id: rosaUsers.id }).from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email.trim().toLowerCase())).limit(1);
+    return res.json({ exists: existing.length > 0 });
+  } catch { return res.json({ exists: false }); }
+});
+
 router.get("/check-nickname", async (req, res) => {
   try {
     const { nickname } = req.query as { nickname: string };
