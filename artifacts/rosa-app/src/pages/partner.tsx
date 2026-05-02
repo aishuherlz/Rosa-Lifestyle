@@ -190,7 +190,7 @@ export default function PartnerPage() {
         )}
       </div>
 
-      {user?.partnerInviteCode && !isPartnerUser && (
+      {user?.partnerInviteCode && (
         <Card className="border-[#B06B8B] bg-gradient-to-r from-[#FBEAF0] to-[#FDF6F0]">
           <CardContent className="p-4 flex items-center justify-between">
             <div>

@@ -120,6 +120,9 @@ export default function SignIn() {
           joinedAt: data.joinedAt || new Date().toISOString(),
           personalityTags: [],
           anonymousName: data.anonymousName || null,
+          partnerInviteCode: data.partnerInviteCode || null,
+          rosaId: data.rosaId || null,
+          nickname: data.nickname || null,
         }, {
           token: data.token,
           email: email.trim().toLowerCase(),
@@ -201,6 +204,9 @@ export default function SignIn() {
           joinedAt: data.joinedAt || new Date().toISOString(),
           personalityTags: [],
           anonymousName: data.anonymousName || null,
+          partnerInviteCode: data.partnerInviteCode || null,
+          rosaId: data.rosaId || null,
+          nickname: data.nickname || null,
         }, {
           token: data.token,
           email: email.trim().toLowerCase(),

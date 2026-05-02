@@ -1,7 +1,7 @@
 import { Router } from "express";
 import express from "express";
 import crypto from "crypto";
-import { eq, and, desc, isNull, sql } from "drizzle-orm";
+import { eq, and, desc, isNull, sql, inArray } from "drizzle-orm";
 import { db, rosaUsers, trustedDevices } from "@workspace/db";
 import { generateUniqueAnonymousName } from "../lib/anonymous-name";
 import { requireAdmin } from "../lib/admin-auth";
@@ -348,7 +348,7 @@ router.post("/auth/send-code", async (req, res) => {
     const [device] = await db.select().from(trustedDevices)
       .where(and(
         eq(trustedDevices.email, dest),
-        sql`${trustedDevices.deviceId} IN (${deviceId}, ${deviceId + "_trusted"})`
+        inArray(trustedDevices.deviceId, [deviceId, String(deviceId) + "_trusted"])
       )).limit(1);
 
     if (device && device.rememberMe) {
