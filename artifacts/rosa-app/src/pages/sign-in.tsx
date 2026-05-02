@@ -35,8 +35,9 @@ export default function SignIn() {
   const [pronouns, setPronouns] = useState("");
   const [customPronouns, setCustomPronouns] = useState("");
   const savedDeviceId = typeof window !== "undefined" ? localStorage.getItem("rosa_device_id") : null;
-  // Default to true when device is already remembered, false for new devices
-  const [rememberMe, setRememberMe] = useState(!!savedDeviceId);
+  // Default to TRUE for all users — seamless login is opt-out, not opt-in.
+  // A new user who doesn't uncheck this will get trusted-device treatment from their very first login.
+  const [rememberMe, setRememberMe] = useState(true);
   const isDeviceRemembered = !!savedDeviceId;
   // Marketing email consent. Default "later" so we don't auto-opt anyone in
   // (CAN-SPAM/GDPR friendly) and so users who don't notice the choice can be
@@ -229,13 +230,17 @@ export default function SignIn() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
-    if (!isExistingUser && !name) return;
-    // Age verification — only for new users
-    if (!isExistingUser && !dob) {
-      setAgeError("Please enter your date of birth to continue.");
+
+    // Existing users skip all new-user guards — just send the code
+    if (isExistingUser) {
+      const ok = await sendCode();
+      if (ok) setStep("verify");
       return;
     }
-    if (!isExistingUser && dob) {
+
+    // New user guards
+    if (!name) return;
+    if (!dob) {
       setAgeError("Please enter your date of birth to continue.");
       return;
     }
@@ -262,6 +267,7 @@ export default function SignIn() {
     const ok = await sendCode();
     if (ok) setStep("verify");
   };
+
 
   const handleGuest = () => {
     setUser({

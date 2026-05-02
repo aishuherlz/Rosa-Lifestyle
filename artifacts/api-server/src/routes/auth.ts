@@ -343,29 +343,38 @@ router.post("/auth/send-code", async (req, res) => {
   if (!destination || typeof destination !== "string") return res.status(400).json({ ok: false, error: "Missing destination" });
   const dest = normalize(destination);
 
-  // Seamless Login Check: If the frontend sends a deviceId, check if it's trusted
+  // ── Seamless Login Bypass ──────────────────────────────────────────────────
+  // If the client sends a remembered deviceId, check if a trust marker exists.
+  // We check BOTH the original deviceId AND the _trusted suffix written by /logout.
   if (deviceId && typeof deviceId === "string") {
+    const now = new Date();
     const [device] = await db.select().from(trustedDevices)
       .where(and(
         eq(trustedDevices.email, dest),
-        inArray(trustedDevices.deviceId, [deviceId, String(deviceId) + "_trusted"])
+        inArray(trustedDevices.deviceId, [deviceId, deviceId + "_trusted"])
       )).limit(1);
 
-    if (device && device.rememberMe) {
+    // Only bypass if the marker is for a remembered device AND hasn't expired
+    if (device && device.rememberMe && device.expiresAt > now) {
+      console.info(`[Auth] Seamless login bypass for ${dest} via device ${device.deviceId}`);
       try {
-        const { tokenVersion, isNewUser } = await ensureUserRow(dest);
+        const { tokenVersion } = await ensureUserRow(dest);
         const newDeviceId = crypto.randomBytes(18).toString("base64url");
         const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30; // 30 days
-        
-        // Remove the old _trusted marker if it exists, since we're generating a fresh session
-        if (device.deviceId.endsWith("_trusted")) {
-          await db.delete(trustedDevices).where(eq(trustedDevices.deviceId, device.deviceId));
-        }
 
+        // Delete BOTH the plain and _trusted variants to prevent row accumulation
+        await db.delete(trustedDevices)
+          .where(and(
+            eq(trustedDevices.email, dest),
+            inArray(trustedDevices.deviceId, [deviceId, deviceId + "_trusted"])
+          ))
+          .catch(() => {});
+
+        // Insert a fresh session row for this login
         await db.insert(trustedDevices).values({
           email: dest,
           deviceId: newDeviceId,
-          deviceName: device.deviceName || "Recognized Device",
+          deviceName: device.deviceName || "Remembered Device",
           userAgent: req.headers["user-agent"]?.slice(0, 500) || "",
           ipHash: hashIp(ip),
           rememberMe: true,
@@ -388,20 +397,18 @@ router.post("/auth/send-code", async (req, res) => {
           .where(eq(rosaUsers.emailOrPhone, dest))
           .limit(1);
 
-        const isReturningUser = !!(profile?.gender);
-
         return res.json({
           ok: true,
           verified: true,
           channel: "email",
           token,
           deviceId: newDeviceId,
-          deviceName: device.deviceName || "Recognized Device",
+          deviceName: device.deviceName || "Remembered Device",
           expiresAt: new Date(exp * 1000).toISOString(),
           rememberMe: true,
           anonymousName: profile?.anonymousName ?? null,
-          isReturningUser,
-          isNewUser,
+          isReturningUser: !!(profile?.gender),
+          isNewUser: false,
           gender: profile?.gender ?? null,
           pronouns: profile?.pronouns ?? null,
           name: profile?.name ?? null,
@@ -411,11 +418,14 @@ router.post("/auth/send-code", async (req, res) => {
           joinedAt: profile?.joinedAt?.toISOString() ?? null,
         });
       } catch (e) {
-        console.error("[Auth] seamless login failed:", e);
-        // Fall back to sending code
+        console.error("[Auth] Seamless login failed, falling back to code:", e);
+        // Fall through to normal email code flow
       }
+    } else if (device) {
+      console.info(`[Auth] Trusted device found but bypass skipped — rememberMe=${device.rememberMe}, expired=${device.expiresAt <= now}`);
     }
   }
+
 
   let channel: "email" | "phone";
   if (isEmail(dest)) channel = "email";
@@ -842,6 +852,14 @@ router.post("/auth/logout", requireSession, async (req: any, res) => {
       .where(and(eq(trustedDevices.email, email), eq(trustedDevices.deviceId, deviceId))).limit(1);
     
     if (device && device.rememberMe) {
+      // Always set a fresh 30-day expiry from NOW (not the old session's expiresAt).
+      // This prevents a scenario where a long-lived session's trust marker inherits
+      // an already-nearly-expired date and stops working days later.
+      const freshExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      // Remove any stale _trusted marker for this device before inserting a fresh one
+      await db.delete(trustedDevices)
+        .where(eq(trustedDevices.deviceId, device.deviceId + "_trusted"))
+        .catch(() => {});
       await db.insert(trustedDevices).values({
         email: device.email,
         deviceId: device.deviceId + "_trusted",
@@ -849,7 +867,7 @@ router.post("/auth/logout", requireSession, async (req: any, res) => {
         userAgent: device.userAgent,
         ipHash: device.ipHash,
         rememberMe: true,
-        expiresAt: device.expiresAt,
+        expiresAt: freshExpiry,
       });
     }
 
