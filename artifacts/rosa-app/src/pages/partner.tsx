@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Heart, Bell, BookOpen, Gift, ChevronRight, Moon, Sun, Zap, Shield, Coffee, Music, Flower } from "lucide-react";
+import { Heart, Bell, BookOpen, Gift, ChevronRight, Link2, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser } from "@/lib/user-context";
 import { useToast } from "@/hooks/use-toast";
@@ -132,19 +133,64 @@ export default function PartnerPage() {
   const { user, getAuthHeaders } = useUser();
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [livePartnerData, setLivePartnerData] = useState<any>(null);
   const [partnerData, setPartnerData] = useLocalStorage<any>("rosa_partner", null);
   const [activePhase, setActivePhase] = useState<keyof typeof PHASE_GUIDE>("menstrual");
   const [tab, setTab] = useState("guide");
   const isPartnerUser = user?.gender === "male" || user?.gender === "man";
   const [sharePrefs, setSharePrefs] = useLocalStorage<Record<string, boolean>>("rosa_share_prefs_v2", {
     cycle: false, mood: false, wishlist: false, milestones: false,
-    fitness: false, travel: false, food: false, skin: false, reminders: false, weight: false
+    fitness: false, travel: false, food: false, skin: false, sleep: false, journal: false, goals: false
   });
   const [savingPrefs, setSavingPrefs] = useState(false);
+  const [linkCode, setLinkCode] = useState("");
+  const [linking, setLinking] = useState(false);
+
+  const linkPartner = async () => {
+    if (!linkCode.trim()) return;
+    setLinking(true);
+    try {
+      const res = await fetch(apiUrl("/api/partner/link"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ partnerInviteCode: linkCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not link");
+      toast({ title: `Linked with ${data.partnerName}! 🌹`, description: "You are now connected on ROSA." });
+      setLinkCode("");
+      fetchPartnerData();
+    } catch (err: any) {
+      toast({ title: "Linking failed", description: err.message, variant: "destructive" });
+    }
+    setLinking(false);
+  };
+
+  const fetchPartnerData = async () => {
+    try {
+      const res = await fetch(apiUrl("/api/partner/shared-data"), { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (data.linked) setLivePartnerData(data);
+    } catch {}
+  };
 
   const saveSharePrefs = async () => {
     setSavingPrefs(true);
     try {
+      if (livePartnerData?.partner) {
+        await fetch(apiUrl("/api/partner/share-prefs"), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+          body: JSON.stringify({
+            shareCycle: sharePrefs.cycle, shareMood: sharePrefs.mood,
+            shareWishlist: sharePrefs.wishlist, shareMilestones: sharePrefs.milestones,
+            shareFitness: sharePrefs.fitness, shareSleep: sharePrefs.sleep,
+            shareSkin: sharePrefs.skin, shareTravel: sharePrefs.travel,
+            shareFood: sharePrefs.food, shareJournal: sharePrefs.journal,
+            shareGoals: sharePrefs.goals,
+          }),
+        });
+      }
       toast({ title: "Sharing preferences saved! 🌹", description: "Your partner will see your selected data." });
     } catch {
       toast({ title: "Error", description: "Could not save preferences", variant: "destructive" });
@@ -153,7 +199,10 @@ export default function PartnerPage() {
   };
 
   useEffect(() => {
-    if (user?.authToken) fetchNotifications();
+    if (user?.authToken) {
+      fetchNotifications();
+      fetchPartnerData();
+    }
   }, [user]);
 
   const fetchNotifications = async () => {
@@ -190,6 +239,7 @@ export default function PartnerPage() {
         )}
       </div>
 
+      {/* My Partner Code */}
       {user?.partnerInviteCode && (
         <Card className="border-[#B06B8B] bg-gradient-to-r from-[#FBEAF0] to-[#FDF6F0]">
           <CardContent className="p-4 flex items-center justify-between">
@@ -197,17 +247,54 @@ export default function PartnerPage() {
               <p className="text-xs text-[#9E7B8A] font-medium uppercase tracking-wider mb-1">Your Partner Code</p>
               <p className="text-xl font-mono font-bold text-[#6B3050] tracking-[0.2em]">{user.partnerInviteCode}</p>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm"
+            <Button
+              variant="outline" size="sm"
               className="border-[#B06B8B] text-[#B06B8B] hover:bg-[#B06B8B] hover:text-white"
               onClick={() => {
                 navigator.clipboard.writeText(user.partnerInviteCode || "");
                 toast({ title: "Copied!", description: "Partner code copied to clipboard 🌹" });
               }}
-            >
-              Copy
-            </Button>
+            >Copy</Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Universal Linking Input — shown to ALL users not yet linked */}
+      {!livePartnerData?.linked && (
+        <Card className="border-[#D4A574] bg-gradient-to-r from-[#FDF6F0] to-[#FBEAF0]">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-[#B06B8B]" />
+              <p className="text-sm font-semibold text-[#6B3050]">Connect with your partner</p>
+            </div>
+            <p className="text-xs text-[#9E7B8A]">Enter your partner's invite code to link your accounts and share selected data.</p>
+            <div className="flex gap-2">
+              <Input
+                placeholder="e.g. ABC-123456"
+                value={linkCode}
+                onChange={e => setLinkCode(e.target.value)}
+                className="border-[#E8C4B8] font-mono text-sm"
+              />
+              <Button
+                onClick={linkPartner} disabled={linking || !linkCode.trim()}
+                className="bg-[#B06B8B] text-white shrink-0"
+              >
+                {linking ? <Loader2 className="w-4 h-4 animate-spin" /> : "Connect"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Linked partner banner */}
+      {livePartnerData?.linked && (
+        <Card className="border-emerald-300 bg-emerald-50">
+          <CardContent className="p-3 flex items-center gap-3">
+            <span className="text-2xl">💑</span>
+            <div>
+              <p className="text-sm font-semibold text-emerald-800">Linked with {livePartnerData.partner?.name}</p>
+              <p className="text-xs text-emerald-600">You're connected on ROSA 🌹</p>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -220,7 +307,7 @@ export default function PartnerPage() {
             Notifications {unreadCount > 0 && `(${unreadCount})`}
           </TabsTrigger>
           <TabsTrigger value="partner-shared" className="flex-1 text-xs">Their Data</TabsTrigger>
-          {!isPartnerUser && <TabsTrigger value="sharing" className="flex-1 text-xs">Sharing</TabsTrigger>}
+          <TabsTrigger value="sharing" className="flex-1 text-xs">Sharing</TabsTrigger>
         </TabsList>
 
         <TabsContent value="guide" className="space-y-3 mt-4">
@@ -334,46 +421,56 @@ export default function PartnerPage() {
         <TabsContent value="partner-shared" className="space-y-3 mt-4">
           <Card className="border-[#E8C4B8]">
             <CardHeader>
-              <CardTitle className="text-[#8B4F6E] text-base">What Your Partner Shared With You 💑</CardTitle>
+              <CardTitle className="text-[#8B4F6E] text-base">What Your Partner Shared 💑</CardTitle>
               <p className="text-xs text-[#9E7B8A]">Data your partner has chosen to share with you</p>
             </CardHeader>
             <CardContent className="space-y-3">
-              {partnerData ? (
-                <div className="space-y-3">
-                  {partnerData.cycle && (
-                    <div className="p-3 bg-rose-50 rounded-xl border border-rose-200">
-                      <p className="font-medium text-rose-700 text-sm">🌸 Cycle Data</p>
-                      <p className="text-xs text-[#9E7B8A] mt-1">Last period: {partnerData.cycle.lastPeriod || "Not shared"}</p>
-                      <p className="text-xs text-[#9E7B8A]">Current phase: {partnerData.cycle.phase || "Not shared"}</p>
-                    </div>
-                  )}
-                  {partnerData.wishlist && (
-                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
-                      <p className="font-medium text-amber-700 text-sm">🎁 Their Wishlist</p>
-                      {partnerData.wishlist.map((item: any, i: number) => (
-                        <p key={i} className="text-xs text-[#9E7B8A] mt-1">• {item.name}</p>
-                      ))}
-                    </div>
-                  )}
-                  {partnerData.milestones && (
-                    <div className="p-3 bg-purple-50 rounded-xl border border-purple-200">
-                      <p className="font-medium text-purple-700 text-sm">🏆 Shared Milestones</p>
-                      {partnerData.milestones.map((m: any, i: number) => (
-                        <p key={i} className="text-xs text-[#9E7B8A] mt-1">• {m.title}: {m.date}</p>
-                      ))}
-                    </div>
-                  )}
-                  {partnerData.mood && (
-                    <div className="p-3 bg-pink-50 rounded-xl border border-pink-200">
-                      <p className="font-medium text-pink-700 text-sm">💗 Their Mood Today</p>
-                      <p className="text-xs text-[#9E7B8A] mt-1">{partnerData.mood}</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
+              {livePartnerData?.partnerData ? (() => {
+                const pd = livePartnerData.partnerData;
+                const sections = [
+                  { key: "cycle", label: "🌸 Cycle", color: "rose" },
+                  { key: "mood", label: "💗 Mood", color: "pink" },
+                  { key: "wishlist", label: "🎁 Wishlist", color: "amber" },
+                  { key: "milestones", label: "🏆 Milestones", color: "purple" },
+                  { key: "goals", label: "🎯 Goals", color: "blue" },
+                  { key: "sleep", label: "😴 Sleep", color: "indigo" },
+                  { key: "skin", label: "🌿 Skin", color: "green" },
+                  { key: "travel", label: "✈️ Travel", color: "sky" },
+                  { key: "food", label: "🍽️ Food", color: "orange" },
+                  { key: "journal", label: "📖 Journal", color: "violet" },
+                  { key: "fitness", label: "💪 Fitness", color: "teal" },
+                ];
+                const shared = sections.filter(s => pd[s.key] !== null && pd[s.key] !== undefined);
+                if (!shared.length) return (
+                  <div className="text-center py-6">
+                    <p className="text-[#9E7B8A] text-sm">Your partner hasn't shared anything yet</p>
+                    <p className="text-xs text-[#9E7B8A] mt-1">Ask them to enable sharing in their Partner settings 🌹</p>
+                  </div>
+                );
+                return (
+                  <div className="space-y-3">
+                    {shared.map(s => (
+                      <div key={s.key} className={`p-3 bg-${s.color}-50 rounded-xl border border-${s.color}-200`}>
+                        <p className={`font-medium text-${s.color}-700 text-sm mb-1`}>{s.label}</p>
+                        {Array.isArray(pd[s.key]) ? (
+                          pd[s.key].slice(0, 5).map((item: any, i: number) => (
+                            <p key={i} className="text-xs text-[#9E7B8A]">• {item.name || item.title || item.text || JSON.stringify(item)}</p>
+                          ))
+                        ) : typeof pd[s.key] === "object" ? (
+                          Object.entries(pd[s.key]).slice(0, 4).map(([k, v]) => (
+                            <p key={k} className="text-xs text-[#9E7B8A]">{k}: {String(v)}</p>
+                          ))
+                        ) : (
+                          <p className="text-xs text-[#9E7B8A]">{String(pd[s.key])}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })() : (
                 <div className="text-center py-6">
                   <p className="text-[#9E7B8A] text-sm">No shared data yet</p>
-                  <p className="text-xs text-[#9E7B8A] mt-1">Ask your partner to share their ROSA data with you 🌹</p>
+                  <p className="text-xs text-[#9E7B8A] mt-1">Link with your partner to see their shared ROSA data 🌹</p>
                 </div>
               )}
             </CardContent>
@@ -406,39 +503,40 @@ export default function PartnerPage() {
           )}
         </TabsContent>
 
-        {!isPartnerUser && (
-          <TabsContent value="sharing" className="space-y-3 mt-4">
-            <Card className="border-[#E8C4B8]">
-              <CardHeader>
-                <CardTitle className="text-[#8B4F6E] text-base">Share with Partner</CardTitle>
-                <p className="text-xs text-[#9E7B8A]">Choose what your partner can see. Your privacy is always protected.</p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {[
-                  { key: "cycle", label: "Cycle & Period data 🌸", desc: "Phase, predictions, period days" },
-                  { key: "mood", label: "Mood updates 💗", desc: "Daily mood and trends" },
-                  { key: "wishlist", label: "Wishlist 🎁", desc: "So they can plan gifts" },
-                  { key: "milestones", label: "Milestones 🏆", desc: "Anniversaries and special dates" },
-                  { key: "fitness", label: "Fitness goals 💪", desc: "Workouts and activity" },
-                  { key: "travel", label: "Travel plans ✈️", desc: "Trip plans and bucket list" },
-                  { key: "food", label: "Food preferences 🍽️", desc: "Diet and nutrition goals" },
-                  { key: "skin", label: "Skin & wellness 🌿", desc: "Self care routine updates" },
-                  { key: "reminders", label: "Important reminders 📅", desc: "Birthdays, anniversaries, events" },
-                  { key: "weight", label: "Weight journey 🎯", desc: "Progress and goals" },
-                ].map(item => (
-                  <div key={item.key} className="flex items-center justify-between p-3 bg-[#FDF6F0] rounded-xl border border-[#E8C4B8]">
-                    <div>
-                      <p className="text-sm font-medium text-[#6B3050]">{item.label}</p>
-                      <p className="text-xs text-[#9E7B8A]">{item.desc}</p>
-                    </div>
-                    <input type="checkbox" className="w-4 h-4 accent-[#B06B8B]" checked={!!sharePrefs[item.key]} onChange={e => setSharePrefs(p => ({ ...p, [item.key]: e.target.checked }))} />
+        <TabsContent value="sharing" className="space-y-3 mt-4">
+          <Card className="border-[#E8C4B8]">
+            <CardHeader>
+              <CardTitle className="text-[#8B4F6E] text-base">Share with Partner</CardTitle>
+              <p className="text-xs text-[#9E7B8A]">Choose what your partner can see. Your privacy is always protected.</p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                { key: "cycle", label: "Cycle & Period 🌸", desc: "Phase, predictions, period days" },
+                { key: "mood", label: "Mood 💗", desc: "Daily mood and trends" },
+                { key: "wishlist", label: "Wishlist 🎁", desc: "So they can plan gifts" },
+                { key: "milestones", label: "Milestones 🏆", desc: "Anniversaries and special dates" },
+                { key: "goals", label: "Goals 🎯", desc: "Personal and relationship goals" },
+                { key: "fitness", label: "Fitness 💪", desc: "Workouts and activity" },
+                { key: "sleep", label: "Sleep 😴", desc: "Sleep patterns and quality" },
+                { key: "travel", label: "Travel ✈️", desc: "Trip plans and bucket list" },
+                { key: "food", label: "Food & Nutrition 🍽️", desc: "Diet and nutrition goals" },
+                { key: "skin", label: "Skin & Wellness 🌿", desc: "Self care routine updates" },
+                { key: "journal", label: "Journal 📖", desc: "Selected journal entries" },
+              ].map(item => (
+                <div key={item.key} className="flex items-center justify-between p-3 bg-[#FDF6F0] rounded-xl border border-[#E8C4B8]">
+                  <div>
+                    <p className="text-sm font-medium text-[#6B3050]">{item.label}</p>
+                    <p className="text-xs text-[#9E7B8A]">{item.desc}</p>
                   </div>
-                ))}
-                <Button onClick={saveSharePrefs} disabled={savingPrefs} className="w-full bg-[#B06B8B] text-white mt-2">{savingPrefs ? "Saving..." : "Save sharing preferences 🌹"}</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
+                  <input type="checkbox" className="w-4 h-4 accent-[#B06B8B]" checked={!!sharePrefs[item.key]} onChange={e => setSharePrefs(p => ({ ...p, [item.key]: e.target.checked }))} />
+                </div>
+              ))}
+              <Button onClick={saveSharePrefs} disabled={savingPrefs} className="w-full bg-[#B06B8B] text-white mt-2">
+                {savingPrefs ? "Saving..." : "Save sharing preferences 🌹"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </motion.div>
   );

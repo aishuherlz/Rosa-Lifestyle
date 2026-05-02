@@ -265,6 +265,32 @@ router.post("/circles/private/:id/messages", requireSession, async (req: any, re
 
 // ─── Partner System (DB-backed) ──────────────────────────────────────────
 
+// Auto-apply DB schema updates for sync/share columns
+db.execute(sql`
+  ALTER TABLE partner_links 
+  ADD COLUMN IF NOT EXISTS share_sleep BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS share_skin BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS share_travel BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS share_food BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS share_journal BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS share_goals BOOLEAN DEFAULT false;
+`).catch(console.error);
+
+db.execute(sql`
+  ALTER TABLE rosa_users
+  ADD COLUMN IF NOT EXISTS wishlist_data TEXT,
+  ADD COLUMN IF NOT EXISTS milestones_data TEXT,
+  ADD COLUMN IF NOT EXISTS goals_data TEXT,
+  ADD COLUMN IF NOT EXISTS sleep_data TEXT,
+  ADD COLUMN IF NOT EXISTS skin_data TEXT,
+  ADD COLUMN IF NOT EXISTS travel_data TEXT,
+  ADD COLUMN IF NOT EXISTS food_data TEXT,
+  ADD COLUMN IF NOT EXISTS journal_data TEXT,
+  ADD COLUMN IF NOT EXISTS mood_data TEXT,
+  ADD COLUMN IF NOT EXISTS cycle_data TEXT,
+  ADD COLUMN IF NOT EXISTS fitness_data TEXT;
+`).catch(console.error);
+
 // Send notification to partner
 router.post("/partner/notify", requireSession, async (req: any, res) => {
   const email = req.rosaUser?.emailOrPhone;
@@ -312,26 +338,28 @@ router.put("/partner/notifications/:id/read", requireSession, async (req: any, r
   }
 });
 
-// Link partner by ROSA ID
+// Link partner by Invite Code (Bidirectional)
 router.post("/partner/link", requireSession, async (req: any, res) => {
   const email = req.rosaUser?.emailOrPhone;
-  const { partnerRosaId } = req.body;
+  const { partnerInviteCode } = req.body;
   try {
     const target = await db.execute(sql`
-      SELECT email_or_phone, name FROM rosa_users WHERE rosa_id = ${partnerRosaId}
+      SELECT email_or_phone, name FROM rosa_users WHERE partner_invite_code = ${partnerInviteCode}
     `);
-    if (!target.rows.length) return res.status(404).json({ error: "Partner not found with that ROSA ID" });
+    if (!target.rows.length) return res.status(404).json({ error: "Partner not found with that invite code" });
     const partnerEmail = (target.rows[0] as any).email_or_phone;
     if (partnerEmail === email) return res.status(400).json({ error: "Cannot link to yourself" });
+    
+    // Bidirectional linking so both can share preferences independently
     await db.execute(sql`
       INSERT INTO partner_links (user_email, partner_email)
-      VALUES (${email}, ${partnerEmail})
+      VALUES (${email}, ${partnerEmail}), (${partnerEmail}, ${email})
       ON CONFLICT (user_email, partner_email) DO NOTHING
     `);
     await db.execute(sql`
       INSERT INTO partner_notifications (from_email, to_email, type, title, message)
-      VALUES (${email}, ${partnerEmail}, 'partner_request', 'Partner Request 🌹',
-        ${req.rosaUser.name + ' wants to link with you on ROSA'})
+      VALUES (${email}, ${partnerEmail}, 'partner_request', 'Partner Linked 🌹',
+        ${req.rosaUser.name + ' has successfully linked with you on ROSA'})
     `);
     res.json({ ok: true, partnerName: (target.rows[0] as any).name });
   } catch (err: any) {
@@ -343,24 +371,59 @@ router.post("/partner/link", requireSession, async (req: any, res) => {
 router.get("/partner/shared-data", requireSession, async (req: any, res) => {
   const email = req.rosaUser?.emailOrPhone;
   try {
+    // Check if my partner has shared things with me
     const link = await db.execute(sql`
       SELECT * FROM partner_links WHERE partner_email = ${email}
     `);
     if (!link.rows.length) return res.json({ linked: false });
     const partnerLink = link.rows[0] as any;
+    
+    // Get their actual user data
     const partner = await db.execute(sql`
-      SELECT name, nickname, rosa_id, profile_photo_url FROM rosa_users
+      SELECT name, nickname, profile_photo_url,
+             wishlist_data, milestones_data, goals_data, sleep_data, skin_data, 
+             travel_data, food_data, journal_data, mood_data, cycle_data, fitness_data
+      FROM rosa_users
       WHERE email_or_phone = ${partnerLink.user_email}
     `);
+    
+    if (!partner.rows.length) return res.json({ linked: false });
+    const pData = partner.rows[0] as any;
+    
+    const safeParse = (str: string | null) => { try { return str ? JSON.parse(str) : null; } catch { return null; } };
+
     res.json({
       linked: true,
-      partner: partner.rows[0],
+      partner: {
+        name: pData.name,
+        nickname: pData.nickname,
+        profilePhotoUrl: pData.profile_photo_url
+      },
       sharePrefs: {
         cycle: partnerLink.share_cycle,
         mood: partnerLink.share_mood,
         wishlist: partnerLink.share_wishlist,
         milestones: partnerLink.share_milestones,
         fitness: partnerLink.share_fitness,
+        sleep: partnerLink.share_sleep,
+        skin: partnerLink.share_skin,
+        travel: partnerLink.share_travel,
+        food: partnerLink.share_food,
+        journal: partnerLink.share_journal,
+        goals: partnerLink.share_goals,
+      },
+      partnerData: {
+        cycle: partnerLink.share_cycle ? safeParse(pData.cycle_data) : null,
+        mood: partnerLink.share_mood ? safeParse(pData.mood_data) : null,
+        wishlist: partnerLink.share_wishlist ? safeParse(pData.wishlist_data) : null,
+        milestones: partnerLink.share_milestones ? safeParse(pData.milestones_data) : null,
+        fitness: partnerLink.share_fitness ? safeParse(pData.fitness_data) : null,
+        sleep: partnerLink.share_sleep ? safeParse(pData.sleep_data) : null,
+        skin: partnerLink.share_skin ? safeParse(pData.skin_data) : null,
+        travel: partnerLink.share_travel ? safeParse(pData.travel_data) : null,
+        food: partnerLink.share_food ? safeParse(pData.food_data) : null,
+        journal: partnerLink.share_journal ? safeParse(pData.journal_data) : null,
+        goals: partnerLink.share_goals ? safeParse(pData.goals_data) : null,
       }
     });
   } catch (err: any) {
@@ -371,7 +434,10 @@ router.get("/partner/shared-data", requireSession, async (req: any, res) => {
 // Update partner share preferences
 router.put("/partner/share-prefs", requireSession, async (req: any, res) => {
   const email = req.rosaUser?.emailOrPhone;
-  const { partnerEmail, shareCycle, shareMood, shareWishlist, shareMilestones, shareFitness } = req.body;
+  const { 
+    partnerEmail, shareCycle, shareMood, shareWishlist, shareMilestones, shareFitness,
+    shareSleep, shareSkin, shareTravel, shareFood, shareJournal, shareGoals
+  } = req.body;
   try {
     await db.execute(sql`
       UPDATE partner_links SET
@@ -379,11 +445,36 @@ router.put("/partner/share-prefs", requireSession, async (req: any, res) => {
         share_mood = ${!!shareMood},
         share_wishlist = ${!!shareWishlist},
         share_milestones = ${!!shareMilestones},
-        share_fitness = ${!!shareFitness}
+        share_fitness = ${!!shareFitness},
+        share_sleep = ${!!shareSleep},
+        share_skin = ${!!shareSkin},
+        share_travel = ${!!shareTravel},
+        share_food = ${!!shareFood},
+        share_journal = ${!!shareJournal},
+        share_goals = ${!!shareGoals}
       WHERE user_email = ${email} AND partner_email = ${partnerEmail}
     `);
     res.json({ ok: true });
   } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Sync data (push from local storage to backend)
+router.post("/sync/push", requireSession, async (req: any, res) => {
+  const email = req.rosaUser?.emailOrPhone;
+  const { type, data } = req.body;
+  const validTypes = ["wishlist", "milestones", "goals", "sleep", "skin", "travel", "food", "journal", "mood", "cycle", "fitness"];
+  
+  if (!validTypes.includes(type)) return res.status(400).json({ error: "Invalid sync type" });
+  
+  try {
+    // We construct the column name safely since type is strictly validated against a whitelist
+    const colName = type + "_data";
+    const jsonData = JSON.stringify(data);
+    await db.execute(sql.raw(`UPDATE rosa_users SET ${colName} = '${jsonData.replace(/'/g, "''")}' WHERE email_or_phone = '${email.replace(/'/g, "''")}'`));
+    res.json({ ok: true });
+  } catch(err: any) {
     res.status(500).json({ error: err.message });
   }
 });

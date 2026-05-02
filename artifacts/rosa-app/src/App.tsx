@@ -13,6 +13,7 @@ import NotFound from "@/pages/not-found";
 import Intro from "@/pages/intro";
 import SignIn from "@/pages/sign-in";
 import Home from "@/pages/home";
+import MaleDashboard from "@/pages/male-dashboard";
 import MoodPage from "@/pages/mood";
 import PeriodPage from "@/pages/period";
 import PartnerPage from "@/pages/partner";
@@ -76,7 +77,11 @@ function Router() {
       <Route path="/intro" component={Intro} />
       <Route path="/sign-in" component={SignIn} />
 
-      <Route path="/">{() => <ProtectedRoute component={Home} />}</Route>
+      <Route path="/">{() => {
+        const { user } = useUser();
+        const isMale = user?.gender === "male" || user?.gender === "man";
+        return <ProtectedRoute component={isMale ? MaleDashboard : Home} />;
+      }}</Route>
       <Route path="/mood">{() => <ProtectedRoute component={MoodPage} />}</Route>
       <Route path="/period">{() => <ProtectedRoute component={PeriodPage} />}</Route>
       <Route path="/partner">{() => <ProtectedRoute component={PartnerPage} />}</Route>
