@@ -134,9 +134,9 @@ export default function MaleDashboard() {
         </CardContent>
       </Card>
 
-      {/* Partner Insights */}
-      {partnerData?.linked && (
-        <Card className="border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50">
+      {/* Partner Insights or Educational Content */}
+      {partnerData?.linked ? (
+        <Card className="border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50 overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="text-rose-700 text-base flex items-center gap-2">
               <Heart className="w-4 h-4" /> {partnerData.partner?.name}'s Updates
@@ -145,56 +145,90 @@ export default function MaleDashboard() {
           </CardHeader>
           <CardContent className="space-y-2">
             {partnerData.partnerData?.cycle && (
-              <div className="p-3 bg-white rounded-xl border border-rose-100">
-                <p className="text-xs font-semibold text-rose-600">🌸 Cycle Phase</p>
-                <p className="text-sm text-slate-700 mt-0.5">
+              <div className="p-3 bg-white/80 backdrop-blur-sm rounded-xl border border-rose-100 shadow-sm">
+                <p className="text-xs font-semibold text-rose-600 flex items-center gap-1.5">
+                  <Activity className="w-3 h-3" /> Cycle Phase
+                </p>
+                <p className="text-sm text-slate-700 mt-0.5 font-medium">
                   {typeof partnerData.partnerData.cycle === "object"
-                    ? partnerData.partnerData.cycle.phase || "Active"
+                    ? partnerData.partnerData.cycle.phase || "Active Phase"
                     : String(partnerData.partnerData.cycle)}
                 </p>
               </div>
             )}
             {partnerData.partnerData?.mood && (
-              <div className="p-3 bg-white rounded-xl border border-pink-100">
-                <p className="text-xs font-semibold text-pink-600">💗 Mood</p>
-                <p className="text-sm text-slate-700 mt-0.5">
+              <div className="p-3 bg-white/80 backdrop-blur-sm rounded-xl border border-pink-100 shadow-sm">
+                <p className="text-xs font-semibold text-pink-600 flex items-center gap-1.5">
+                  <Star className="w-3 h-3" /> Her Mood
+                </p>
+                <p className="text-sm text-slate-700 mt-0.5 font-medium">
                   {typeof partnerData.partnerData.mood === "object"
-                    ? partnerData.partnerData.mood.mood || "Good"
+                    ? partnerData.partnerData.mood.mood || "Doing well"
                     : String(partnerData.partnerData.mood)}
                 </p>
               </div>
             )}
             {partnerData.partnerData?.wishlist && Array.isArray(partnerData.partnerData.wishlist) && partnerData.partnerData.wishlist.length > 0 && (
-              <div className="p-3 bg-white rounded-xl border border-amber-100">
-                <p className="text-xs font-semibold text-amber-600">🎁 Her Wishlist</p>
-                {partnerData.partnerData.wishlist.slice(0, 3).map((item: any, i: number) => (
-                  <p key={i} className="text-sm text-slate-700">• {item.name || item.title}</p>
-                ))}
+              <div className="p-3 bg-white/80 backdrop-blur-sm rounded-xl border border-amber-100 shadow-sm">
+                <p className="text-xs font-semibold text-amber-600 flex items-center gap-1.5">
+                  <Gift className="w-3 h-3" /> Her Wishlist
+                </p>
+                <div className="mt-1 space-y-1">
+                  {partnerData.partnerData.wishlist.slice(0, 2).map((item: any, i: number) => (
+                    <p key={i} className="text-sm text-slate-700 truncate">• {item.name || item.title}</p>
+                  ))}
+                </div>
               </div>
             )}
             {!partnerData.partnerData?.cycle && !partnerData.partnerData?.mood && !partnerData.partnerData?.wishlist && (
-              <p className="text-xs text-rose-400 text-center py-2">
-                She hasn't shared any data yet. Ask her to enable sharing in her Partner settings 🌹
-              </p>
+              <div className="text-center py-6 px-4">
+                <p className="text-sm text-rose-500 font-medium italic">
+                  "Connection is built on shared moments."
+                </p>
+                <p className="text-xs text-rose-400 mt-2">
+                  She hasn't shared any data yet. Check in with her today 🌹
+                </p>
+              </div>
             )}
             <Link href="/partner">
-              <Button variant="outline" size="sm" className="w-full border-rose-200 text-rose-600 hover:bg-rose-50 mt-1">
-                View all partner data <ChevronRight className="w-3 h-3 ml-1" />
+              <Button variant="ghost" size="sm" className="w-full text-rose-600 hover:bg-rose-100/50 mt-1 text-xs">
+                Manage sharing preferences <ChevronRight className="w-3 h-3 ml-1" />
               </Button>
             </Link>
           </CardContent>
         </Card>
-      )}
+      ) : (
+        <Card className="border-indigo-100 bg-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[#1E3A5F] text-base flex items-center gap-2">
+              <Brain className="w-4 h-4 text-indigo-500" /> Cycle Awareness
+            </CardTitle>
+            <p className="text-xs text-slate-500 font-normal italic">Understanding her world better</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">The Phase</p>
+                <p className="text-sm font-semibold text-slate-700 mt-1">Luteal Phase</p>
+                <p className="text-[10px] text-slate-500 mt-1 leading-tight">Focus on comfort, hydration, and patience.</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">The Tip</p>
+                <p className="text-sm font-semibold text-slate-700 mt-1">Small Gestures</p>
+                <p className="text-[10px] text-slate-500 mt-1 leading-tight">A surprise tea or snack goes a long way.</p>
+              </div>
+            </div>
+            
+            <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50">
+              <p className="text-xs text-indigo-800 leading-relaxed italic">
+                "Understanding the menstrual cycle isn't just about dates; it's about recognizing the biological shifts that influence energy and emotion."
+              </p>
+            </div>
 
-      {/* Not linked yet */}
-      {!partnerData?.linked && (
-        <Card className="border-slate-200 bg-slate-50">
-          <CardContent className="p-4 text-center space-y-2">
-            <p className="text-2xl">💑</p>
-            <p className="text-sm font-semibold text-slate-700">Connect with your partner</p>
-            <p className="text-xs text-slate-500">Link your accounts to see her shared updates here.</p>
             <Link href="/partner">
-              <Button size="sm" className="bg-[#B06B8B] text-white">Go to Partner page</Button>
+              <Button className="w-full bg-[#1E3A5F] text-white hover:bg-[#1E3A5F]/90 rounded-xl h-11">
+                Link with Partner for Real-time Insights
+              </Button>
             </Link>
           </CardContent>
         </Card>

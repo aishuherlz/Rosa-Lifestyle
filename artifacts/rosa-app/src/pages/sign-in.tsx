@@ -18,6 +18,10 @@ export default function SignIn() {
   // If already logged in OR valid remembered session exists, redirect to home
   useEffect(() => {
     if (user && user.authToken && !user.guestMode) {
+      if (!user.gender) {
+        setStep("gender");
+        return;
+      }
       setLocation("/");
       return;
     }
@@ -25,6 +29,7 @@ export default function SignIn() {
     const session = loadSession();
     if (session && session.rememberMe) {
       // Valid remembered session — redirect to home, user-context will validate it
+      // Note: If gender is missing, home will redirect back here and we'll catch it above
       setLocation("/");
     }
   }, [user]);
@@ -194,8 +199,8 @@ export default function SignIn() {
       } else {
         setPendingAnonymousName(null);
       }
-      // If returning user, skip gender/pronouns/onboarding completely
-      if (!data.isNewUser) {
+      // If returning user AND has gender, skip gender/pronouns/onboarding completely
+      if (!data.isNewUser && data.gender) {
         // Sign them in directly
         signInWith({
           name: data.name || name.trim(),
@@ -218,6 +223,7 @@ export default function SignIn() {
         });
         setLocation("/");
       } else {
+        // New user OR returning user with missing profile data
         setStep("gender");
       }
     } catch {

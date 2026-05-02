@@ -77,13 +77,23 @@ function Router() {
       <Route path="/intro" component={Intro} />
       <Route path="/sign-in" component={SignIn} />
 
-      <Route path="/">{() => {
-        const { user } = useUser();
-        const isMale = user?.gender === "male" || user?.gender === "man";
-        return <ProtectedRoute component={isMale ? MaleDashboard : Home} />;
-      }}</Route>
+      <Route path="/">
+        <ProtectedRoute
+          component={() => {
+            if (!user?.gender) return <Redirect to="/sign-in" />;
+            const isMale = user.gender.toLowerCase() === "male" || user.gender.toLowerCase() === "man";
+            return isMale ? <MaleDashboard /> : <Home />;
+          }}
+        />
+      </Route>
       <Route path="/mood">{() => <ProtectedRoute component={MoodPage} />}</Route>
-      <Route path="/period">{() => <ProtectedRoute component={PeriodPage} />}</Route>
+      <Route path="/period">
+        {() => {
+          const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
+          if (isMale) return <Redirect to="/" />;
+          return <ProtectedRoute component={PeriodPage} />;
+        }}
+      </Route>
       <Route path="/partner">{() => <ProtectedRoute component={PartnerPage} />}</Route>
       <Route path="/wishlist">{() => <ProtectedRoute component={WishlistPage} />}</Route>
       <Route path="/milestones">{() => <ProtectedRoute component={MilestonesPage} />}</Route>

@@ -110,7 +110,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
             return;
           }
           if (!r.ok) return;
-          const body = await r.json().catch(() => null) as { user?: { anonymousName?: string | null; rosaId?: string | null; partnerInviteCode?: string | null; nickname?: string | null; nicknameChanges?: number; bio?: string | null; profilePhotoUrl?: string | null } | null } | null;
+          const body = await r.json().catch(() => null) as { user?: { anonymousName?: string | null; rosaId?: string | null; partnerInviteCode?: string | null; nickname?: string | null; nicknameChanges?: number; bio?: string | null; profilePhotoUrl?: string | null; gender?: string | null; pronouns?: string | null } | null } | null;
           const serverUser = body?.user;
           if (!serverUser) return;
           setUserState((prev) => {
@@ -124,6 +124,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
               nicknameChanges: serverUser.nicknameChanges ?? prev.nicknameChanges,
               bio: serverUser.bio ?? prev.bio,
               profilePhotoUrl: serverUser.profilePhotoUrl ?? prev.profilePhotoUrl,
+              gender: serverUser.gender ?? prev.gender,
+              pronouns: serverUser.pronouns ?? prev.pronouns,
             };
             try {
               const target = next.rememberMe ? localStorage : sessionStorage;
