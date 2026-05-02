@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useGarden } from "@/lib/garden-context";
 import { apiUrl } from "@/lib/api";
+import { scopedStorage } from "@/lib/scoped-storage";
 
 type Stats = { totalCheckIns: number; activeToday: number; goalToday: number; petalsFilled: number };
 
@@ -26,8 +27,8 @@ export function CommunityRose() {
   useEffect(() => {
     load();
     const todayKey = `rosa_community_pinged_${new Date().toISOString().split("T")[0]}`;
-    if (garden.lastCheckIn === new Date().toISOString().split("T")[0] && !localStorage.getItem(todayKey)) {
-      localStorage.setItem(todayKey, "1");
+    if (garden.lastCheckIn === new Date().toISOString().split("T")[0] && !scopedStorage.getItem(todayKey)) {
+      scopedStorage.setItem(todayKey, "1");
       ping();
     }
     const t = setInterval(load, 60_000);

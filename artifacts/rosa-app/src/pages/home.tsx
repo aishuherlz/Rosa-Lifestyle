@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import confetti from "canvas-confetti";
 import { useToast } from "@/hooks/use-toast";
+import { scopedStorage } from "@/lib/scoped-storage";
 
 type PeriodData = { lastPeriodDate?: string; cycleLength?: number };
 
@@ -132,8 +133,8 @@ export default function Home() {
   ];
 
   const weeklyRecap = (() => {
-    const journal = JSON.parse(localStorage.getItem("rosa_journal") || "[]");
-    const moods = JSON.parse(localStorage.getItem("rosa_moods") || "[]");
+    const journal = JSON.parse(scopedStorage.getItem("rosa_journal") || "[]");
+    const moods = JSON.parse(scopedStorage.getItem("rosa_moods") || "[]");
     const weekAgo = Date.now() - 7 * 86400000;
     const j = journal.filter((e: any) => new Date(e.date).getTime() > weekAgo).length;
     const m = Array.isArray(moods) ? moods.filter((e: any) => (typeof e.date === "string" ? new Date(e.date).getTime() : e.date) > weekAgo).length : 0;

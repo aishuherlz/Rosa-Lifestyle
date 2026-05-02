@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { scopedStorage } from "./scoped-storage";
 
 export type ShareableFeature =
   | "cycle"
@@ -49,7 +50,7 @@ const EVENT = "rosa-partner-share-changed";
 
 export function getSharePrefs(): SharePrefs {
   try {
-    const raw = localStorage.getItem(PREFS_KEY);
+    const raw = scopedStorage.getItem(PREFS_KEY);
     if (!raw) return { ...DEFAULT_PREFS };
     return { ...DEFAULT_PREFS, ...JSON.parse(raw) };
   } catch { return { ...DEFAULT_PREFS }; }
@@ -57,7 +58,7 @@ export function getSharePrefs(): SharePrefs {
 
 export function setSharePref(feature: ShareableFeature, value: boolean) {
   const next = { ...getSharePrefs(), [feature]: value };
-  localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+  scopedStorage.setItem(PREFS_KEY, JSON.stringify(next));
   window.dispatchEvent(new CustomEvent(EVENT));
 }
 
@@ -89,7 +90,7 @@ export function buildShareSnapshot(meta: { fromName?: string }): {
 } {
   const prefs = getSharePrefs();
   const data: Record<string, any> = {};
-  const grab = (k: string) => { try { const v = localStorage.getItem(k); if (v) data[k] = JSON.parse(v); } catch {} };
+  const grab = (k: string) => { try { const v = scopedStorage.getItem(k); if (v) data[k] = JSON.parse(v); } catch {} };
 
   if (prefs.cycle) { grab("rosa_period_data"); grab("rosa_cycle_length"); }
   if (prefs.mood) grab("rosa_moods");
@@ -98,7 +99,7 @@ export function buildShareSnapshot(meta: { fromName?: string }): {
   if (prefs.goals) grab("rosa_goals");
   if (prefs.journal) {
     try {
-      const j = localStorage.getItem("rosa_journal_entries");
+      const j = scopedStorage.getItem("rosa_journal_entries");
       if (j) {
         const parsed = JSON.parse(j) as Array<{ id: string; date: string; title?: string }>;
         data["rosa_journal_titles"] = parsed.slice(0, 10).map(e => ({ id: e.id, date: e.date, title: e.title || "(untitled)" }));
@@ -126,19 +127,19 @@ export function buildShareSnapshot(meta: { fromName?: string }): {
 export type IncomingSnapshot = ReturnType<typeof buildShareSnapshot>;
 
 export function saveIncomingSnapshot(snap: IncomingSnapshot) {
-  localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap));
+  scopedStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap));
   window.dispatchEvent(new CustomEvent(EVENT));
 }
 
 export function getIncomingSnapshot(): IncomingSnapshot | null {
   try {
-    const raw = localStorage.getItem(SNAPSHOT_KEY);
+    const raw = scopedStorage.getItem(SNAPSHOT_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
 
 export function clearIncomingSnapshot() {
-  localStorage.removeItem(SNAPSHOT_KEY);
+  scopedStorage.removeItem(SNAPSHOT_KEY);
   window.dispatchEvent(new CustomEvent(EVENT));
 }
 

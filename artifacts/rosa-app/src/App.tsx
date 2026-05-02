@@ -137,12 +137,14 @@ function Router() {
   );
 }
 
+import { scopedStorage } from "@/lib/scoped-storage";
+
 function App() {
   useEffect(() => {
     import("@/lib/notifications").then(async ({ registerSW, requestNotifPermission, showLocalNotification }) => {
       await registerSW();
       const today = new Date().toISOString().split("T")[0];
-      const lastRose = localStorage.getItem("rosa_daily_notif");
+      const lastRose = scopedStorage.getItem("rosa_daily_notif");
       if (lastRose !== today) {
         const perm = await requestNotifPermission();
         if (perm === "granted") {
@@ -155,7 +157,7 @@ function App() {
           ];
           const w = whispers[new Date().getDate() % whispers.length];
           showLocalNotification("ROSA 🌹", w, "/affirmation");
-          localStorage.setItem("rosa_daily_notif", today);
+          scopedStorage.setItem("rosa_daily_notif", today);
         }
       }
     }).catch(() => {});

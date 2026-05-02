@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { scopedStorage } from "./scoped-storage";
 
 export type SubscriptionPlan = "trial" | "monthly" | "yearly" | "expired";
 
@@ -67,7 +68,7 @@ function computeState(raw: Partial<SubscriptionState> & { joinedAt?: string }): 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SubscriptionState>(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      const stored = JSON.parse(scopedStorage.getItem(STORAGE_KEY) || "{}");
       const userRaw = JSON.parse(localStorage.getItem("rosa_user") || "{}");
       return computeState({ ...stored, joinedAt: userRaw.joinedAt });
     } catch {
@@ -78,7 +79,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const interval = setInterval(() => {
       try {
-        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+        const stored = JSON.parse(scopedStorage.getItem(STORAGE_KEY) || "{}");
         const userRaw = JSON.parse(localStorage.getItem("rosa_user") || "{}");
         setState(computeState({ ...stored, joinedAt: userRaw.joinedAt }));
       } catch {}
@@ -92,13 +93,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       ? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
       : new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
     const newData = { plan, subscribedAt: now.toISOString(), renewsAt };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+    scopedStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
     const userRaw = JSON.parse(localStorage.getItem("rosa_user") || "{}");
     setState(computeState({ ...newData, joinedAt: userRaw.joinedAt }));
   };
 
   const cancelSubscription = () => {
-    localStorage.removeItem(STORAGE_KEY);
+    scopedStorage.removeItem(STORAGE_KEY);
     const userRaw = JSON.parse(localStorage.getItem("rosa_user") || "{}");
     setState(computeState({ joinedAt: userRaw.joinedAt }));
   };

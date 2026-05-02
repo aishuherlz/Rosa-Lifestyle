@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { OnboardingQuiz } from "@/components/onboarding/onboarding-quiz";
 import { apiUrl } from "@/lib/api";
+import { scopedStorage } from "@/lib/scoped-storage";
 import type { StoredSession } from "@/lib/auth-storage";
 import { loadSession } from "@/lib/auth-storage";
 
@@ -47,7 +48,10 @@ export default function SignIn() {
   // Marketing email consent. Default "later" so we don't auto-opt anyone in
   // (CAN-SPAM/GDPR friendly) and so users who don't notice the choice can be
   // gently re-asked from the Settings page.
-  const savedMarketing = localStorage.getItem("rosa_marketing_pref") as "yes" | "later" | "never" | null;
+  // Marketing email consent. Default "later" so we don't auto-opt anyone in
+  // (CAN-SPAM/GDPR friendly) and so users who don't notice the choice can be
+  // gently re-asked from the Settings page.
+  const savedMarketing = scopedStorage.getItem("rosa_marketing_pref") as "yes" | "later" | "never" | null;
   const [marketingOptIn, setMarketingOptIn] = useState<"yes" | "later" | "never">(savedMarketing || "later");
   const hasAnsweredMarketing = savedMarketing === "yes" || savedMarketing === "never";
 
@@ -329,7 +333,7 @@ export default function SignIn() {
       return;
     }
 
-    const existingOnboarding = JSON.parse(localStorage.getItem("rosa_onboarding") || "{}"); 
+    const existingOnboarding = JSON.parse(scopedStorage.getItem("rosa_onboarding") || "{}"); 
     if (existingOnboarding?.completed) { setLocation("/"); } else { setStep("onboarding"); }
   };
 
@@ -489,7 +493,7 @@ export default function SignIn() {
                           checked={marketingOptIn === opt.v}
                           onChange={() => {
                             setMarketingOptIn(opt.v);
-                            localStorage.setItem("rosa_marketing_pref", opt.v);
+                            scopedStorage.setItem("rosa_marketing_pref", opt.v);
                           }}
                           data-testid={`radio-marketing-${opt.v}`}
                           className="mt-1 accent-primary"

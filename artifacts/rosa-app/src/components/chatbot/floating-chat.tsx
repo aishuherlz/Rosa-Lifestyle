@@ -4,6 +4,8 @@ import { MessageCircle, X, Send, Loader2, Trash2, Sparkles, Mic, MicOff, Volume2
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiUrl } from "@/lib/api";
+import { scopedStorage } from "@/lib/scoped-storage";
+
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -131,7 +133,7 @@ export function FloatingChat() {
       // Try to resume an existing conversation, but only if the stored id is a real positive number.
       // (Old/corrupt entries with id === undefined / null / NaN used to produce
       //  /api/openai/conversations/undefined and 404. Validate before using.)
-      const stored = localStorage.getItem("rosa_chatbot_conversation");
+      const stored = scopedStorage.getItem("rosa_chatbot_conversation");
       let storedId: number | null = null;
       if (stored) {
         try {
@@ -140,7 +142,7 @@ export function FloatingChat() {
           if (Number.isFinite(n) && n > 0) storedId = n;
         } catch {}
         // Wipe corrupt entries so we never try them again.
-        if (storedId === null) localStorage.removeItem("rosa_chatbot_conversation");
+        if (storedId === null) scopedStorage.removeItem("rosa_chatbot_conversation");
       }
       if (storedId !== null) {
         const res = await fetch(apiUrl(`/api/openai/conversations/${storedId}`), { signal: ac.signal });
@@ -157,7 +159,7 @@ export function FloatingChat() {
           return;
         }
         // Conversation no longer exists on the server — drop the stale id and create a fresh one.
-        localStorage.removeItem("rosa_chatbot_conversation");
+        scopedStorage.removeItem("rosa_chatbot_conversation");
       }
       // Create a brand-new conversation. Validate the response before storing the id.
       const res = await fetch(apiUrl(`/api/openai/conversations`), {
@@ -173,7 +175,7 @@ export function FloatingChat() {
         throw new Error("Server returned invalid conversation id");
       }
       safeSet(setConversationId, newId);
-      localStorage.setItem("rosa_chatbot_conversation", JSON.stringify({ id: newId }));
+      scopedStorage.setItem("rosa_chatbot_conversation", JSON.stringify({ id: newId }));
       safeSet(setMessages, [
         {
           id: "welcome",
@@ -282,7 +284,7 @@ export function FloatingChat() {
         await fetch(apiUrl(`/api/openai/conversations/${conversationId}`), { method: "DELETE" });
       } catch {}
     }
-    localStorage.removeItem("rosa_chatbot_conversation");
+    scopedStorage.removeItem("rosa_chatbot_conversation");
     if (!mountedRef.current) return;
     setConversationId(null);
     setMessages([]);

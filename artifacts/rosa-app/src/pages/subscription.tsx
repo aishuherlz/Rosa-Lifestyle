@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { apiUrl } from "@/lib/api";
 import { getAuthHeader, loadSession } from "@/lib/auth-storage";
 import { useLocation } from "wouter";
+import { scopedStorage } from "@/lib/scoped-storage";
 
 const FREE_FEATURES = [
   "Period & cycle tracking",
@@ -74,10 +75,9 @@ export default function Subscription() {
     setLoading(true);
     try {
       const priceId = selectedPlan === "monthly" ? prices?.monthly.id : prices?.yearly.id;
-
       let gardenRoses = 0;
       try {
-        const g = JSON.parse(localStorage.getItem("rosa_garden") || "{}");
+        const g = JSON.parse(scopedStorage.getItem("rosa_garden") || "{}");
         gardenRoses = g.roses || 0;
       } catch {}
 

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { loadSession, saveSession, clearSession, getAuthHeader, type StoredSession } from "./auth-storage";
 import { apiUrl } from "./api";
+import { scopedStorage } from "./scoped-storage";
 
 export type User = {
   name: string;
@@ -184,6 +185,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
         } catch { /* offline — local clear still happens */ }
       }
     }
+    
+    // Clear user-specific data from localStorage
+    scopedStorage.clearUserCache();
+    
     clearSession();
     try { localStorage.removeItem(PROFILE_KEY); sessionStorage.removeItem(PROFILE_KEY); } catch {}
     sessionStorage.removeItem("rosa_intro_seen");

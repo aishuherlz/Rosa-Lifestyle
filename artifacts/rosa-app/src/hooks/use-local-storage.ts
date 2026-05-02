@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { scopedStorage, scopeKey } from "@/lib/scoped-storage";
 
 export function useLocalStorage<T>(key: string, initialValue: T) {
   const [storedValue, setStoredValue] = useState<T>(() => {
@@ -6,7 +7,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
       return initialValue;
     }
     try {
-      const item = window.localStorage.getItem(key);
+      const item = scopedStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
     } catch (error) {
       console.error(error);
@@ -14,12 +15,23 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     }
   });
 
+  // Re-sync if the user changes (and thus the scoped key changes)
+  const currentScopedKey = scopeKey(key);
+  useEffect(() => {
+    try {
+      const item = scopedStorage.getItem(key);
+      setStoredValue(item ? JSON.parse(item) : initialValue);
+    } catch (error) {
+      console.error(error);
+    }
+  }, [currentScopedKey]);
+
   const setValue = (value: T | ((val: T) => T)) => {
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value;
       setStoredValue(valueToStore);
       if (typeof window !== "undefined") {
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+        scopedStorage.setItem(key, JSON.stringify(valueToStore));
       }
     } catch (error) {
       console.error(error);

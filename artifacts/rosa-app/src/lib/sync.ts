@@ -1,11 +1,12 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
+import { scopedStorage } from "./scoped-storage";
 
 export type CyclePhase = "menstrual" | "follicular" | "ovulation" | "luteal" | "unknown";
 
 export function readCyclePhase(): { phase: CyclePhase; day: number } {
   if (typeof window === "undefined") return { phase: "unknown", day: 0 };
   try {
-    const raw = localStorage.getItem("rosa_cycle_logs");
+    const raw = scopedStorage.getItem("rosa_cycle_logs");
     if (!raw) return { phase: "unknown", day: 0 };
     const logs = JSON.parse(raw);
     if (!Array.isArray(logs) || !logs.length) return { phase: "unknown", day: 0 };
@@ -52,7 +53,7 @@ export type Destination = {
 export function getNextPlannedTrip(): Destination | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem("rosa_destinations");
+    const raw = scopedStorage.getItem("rosa_destinations");
     if (!raw) return null;
     const list: Destination[] = JSON.parse(raw);
     const now = Date.now();
@@ -68,7 +69,7 @@ export type PartnerOccasion = { kind: "birthday" | "anniversary"; date: string; 
 export function getPartnerOccasions(withinDays = 60): PartnerOccasion[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem("rosa_partner");
+    const raw = scopedStorage.getItem("rosa_partner");
     if (!raw) return [];
     const p = JSON.parse(raw);
     if (!p) return [];
@@ -96,7 +97,7 @@ export type Milestone = { id: string; title: string; date: string };
 export function getUpcomingMilestones(withinDays = 60): Milestone[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem("rosa_milestones");
+    const raw = scopedStorage.getItem("rosa_milestones");
     if (!raw) return [];
     const list: Milestone[] = JSON.parse(raw);
     const now = Date.now();

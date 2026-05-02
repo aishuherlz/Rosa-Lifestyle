@@ -85,8 +85,10 @@ function getSeason(): string {
   return "winter";
 }
 
+import { scopedStorage } from "@/lib/scoped-storage";
+
 function getCyclePhase(): string {
-  const cycleData = localStorage.getItem("rosa_cycle_logs");
+  const cycleData = scopedStorage.getItem("rosa_cycle_logs");
   if (!cycleData) return "follicular";
   try {
     const logs = JSON.parse(cycleData);

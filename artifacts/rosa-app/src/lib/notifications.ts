@@ -1,3 +1,5 @@
+import { scopedStorage } from "./scoped-storage";
+
 // Local notification helpers + service-worker registration
 
 export async function registerSW(): Promise<ServiceWorkerRegistration | null> {
@@ -39,7 +41,7 @@ export async function showLocalNotification(title: string, body: string, url = "
 type SyncEvent = { id: string; title: string; body: string; url: string };
 export async function fireDueSyncNotifications(events: SyncEvent[]) {
   if (notifPermission() !== "granted") return;
-  const sentRaw = localStorage.getItem("rosa_notif_sent") || "{}";
+  const sentRaw = scopedStorage.getItem("rosa_notif_sent") || "{}";
   let sent: Record<string, number> = {};
   try { sent = JSON.parse(sentRaw); } catch {}
   const today = new Date().toISOString().split("T")[0];
@@ -53,5 +55,5 @@ export async function fireDueSyncNotifications(events: SyncEvent[]) {
     await showLocalNotification(ev.title, ev.body, ev.url);
     sent[key] = Date.now();
   }
-  localStorage.setItem("rosa_notif_sent", JSON.stringify(sent));
+  scopedStorage.setItem("rosa_notif_sent", JSON.stringify(sent));
 }
