@@ -67,6 +67,9 @@ export function saveSession(session: StoredSession): void {
   try {
     target.setItem(STORAGE_KEY, obfuscate(JSON.stringify(session)));
     target.setItem(REMEMBER_KEY, session.rememberMe ? "1" : "0");
+    if (session.rememberMe) {
+      localStorage.setItem("rosa_device_id", session.deviceId);
+    }
     // Don't leave a stale token in the other storage.
     other.removeItem(STORAGE_KEY);
     other.removeItem(REMEMBER_KEY);

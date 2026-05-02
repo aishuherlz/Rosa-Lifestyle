@@ -34,11 +34,9 @@ export default function SignIn() {
   const [gender, setGender] = useState("");
   const [pronouns, setPronouns] = useState("");
   const [customPronouns, setCustomPronouns] = useState("");
-  // Persistent-session opt-in. Default true because the most common ROSA use
-  // case is the user's own phone/laptop and re-verifying every visit is friction.
-  const _savedSession = typeof window !== "undefined" ? (() => { try { const raw = localStorage.getItem("rosa_auth_session"); if (!raw) return null; return JSON.parse(atob(raw)); } catch { return null; } })() : null;
-  const [rememberMe, setRememberMe] = useState(_savedSession?.rememberMe ?? true);
-  const isDeviceRemembered = !!_savedSession?.rememberMe;
+  const savedDeviceId = typeof window !== "undefined" ? localStorage.getItem("rosa_device_id") : null;
+  const [rememberMe, setRememberMe] = useState(savedDeviceId ? true : true);
+  const isDeviceRemembered = !!savedDeviceId;
   // Marketing email consent. Default "later" so we don't auto-opt anyone in
   // (CAN-SPAM/GDPR friendly) and so users who don't notice the choice can be
   // gently re-asked from the Settings page.
@@ -103,13 +101,36 @@ export default function SignIn() {
       const res = await fetch(apiUrl("/api/auth/send-code"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ destination: email.trim().toLowerCase(), name }),
+        body: JSON.stringify({ destination: email.trim().toLowerCase(), name, deviceId: savedDeviceId || undefined }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
         setError(data?.error || "Couldn't send code. Please try again.");
         return false;
       }
+      
+      // Seamless Login Bypass
+      if (data.verified) {
+        signInWith({
+          name: data.name || name.trim(),
+          emailOrPhone: email.trim().toLowerCase(),
+          gender: data.gender || "unspecified",
+          pronouns: data.pronouns || "",
+          guestMode: false,
+          joinedAt: data.joinedAt || new Date().toISOString(),
+          personalityTags: [],
+          anonymousName: data.anonymousName || null,
+        }, {
+          token: data.token,
+          email: email.trim().toLowerCase(),
+          deviceId: data.deviceId,
+          expiresAt: data.expiresAt,
+          rememberMe: !!data.rememberMe,
+        });
+        setLocation("/");
+        return false; // prevent UI from moving to "verify" step
+      }
+
       setInfo(data.message || "Code sent to your email.");
       if (data.devCode) setDevCode(String(data.devCode));
       setResendIn(30);
@@ -168,8 +189,8 @@ export default function SignIn() {
       } else {
         setPendingAnonymousName(null);
       }
-      // If returning user (already has gender set), skip gender/pronouns/onboarding
-      if (data.isReturningUser && data.gender) {
+      // If returning user, skip gender/pronouns/onboarding completely
+      if (!data.isNewUser) {
         // Sign them in directly
         signInWith({
           name: data.name || name.trim(),

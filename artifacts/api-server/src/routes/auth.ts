@@ -30,6 +30,29 @@ async function backfillRosaIdIfNull(email: string): Promise<void> {
     .where(and(eq(rosaUsers.emailOrPhone, email), isNull(rosaUsers.rosaId)));
 }
 
+async function generateUniquePartnerCode(): Promise<string> {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  for (let attempt = 0; attempt < 10; attempt++) {
+    let id = "LINK-";
+    for (let i = 0; i < 5; i++) {
+      id += chars[Math.floor(Math.random() * chars.length)];
+    }
+    const existing = await db.select({ partnerInviteCode: rosaUsers.partnerInviteCode })
+      .from(rosaUsers)
+      .where(eq(rosaUsers.partnerInviteCode, id))
+      .limit(1);
+    if (!existing[0]) return id;
+  }
+  return "LINK-" + Date.now().toString(36).toUpperCase().slice(-5);
+}
+
+async function backfillPartnerCodeIfNull(email: string): Promise<void> {
+  const partnerInviteCode = await generateUniquePartnerCode();
+  await db.update(rosaUsers)
+    .set({ partnerInviteCode })
+    .where(and(eq(rosaUsers.emailOrPhone, email), isNull(rosaUsers.partnerInviteCode)));
+}
+
 const router = Router();
 
 const AUTH_SECRET = (() => {
@@ -316,9 +339,83 @@ router.post("/auth/send-code", async (req, res) => {
   const ip = getClientIp(req);
   if (!rateLimit(ip)) return res.status(429).json({ ok: false, error: "Too many requests. Please wait a minute." });
 
-  const { destination, name } = req.body || {};
+  const { destination, name, deviceId } = req.body || {};
   if (!destination || typeof destination !== "string") return res.status(400).json({ ok: false, error: "Missing destination" });
   const dest = normalize(destination);
+
+  // Seamless Login Check: If the frontend sends a deviceId, check if it's trusted
+  if (deviceId && typeof deviceId === "string") {
+    const [device] = await db.select().from(trustedDevices)
+      .where(and(
+        eq(trustedDevices.email, dest),
+        sql`${trustedDevices.deviceId} IN (${deviceId}, ${deviceId + "_trusted"})`
+      )).limit(1);
+
+    if (device && device.rememberMe) {
+      try {
+        const { tokenVersion, isNewUser } = await ensureUserRow(dest);
+        const newDeviceId = crypto.randomBytes(18).toString("base64url");
+        const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30; // 30 days
+        
+        // Remove the old _trusted marker if it exists, since we're generating a fresh session
+        if (device.deviceId.endsWith("_trusted")) {
+          await db.delete(trustedDevices).where(eq(trustedDevices.deviceId, device.deviceId));
+        }
+
+        await db.insert(trustedDevices).values({
+          email: dest,
+          deviceId: newDeviceId,
+          deviceName: device.deviceName || "Recognized Device",
+          userAgent: req.headers["user-agent"]?.slice(0, 500) || "",
+          ipHash: hashIp(ip),
+          rememberMe: true,
+          expiresAt: new Date(exp * 1000),
+        });
+
+        const token = signSessionToken({ e: dest, exp, v: tokenVersion, d: newDeviceId, r: 1 });
+        const [profile] = await db
+          .select({
+            anonymousName: rosaUsers.anonymousName,
+            gender: rosaUsers.gender,
+            pronouns: rosaUsers.pronouns,
+            name: rosaUsers.name,
+            rosaId: rosaUsers.rosaId,
+            partnerInviteCode: rosaUsers.partnerInviteCode,
+            nickname: rosaUsers.nickname,
+            joinedAt: rosaUsers.createdAt,
+          })
+          .from(rosaUsers)
+          .where(eq(rosaUsers.emailOrPhone, dest))
+          .limit(1);
+
+        const isReturningUser = !!(profile?.gender);
+
+        return res.json({
+          ok: true,
+          verified: true,
+          channel: "email",
+          token,
+          deviceId: newDeviceId,
+          deviceName: device.deviceName || "Recognized Device",
+          expiresAt: new Date(exp * 1000).toISOString(),
+          rememberMe: true,
+          anonymousName: profile?.anonymousName ?? null,
+          isReturningUser,
+          isNewUser,
+          gender: profile?.gender ?? null,
+          pronouns: profile?.pronouns ?? null,
+          name: profile?.name ?? null,
+          rosaId: profile?.rosaId ?? null,
+          partnerInviteCode: profile?.partnerInviteCode ?? null,
+          nickname: profile?.nickname ?? null,
+          joinedAt: profile?.joinedAt?.toISOString() ?? null,
+        });
+      } catch (e) {
+        console.error("[Auth] seamless login failed:", e);
+        // Fall back to sending code
+      }
+    }
+  }
 
   let channel: "email" | "phone";
   if (isEmail(dest)) channel = "email";
@@ -392,7 +489,7 @@ async function ensureUserRow(
   email: string,
   marketingOptIn?: "yes" | "later" | "never",
   name?: string,
-): Promise<{ tokenVersion: number }> {
+): Promise<{ tokenVersion: number, isNewUser: boolean }> {
   const cleanName = (name || "").trim().slice(0, 80);
   const existing = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
   if (existing[0]) {
@@ -419,7 +516,10 @@ async function ensureUserRow(
     if (!existing[0].rosaId) {
       await backfillRosaIdIfNull(email);
     }
-    return { tokenVersion: existing[0].tokenVersion ?? 1 };
+    if (!existing[0].partnerInviteCode) {
+      await backfillPartnerCodeIfNull(email);
+    }
+    return { tokenVersion: existing[0].tokenVersion ?? 1, isNewUser: false };
   }
 
   // New user: try to insert with a freshly minted anonymous name. If the
@@ -437,17 +537,21 @@ async function ensureUserRow(
           marketingOptIn: marketingOptIn ?? "later",
           anonymousName,
           rosaId,
+          partnerInviteCode: await generateUniquePartnerCode(),
         })
         .onConflictDoNothing({ target: rosaUsers.emailOrPhone })
         .returning();
-      if (row) return { tokenVersion: row.tokenVersion ?? 1 };
+      if (row) return { tokenVersion: row.tokenVersion ?? 1, isNewUser: true };
       // emailOrPhone race: another request created it; re-read and try a
       // best-effort backfill in case that other writer ran out of attempts.
       const again = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
       if (again[0] && !again[0].anonymousName) {
         await backfillAnonymousNameIfNull(email);
       }
-      return { tokenVersion: again[0]?.tokenVersion ?? 1 };
+      if (again[0] && !again[0].partnerInviteCode) {
+        await backfillPartnerCodeIfNull(email);
+      }
+      return { tokenVersion: again[0]?.tokenVersion ?? 1, isNewUser: false };
     } catch (err: any) {
       // 23505 on anonymous_name unique → regenerate + retry. Anything else bubbles.
       if (err?.code !== "23505") throw err;
@@ -456,7 +560,7 @@ async function ensureUserRow(
       const detail = String(err?.constraint || err?.detail || "");
       if (detail.includes("email")) {
         const again = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
-        return { tokenVersion: again[0]?.tokenVersion ?? 1 };
+        return { tokenVersion: again[0]?.tokenVersion ?? 1, isNewUser: false };
       }
       // Else: anonymous_name collision — loop and try a different one.
     }
@@ -472,18 +576,23 @@ async function ensureUserRow(
       emailOrPhone: email,
       name: cleanName || (email.split("@")[0] || "Friend"),
       marketingOptIn: marketingOptIn ?? "later",
+      partnerInviteCode: await generateUniquePartnerCode(),
     })
     .onConflictDoNothing({ target: rosaUsers.emailOrPhone })
     .returning();
   if (row) {
     if (!row.anonymousName) await backfillAnonymousNameIfNull(email);
-    return { tokenVersion: row.tokenVersion ?? 1 };
+    if (!row.partnerInviteCode) await backfillPartnerCodeIfNull(email);
+    return { tokenVersion: row.tokenVersion ?? 1, isNewUser: true };
   }
   const again = await db.select().from(rosaUsers).where(eq(rosaUsers.emailOrPhone, email)).limit(1);
   if (again[0] && !again[0].anonymousName) {
     await backfillAnonymousNameIfNull(email);
   }
-  return { tokenVersion: again[0]?.tokenVersion ?? 1 };
+  if (again[0] && !again[0].partnerInviteCode) {
+    await backfillPartnerCodeIfNull(email);
+  }
+  return { tokenVersion: again[0]?.tokenVersion ?? 1, isNewUser: false };
 }
 
 router.post("/auth/verify-code", async (req, res) => {
@@ -511,16 +620,16 @@ router.post("/auth/verify-code", async (req, res) => {
   const ip = getClientIp(req);
 
   try {
-    const { tokenVersion } = await ensureUserRow(
+    const { tokenVersion, isNewUser } = await ensureUserRow(
       dest,
       marketingOptIn !== undefined ? cleanMarketingPref(marketingOptIn) : undefined,
       typeof name === "string" ? name : undefined,
     );
-    // Link partner if partner code (ROSA ID) provided at signup
+    // Link partner if partner code provided at signup
     if (partnerCode && typeof partnerCode === 'string' && partnerCode.trim()) {
       try {
         const partnerResult = await db.select({ emailOrPhone: rosaUsers.emailOrPhone, name: rosaUsers.name })
-          .from(rosaUsers).where(eq(rosaUsers.rosaId, partnerCode.trim().toUpperCase())).limit(1);
+          .from(rosaUsers).where(eq(rosaUsers.partnerInviteCode, partnerCode.trim().toUpperCase())).limit(1);
         if (partnerResult.length > 0) {
           const partnerEmail = partnerResult[0].emailOrPhone;
           await db.execute(sql`
@@ -556,6 +665,7 @@ router.post("/auth/verify-code", async (req, res) => {
         pronouns: rosaUsers.pronouns,
         name: rosaUsers.name,
         rosaId: rosaUsers.rosaId,
+        partnerInviteCode: rosaUsers.partnerInviteCode,
         nickname: rosaUsers.nickname,
         joinedAt: rosaUsers.createdAt,
       })
@@ -576,10 +686,12 @@ router.post("/auth/verify-code", async (req, res) => {
       rememberMe: remember,
       anonymousName: profile?.anonymousName ?? null,
       isReturningUser,
+      isNewUser,
       gender: profile?.gender ?? null,
       pronouns: profile?.pronouns ?? null,
       name: profile?.name ?? null,
       rosaId: profile?.rosaId ?? null,
+      partnerInviteCode: profile?.partnerInviteCode ?? null,
       nickname: profile?.nickname ?? null,
       joinedAt: profile?.joinedAt?.toISOString() ?? null,
     });
@@ -651,6 +763,7 @@ router.get("/auth/me", requireSession, async (req: any, res) => {
       // anyone but the user themselves.
       anonymousName: user.anonymousName ?? null,
       rosaId: user.rosaId ?? null,
+      partnerInviteCode: user.partnerInviteCode ?? null,
       nickname: user.nickname ?? null,
       nicknameChanges: user.nicknameChanges ?? 0,
       bio: user.bio ?? null,
@@ -722,6 +835,24 @@ router.post("/auth/logout-all", requireSession, async (req: any, res) => {
 router.post("/auth/logout", requireSession, async (req: any, res) => {
   const { email, deviceId } = req.session;
   if (deviceId) {
+    // Before deleting the active device session, explicitly preserve trust
+    // if this device was marked as "Remember Me". This allows seamless login
+    // later via the _trusted suffix, while keeping the old token securely revoked.
+    const [device] = await db.select().from(trustedDevices)
+      .where(and(eq(trustedDevices.email, email), eq(trustedDevices.deviceId, deviceId))).limit(1);
+    
+    if (device && device.rememberMe) {
+      await db.insert(trustedDevices).values({
+        email: device.email,
+        deviceId: device.deviceId + "_trusted",
+        deviceName: device.deviceName,
+        userAgent: device.userAgent,
+        ipHash: device.ipHash,
+        rememberMe: true,
+        expiresAt: device.expiresAt,
+      });
+    }
+
     await db.delete(trustedDevices).where(and(eq(trustedDevices.email, email), eq(trustedDevices.deviceId, deviceId)));
   }
   res.json({ ok: true });

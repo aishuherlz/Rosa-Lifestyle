@@ -190,6 +190,28 @@ export default function PartnerPage() {
         )}
       </div>
 
+      {user?.partnerInviteCode && !isPartnerUser && (
+        <Card className="border-[#B06B8B] bg-gradient-to-r from-[#FBEAF0] to-[#FDF6F0]">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-[#9E7B8A] font-medium uppercase tracking-wider mb-1">Your Partner Code</p>
+              <p className="text-xl font-mono font-bold text-[#6B3050] tracking-[0.2em]">{user.partnerInviteCode}</p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="border-[#B06B8B] text-[#B06B8B] hover:bg-[#B06B8B] hover:text-white"
+              onClick={() => {
+                navigator.clipboard.writeText(user.partnerInviteCode || "");
+                toast({ title: "Copied!", description: "Partner code copied to clipboard 🌹" });
+              }}
+            >
+              Copy
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full bg-[#FDF6F0] border border-[#E8C4B8]">
           <TabsTrigger value="guide" className="flex-1 text-xs">Partner Guide</TabsTrigger>

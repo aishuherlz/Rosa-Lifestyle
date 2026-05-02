@@ -23,6 +23,7 @@ export type User = {
   // Surfaced here so the Settings screen can show "your anonymous name is …".
   anonymousName?: string | null;
   rosaId?: string | null;
+  partnerInviteCode?: string | null;
   nickname?: string | null;
   nicknameChanges?: number;
   bio?: string | null;
@@ -109,7 +110,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
             return;
           }
           if (!r.ok) return;
-          const body = await r.json().catch(() => null) as { user?: { anonymousName?: string | null; rosaId?: string | null; nickname?: string | null; nicknameChanges?: number; bio?: string | null; profilePhotoUrl?: string | null } | null } | null;
+          const body = await r.json().catch(() => null) as { user?: { anonymousName?: string | null; rosaId?: string | null; partnerInviteCode?: string | null; nickname?: string | null; nicknameChanges?: number; bio?: string | null; profilePhotoUrl?: string | null } | null } | null;
           const serverUser = body?.user;
           if (!serverUser) return;
           setUserState((prev) => {
@@ -118,6 +119,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
               ...prev,
               anonymousName: serverUser.anonymousName ?? prev.anonymousName,
               rosaId: serverUser.rosaId ?? prev.rosaId,
+              partnerInviteCode: serverUser.partnerInviteCode ?? prev.partnerInviteCode,
               nickname: serverUser.nickname ?? prev.nickname,
               nicknameChanges: serverUser.nicknameChanges ?? prev.nicknameChanges,
               bio: serverUser.bio ?? prev.bio,
