@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Settings, LogOut, User, Bell, Tag, Shield, Crown, Globe, Clock, Sparkles } from "lucide-react";
+import { Settings, LogOut, User, Bell, Tag, Shield, Crown, Globe, Clock, Sparkles, ShieldCheck, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { TrustedDevices } from "@/components/trusted-devices";
 import { MarketingPreferences } from "@/components/marketing-preferences";
 import { RosaProfileCard } from "@/components/rosa-profile-card";
+import { forgetDevice } from "@/lib/auth-storage";
 
 const PERSONALITY_TAGS = ["feminist", "spiritual", "adventurous", "gentle", "bold", "self-love", "strength", "growth"];
 
@@ -105,6 +106,53 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-serif text-foreground">Settings</h1>
         <p className="text-muted-foreground mt-1">Make ROSA your own.</p>
       </motion.div>
+
+      {/* Device Trust Status Banner */}
+      {(() => {
+        const deviceId = typeof window !== "undefined" ? localStorage.getItem("rosa_device_id") : null;
+        if (deviceId) {
+          return (
+            <Card className="border-green-200 bg-green-50">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="w-5 h-5 text-green-600 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-green-800">This device is trusted ✔</p>
+                      <p className="text-xs text-green-600 mt-0.5">You won't need to verify your email again on this device.</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-green-300 text-green-700 hover:bg-green-100 shrink-0 text-xs"
+                    onClick={() => {
+                      forgetDevice();
+                      toast({ title: "Device trust removed", description: "You'll need to verify your email next time." });
+                      window.location.reload();
+                    }}
+                  >
+                    Remove trust
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        }
+        return (
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <ShieldOff className="w-5 h-5 text-amber-600 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">This device is not remembered</p>
+                  <p className="text-xs text-amber-600 mt-0.5">Sign in and check &quot;Remember me&quot; to skip email verification next time.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Subscription Status */}
       <Card

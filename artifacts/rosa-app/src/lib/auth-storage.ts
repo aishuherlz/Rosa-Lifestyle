@@ -96,8 +96,18 @@ export function loadSession(): StoredSession | null {
 }
 
 export function clearSession(): void {
+  // Intentionally preserve "rosa_device_id" so the backend's _trusted marker
+  // still works after logout — a "Remember Me" user should get seamless login
+  // on their next visit without re-verifying via email code.
   try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(REMEMBER_KEY); } catch {}
   try { sessionStorage.removeItem(STORAGE_KEY); sessionStorage.removeItem(REMEMBER_KEY); } catch {}
+}
+
+/** Call this only when the user explicitly wants to FORGET this device (e.g. a
+ *  "Remove this device" button in Settings). Removes the device trust marker. */
+export function forgetDevice(): void {
+  clearSession();
+  try { localStorage.removeItem("rosa_device_id"); } catch {}
 }
 
 export function getAuthHeader(): Record<string, string> {

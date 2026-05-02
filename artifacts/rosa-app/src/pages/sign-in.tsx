@@ -35,7 +35,8 @@ export default function SignIn() {
   const [pronouns, setPronouns] = useState("");
   const [customPronouns, setCustomPronouns] = useState("");
   const savedDeviceId = typeof window !== "undefined" ? localStorage.getItem("rosa_device_id") : null;
-  const [rememberMe, setRememberMe] = useState(savedDeviceId ? true : true);
+  // Default to true when device is already remembered, false for new devices
+  const [rememberMe, setRememberMe] = useState(!!savedDeviceId);
   const isDeviceRemembered = !!savedDeviceId;
   // Marketing email consent. Default "later" so we don't auto-opt anyone in
   // (CAN-SPAM/GDPR friendly) and so users who don't notice the choice can be
@@ -416,21 +417,32 @@ export default function SignIn() {
                   </>}
                 </div>
 
-                {!isDeviceRemembered && <div className="flex items-start gap-2 pt-1">
-                  <Checkbox
-                    id="remember-me"
-                    checked={rememberMe}
-                    onCheckedChange={(v) => setRememberMe(v === true)}
-                    data-testid="checkbox-remember-me"
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <Label htmlFor="remember-me" className="text-sm cursor-pointer">Remember me on this device</Label>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {rememberMe ? "Stay signed in for 30 days." : "Sign me out when I close my browser."}
-                    </p>
+                {/* Remember Me — always visible so user can see & change their preference */}
+                <div className="space-y-2">
+                  {isDeviceRemembered && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+                      <span className="text-green-600 text-sm">✔</span>
+                      <p className="text-xs text-green-700 font-medium">This device is trusted — you won't need to verify again.</p>
+                    </div>
+                  )}
+                  <div className="flex items-start gap-2 pt-1">
+                    <Checkbox
+                      id="remember-me"
+                      checked={rememberMe}
+                      onCheckedChange={(v) => setRememberMe(v === true)}
+                      data-testid="checkbox-remember-me"
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <Label htmlFor="remember-me" className="text-sm cursor-pointer">Remember me on this device</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {rememberMe
+                          ? "✔ Stay signed in for 30 days on this device."
+                          : "You'll be asked to verify next time you log in."}
+                      </p>
+                    </div>
                   </div>
-                </div>}
+                </div>
 
                 {/* Marketing email opt-in — three explicit choices so we have
                     real consent (not a pre-checked dark pattern). "Later" is
