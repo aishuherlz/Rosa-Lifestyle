@@ -267,6 +267,41 @@ router.post("/circles/private/:id/messages", requireSession, async (req: any, re
 
 // Auto-apply DB schema updates for sync/share columns
 db.execute(sql`
+  CREATE TABLE IF NOT EXISTS partner_links (
+    id SERIAL PRIMARY KEY,
+    user_email TEXT NOT NULL,
+    partner_email TEXT NOT NULL,
+    share_cycle BOOLEAN DEFAULT false,
+    share_mood BOOLEAN DEFAULT false,
+    share_wishlist BOOLEAN DEFAULT false,
+    share_milestones BOOLEAN DEFAULT false,
+    share_fitness BOOLEAN DEFAULT false,
+    share_sleep BOOLEAN DEFAULT false,
+    share_skin BOOLEAN DEFAULT false,
+    share_travel BOOLEAN DEFAULT false,
+    share_food BOOLEAN DEFAULT false,
+    share_journal BOOLEAN DEFAULT false,
+    share_goals BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_email, partner_email)
+  );
+`).catch(console.error);
+
+db.execute(sql`
+  CREATE TABLE IF NOT EXISTS partner_notifications (
+    id SERIAL PRIMARY KEY,
+    from_email TEXT NOT NULL,
+    to_email TEXT NOT NULL,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    data JSONB DEFAULT '{}',
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT NOW()
+  );
+`).catch(console.error);
+
+db.execute(sql`
   ALTER TABLE partner_links 
   ADD COLUMN IF NOT EXISTS share_sleep BOOLEAN DEFAULT false,
   ADD COLUMN IF NOT EXISTS share_skin BOOLEAN DEFAULT false,
@@ -274,7 +309,17 @@ db.execute(sql`
   ADD COLUMN IF NOT EXISTS share_food BOOLEAN DEFAULT false,
   ADD COLUMN IF NOT EXISTS share_journal BOOLEAN DEFAULT false,
   ADD COLUMN IF NOT EXISTS share_goals BOOLEAN DEFAULT false;
-`).catch(console.error);
+`).catch(() => {});
+
+// Ensure the unique constraint exists (Postgres 9.1+ syntax)
+db.execute(sql`
+  DO $$ 
+  BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'partner_links_user_partner_unique') THEN
+      ALTER TABLE partner_links ADD CONSTRAINT partner_links_user_partner_unique UNIQUE (user_email, partner_email);
+    END IF;
+  END $$;
+`).catch(err => console.error("Constraint repair failed:", err.message));
 
 db.execute(sql`
   ALTER TABLE rosa_users
@@ -296,9 +341,11 @@ router.post("/partner/notify", requireSession, async (req: any, res) => {
   const email = req.rosaUser?.emailOrPhone;
   const { toEmail, type, title, message, data } = req.body;
   try {
+    const from = String(email || "").toLowerCase().trim();
+    const to = String(toEmail || "").toLowerCase().trim();
     await db.execute(sql`
       INSERT INTO partner_notifications (from_email, to_email, type, title, message, data)
-      VALUES (${email}, ${toEmail}, ${type}, ${title}, ${message}, ${JSON.stringify(data || {})})
+      VALUES (${from}, ${to}, ${type}, ${title}, ${message}, ${JSON.stringify(data || {})})
     `);
     res.json({ ok: true });
   } catch (err: any) {
@@ -342,28 +389,79 @@ router.put("/partner/notifications/:id/read", requireSession, async (req: any, r
 router.post("/partner/link", requireSession, async (req: any, res) => {
   const email = req.rosaUser?.emailOrPhone;
   const { partnerInviteCode } = req.body;
+  
+  console.log(`[PARTNER LINK] Request from ${email} with code: ${partnerInviteCode}`);
+  
   try {
+    const code = String(partnerInviteCode || "").trim().toUpperCase();
+    if (!code) {
+      console.log(`[PARTNER LINK] Rejected: empty code`);
+      return res.status(400).json({ error: "Invite code required" });
+    }
+
     const target = await db.execute(sql`
-      SELECT email_or_phone, name FROM rosa_users WHERE partner_invite_code = ${partnerInviteCode}
+      SELECT email_or_phone, name FROM rosa_users WHERE UPPER(TRIM(partner_invite_code)) = ${code}
     `);
-    if (!target.rows.length) return res.status(404).json({ error: "Partner not found with that invite code" });
-    const partnerEmail = (target.rows[0] as any).email_or_phone;
-    if (partnerEmail === email) return res.status(400).json({ error: "Cannot link to yourself" });
     
-    // Bidirectional linking so both can share preferences independently
-    await db.execute(sql`
-      INSERT INTO partner_links (user_email, partner_email)
-      VALUES (${email}, ${partnerEmail}), (${partnerEmail}, ${email})
-      ON CONFLICT (user_email, partner_email) DO NOTHING
-    `);
-    await db.execute(sql`
-      INSERT INTO partner_notifications (from_email, to_email, type, title, message)
-      VALUES (${email}, ${partnerEmail}, 'partner_request', 'Partner Linked 🌹',
-        ${req.rosaUser.name + ' has successfully linked with you on ROSA'})
-    `);
-    res.json({ ok: true, partnerName: (target.rows[0] as any).name });
+    if (!target.rows.length) {
+      console.log(`[PARTNER LINK] Rejected: code ${code} not found in DB`);
+      return res.status(404).json({ error: "Partner not found with that invite code. Please check the code and try again." });
+    }
+    
+    const partnerEmail = (target.rows[0] as any).email_or_phone;
+    const partnerName = (target.rows[0] as any).name;
+    
+    if (partnerEmail.toLowerCase() === email.toLowerCase()) {
+      console.log(`[PARTNER LINK] Rejected: user ${email} tried to link to self`);
+      return res.status(400).json({ error: "Cannot link to yourself" });
+    }
+    
+    console.log(`[PARTNER LINK] Linking ${email} <-> ${partnerEmail}`);
+    
+    // Use a transaction for the bidirectional link
+    await db.transaction(async (tx) => {
+      const u1 = email.toLowerCase().trim();
+      const u2 = partnerEmail.toLowerCase().trim();
+
+      console.log(`[PARTNER LINK] Executing inserts for: ${u1} and ${u2}`);
+
+      // 1. Create the bidirectional links (Manual check to avoid ON CONFLICT syntax issues)
+      const existing1 = await tx.execute(sql`SELECT id FROM partner_links WHERE user_email = ${u1} AND partner_email = ${u2}`);
+      if (!existing1.rows.length) {
+        await tx.execute(sql`INSERT INTO partner_links (user_email, partner_email) VALUES (${u1}, ${u2})`);
+      }
+      
+      const existing2 = await tx.execute(sql`SELECT id FROM partner_links WHERE user_email = ${u2} AND partner_email = ${u1}`);
+      if (!existing2.rows.length) {
+        await tx.execute(sql`INSERT INTO partner_links (user_email, partner_email) VALUES (${u2}, ${u1})`);
+      }
+      
+      // 2. Mark users as linked in rosa_users table (for easier querying elsewhere)
+      await tx.execute(sql`
+        UPDATE rosa_users SET partner_linked = true 
+        WHERE email_or_phone IN (${email.toLowerCase()}, ${partnerEmail.toLowerCase()})
+      `);
+      
+      // 3. Send notification to the partner
+      try {
+        const from = email.trim();
+        const to = partnerEmail.trim();
+        const senderName = req.rosaUser.name || 'Your partner';
+        await tx.execute(sql`
+          INSERT INTO partner_notifications (from_email, to_email, type, title, message)
+          VALUES (${from}, ${to}, 'partner_request', 'Partner Linked 🌹',
+            ${senderName + ' has successfully linked with you on ROSA'})
+        `);
+      } catch (notifyErr) {
+        console.error(`[PARTNER LINK] Notification failed (non-fatal):`, notifyErr);
+      }
+    });
+
+    console.log(`[PARTNER LINK] Successfully linked ${email} with ${partnerEmail}`);
+    res.json({ ok: true, partnerName });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error(`[PARTNER LINK] CRITICAL ERROR for ${email}:`, err);
+    res.status(500).json({ error: `Linking failed: ${err.message}` });
   }
 });
 
@@ -374,6 +472,7 @@ router.get("/partner/shared-data", requireSession, async (req: any, res) => {
     // Check if my partner has shared things with me
     const link = await db.execute(sql`
       SELECT * FROM partner_links WHERE partner_email = ${email}
+      ORDER BY created_at DESC LIMIT 1
     `);
     if (!link.rows.length) return res.json({ linked: false });
     const partnerLink = link.rows[0] as any;
@@ -439,6 +538,19 @@ router.put("/partner/share-prefs", requireSession, async (req: any, res) => {
     shareSleep, shareSkin, shareTravel, shareFood, shareJournal, shareGoals
   } = req.body;
   try {
+    let targetEmail = partnerEmail;
+    if (!targetEmail) {
+      // If client didn't provide partnerEmail, look it up from existing links
+      const link = await db.execute(sql`
+        SELECT partner_email FROM partner_links WHERE user_email = ${email} LIMIT 1
+      `);
+      if (link.rows.length > 0) {
+        targetEmail = (link.rows[0] as any).partner_email;
+      }
+    }
+
+    if (!targetEmail) return res.status(400).json({ error: "No partner link found to update" });
+
     await db.execute(sql`
       UPDATE partner_links SET
         share_cycle = ${!!shareCycle},
@@ -452,7 +564,7 @@ router.put("/partner/share-prefs", requireSession, async (req: any, res) => {
         share_food = ${!!shareFood},
         share_journal = ${!!shareJournal},
         share_goals = ${!!shareGoals}
-      WHERE user_email = ${email} AND partner_email = ${partnerEmail}
+      WHERE user_email = ${email} AND partner_email = ${targetEmail}
     `);
     res.json({ ok: true });
   } catch (err: any) {

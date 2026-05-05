@@ -636,24 +636,35 @@ router.post("/auth/verify-code", async (req, res) => {
       typeof name === "string" ? name : undefined,
     );
     // Link partner if partner code provided at signup
+    // Link partner if partner code provided at signup
     if (partnerCode && typeof partnerCode === 'string' && partnerCode.trim()) {
       try {
+        const cleanCode = partnerCode.trim().toUpperCase();
         const partnerResult = await db.select({ emailOrPhone: rosaUsers.emailOrPhone, name: rosaUsers.name })
-          .from(rosaUsers).where(eq(rosaUsers.partnerInviteCode, partnerCode.trim().toUpperCase())).limit(1);
+          .from(rosaUsers).where(eq(rosaUsers.partnerInviteCode, cleanCode)).limit(1);
         if (partnerResult.length > 0) {
-          const partnerEmail = partnerResult[0].emailOrPhone;
-          await db.execute(sql`
-            INSERT INTO partner_links (user_email, partner_email)
-            VALUES (${dest}, ${partnerEmail})
-            ON CONFLICT DO NOTHING
-          `);
-          await db.execute(sql`
-            INSERT INTO partner_notifications (from_email, to_email, type, title, message)
-            VALUES (${dest}, ${partnerEmail}, 'partner_linked', 'New Partner Request 🌹',
-              ${(typeof name === "string" ? name : "Someone") + " has linked with you on ROSA using your ROSA ID"})
-          `);
+          const u1 = dest.toLowerCase().trim();
+          const u2 = partnerResult[0].emailOrPhone.toLowerCase().trim();
+          
+          await db.transaction(async (tx) => {
+            // Bidirectional linking (Manual check to avoid ON CONFLICT syntax issues)
+            const e1 = await tx.execute(sql`SELECT id FROM partner_links WHERE user_email = ${u1} AND partner_email = ${u2}`);
+            if (!e1.rows.length) {
+              await tx.execute(sql`INSERT INTO partner_links (user_email, partner_email) VALUES (${u1}, ${u2})`);
+            }
+            const e2 = await tx.execute(sql`SELECT id FROM partner_links WHERE user_email = ${u2} AND partner_email = ${u1}`);
+            if (!e2.rows.length) {
+              await tx.execute(sql`INSERT INTO partner_links (user_email, partner_email) VALUES (${u2}, ${u1})`);
+            }
+            
+            await tx.execute(sql`
+              INSERT INTO partner_notifications (from_email, to_email, type, title, message)
+              VALUES (${u1}, ${u2}, 'partner_linked', 'New Partner Request 🌹',
+                ${(typeof name === "string" ? name : "Someone") + " has linked with you on ROSA using your ROSA ID"})
+            `);
+          });
         }
-      } catch (e) { console.error("Partner link error:", e); }
+      } catch (e) { console.error("Partner link error during signup:", e); }
     }
 
     await db.insert(trustedDevices).values({
