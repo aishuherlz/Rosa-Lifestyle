@@ -13,7 +13,6 @@ import NotFound from "@/pages/not-found";
 import Intro from "@/pages/intro";
 import SignIn from "@/pages/sign-in";
 import Home from "@/pages/home";
-import MaleDashboard from "@/pages/male-dashboard";
 import MoodPage from "@/pages/mood";
 import PeriodPage from "@/pages/period";
 import PartnerPage from "@/pages/partner";
@@ -80,20 +79,13 @@ function Router() {
       <Route path="/">
         <ProtectedRoute
           component={() => {
-            if (!user?.gender) return <Redirect to="/sign-in" />;
-            const isMale = user.gender.toLowerCase() === "male" || user.gender.toLowerCase() === "man";
-            return isMale ? <MaleDashboard /> : <Home />;
+            if (user && !user.gender && !user.guestMode) return <Redirect to="/sign-in" />;
+            return <Home />;
           }}
         />
       </Route>
       <Route path="/mood">{() => <ProtectedRoute component={MoodPage} />}</Route>
-      <Route path="/period">
-        {() => {
-          const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
-          if (isMale) return <Redirect to="/" />;
-          return <ProtectedRoute component={PeriodPage} />;
-        }}
-      </Route>
+      <Route path="/period">{() => <ProtectedRoute component={PeriodPage} />}</Route>
       <Route path="/partner">{() => <ProtectedRoute component={PartnerPage} />}</Route>
       <Route path="/wishlist">{() => <ProtectedRoute component={WishlistPage} />}</Route>
       <Route path="/milestones">{() => <ProtectedRoute component={MilestonesPage} />}</Route>
@@ -149,11 +141,11 @@ function App() {
         const perm = await requestNotifPermission();
         if (perm === "granted") {
           const whispers = [
-            "🌹 Good morning, sister. Take a soft breath.",
+            "🌹 Good morning. Take a soft breath.",
             "🌹 You are someone's answered prayer today.",
             "🌹 Romanticise your morning. You deserve it.",
             "🌹 Bloom check-in: how is your heart today?",
-            "🌹 Your softness is your superpower.",
+            "🌹 Your kindness is your superpower.",
           ];
           const w = whispers[new Date().getDate() % whispers.length];
           showLocalNotification("ROSA 🌹", w, "/affirmation");

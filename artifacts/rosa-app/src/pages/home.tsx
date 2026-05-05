@@ -11,13 +11,15 @@ import {
   CloudRain, Sun, Cloud, Wind,
   HeartPulse, CalendarHeart, Droplets, CalendarDays,
   Utensils, Dumbbell, Shirt, Map, Timer, Gift, Crown,
-  ClipboardList, BookHeart, Target, Sparkles, Moon, FlameKindling, Flower2,
+  ClipboardList, BookHeart, Target, Sparkles, Moon, FlameKindling, Flower2, Users, Info
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import confetti from "canvas-confetti";
 import { useToast } from "@/hooks/use-toast";
 import { scopedStorage } from "@/lib/scoped-storage";
+import { apiUrl } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type PeriodData = { lastPeriodDate?: string; cycleLength?: number };
 
@@ -43,7 +45,7 @@ const DAILY_QUOTES = [
 ];
 
 export default function Home() {
-  const { user } = useUser();
+  const { user, getAuthHeaders } = useUser();
   const { plan, daysLeftInTrial, isPremium } = useSubscription();
   const { garden, checkIn, wellnessScore } = useGarden();
   const [weather, setWeather] = useState<{ temp: number; code: number } | null>(null);
@@ -53,11 +55,24 @@ export default function Home() {
   const [shareAch, setShareAch] = useState<{ id: string; emoji: string; title: string; description?: string } | null>(null);
   const { toast } = useToast();
 
+  const [partnerData, setPartnerData] = useState<any>(null);
+  const [isPartnerLoading, setIsPartnerLoading] = useState(false);
+
   const today = new Date();
   const quote = DAILY_QUOTES[today.getDate() % DAILY_QUOTES.length];
-  const cycleInfo = getCyclePhase(periodData);
+  const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
+  
+  const cycleInfo = isMale && partnerData?.partnerData?.cycle?.logs?.[0] 
+    ? getCyclePhase({ 
+        lastPeriodDate: partnerData.partnerData.cycle.logs[0].periodStart,
+        cycleLength: partnerData.partnerData.cycle.logs[0].cycleLength 
+      })
+    : getCyclePhase(periodData);
+
   const todayStr = format(today, "yyyy-MM-dd");
   const alreadyCheckedIn = garden.lastCheckIn === todayStr;
+
+  const greetingSuffix = isMale ? "Sir" : (user?.name || "Beautiful");
 
   useEffect(() => {
     const fetchWeather = async (lat: number, lon: number) => {
@@ -76,6 +91,27 @@ export default function Home() {
       fetchWeather(43.6532, -79.3832); // fallback: Toronto
     }
   }, []);
+
+  useEffect(() => {
+    if (isMale) {
+      fetchPartnerData();
+    }
+  }, [isMale]);
+
+  const fetchPartnerData = async () => {
+    setIsPartnerLoading(true);
+    try {
+      const res = await fetch(apiUrl("/api/partner/shared-data"), { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (data.linked) {
+        setPartnerData(data);
+      }
+    } catch (e) {
+      console.error("[HOME] Failed to fetch partner data:", e);
+    } finally {
+      setIsPartnerLoading(false);
+    }
+  };
 
   const getWeatherIcon = (code: number) => {
     if (code <= 3) return <Sun className="w-7 h-7 text-amber-500" />;
@@ -97,10 +133,10 @@ export default function Home() {
     const { newStreak, celebration } = checkIn();
     setCheckedInToday(true);
     if (celebration === "confetti") {
-      confetti({ particleCount: 100, spread: 80, colors: ["#be185d", "#f9a8d4", "#fbbf24"] });
+      confetti({ particleCount: 100, spread: 80, colors: ["#2563eb", "#60a5fa", "#fbbf24"] });
       toast({ title: "7-day streak! 🎉", description: "You're on fire! Keep going." });
     } else if (celebration === "bloom") {
-      confetti({ particleCount: 200, spread: 140, colors: ["#be185d", "#f9a8d4", "#fde68a", "#fbcfe8"] });
+      confetti({ particleCount: 200, spread: 140, colors: ["#2563eb", "#60a5fa", "#fde68a", "#fbcfe8"] });
       toast({ title: "30-day streak! 🌹🌹🌹", description: "A full bloom! You're incredible." });
     } else {
       toast({ title: `Day ${newStreak} streak! 🌹`, description: "Your garden is growing." });
@@ -108,26 +144,26 @@ export default function Home() {
   };
 
   const QUICK_LINKS = [
-    { href: "/mood", label: "Mood", icon: HeartPulse, color: "text-rose-500 bg-rose-50" },
-    { href: "/period", label: "Cycle", icon: Droplets, color: "text-pink-500 bg-pink-50" },
+    { href: "/mood", label: "Mood", icon: HeartPulse, color: isMale ? "text-blue-500 bg-blue-50" : "text-rose-500 bg-rose-50" },
+    { href: "/period", label: isMale ? "Partner Cycle" : "Cycle", icon: Droplets, color: isMale ? "text-blue-500 bg-blue-50" : "text-pink-500 bg-pink-50" },
     { href: "/food", label: "Food", icon: Utensils, color: "text-amber-500 bg-amber-50", premium: true },
     { href: "/health", label: "Health", icon: Dumbbell, color: "text-emerald-500 bg-emerald-50" },
-    { href: "/outfit", label: "Outfits", icon: Shirt, color: "text-fuchsia-500 bg-fuchsia-50", premium: true },
+    { href: "/outfit", label: "Outfits", icon: Shirt, color: isMale ? "text-blue-400 bg-blue-50" : "text-fuchsia-500 bg-fuchsia-50", premium: true },
     { href: "/travel", label: "Travel", icon: Map, color: "text-sky-500 bg-sky-50" },
     { href: "/milestones", label: "Milestones", icon: Timer, color: "text-indigo-500 bg-indigo-50" },
     { href: "/wishlist", label: "Wishlist", icon: Gift, color: "text-orange-500 bg-orange-50" },
-    { href: "/journal", label: "Journal", icon: BookHeart, color: "text-rose-400 bg-rose-50" },
+    { href: "/journal", label: "Journal", icon: BookHeart, color: isMale ? "text-blue-400 bg-blue-50" : "text-rose-400 bg-rose-50" },
     { href: "/goals", label: "Goals", icon: Target, color: "text-teal-500 bg-teal-50" },
     { href: "/challenges", label: "Challenges", icon: FlameKindling, color: "text-red-500 bg-red-50" },
     { href: "/skin", label: "Skin", icon: Sparkles, color: "text-violet-500 bg-violet-50" },
     { href: "/letters", label: "Letters", icon: Moon, color: "text-purple-500 bg-purple-50" },
     { href: "/reminders", label: "Reminders", icon: CalendarDays, color: "text-violet-400 bg-violet-50" },
-    { href: "/partner", label: "Partner", icon: CalendarHeart, color: "text-rose-400 bg-rose-50" },
+    { href: "/partner", label: "Partner", icon: CalendarHeart, color: isMale ? "text-blue-400 bg-blue-50" : "text-rose-400 bg-rose-50" },
     { href: "/surveys", label: "Surveys", icon: ClipboardList, color: "text-blue-500 bg-blue-50" },
-    { href: "/affirmation", label: "Affirmation", icon: Sparkles, color: "text-rose-500 bg-rose-50" },
-    { href: "/rose-wall", label: "Rose Wall", icon: BookHeart, color: "text-pink-500 bg-pink-50" },
+    { href: "/affirmation", label: "Affirmation", icon: Sparkles, color: isMale ? "text-blue-500 bg-blue-50" : "text-rose-500 bg-rose-50" },
+    { href: "/rose-wall", label: "Rose Wall", icon: BookHeart, color: isMale ? "text-blue-400 bg-blue-50" : "text-pink-500 bg-pink-50" },
     { href: "/rose-quiz", label: "Rose Quiz", icon: Sparkles, color: "text-violet-500 bg-violet-50" },
-    { href: "/sos", label: "Period SOS", icon: HeartPulse, color: "text-red-500 bg-red-50" },
+    { href: "/sos", label: "Support", icon: HeartPulse, color: "text-red-500 bg-red-50" },
     { href: "/sanctuary", label: "Sanctuary", icon: Moon, color: "text-indigo-500 bg-indigo-50" },
     { href: "/wisdom", label: "Wisdom", icon: BookHeart, color: "text-amber-500 bg-amber-50" },
   ];
@@ -138,8 +174,7 @@ export default function Home() {
     const weekAgo = Date.now() - 7 * 86400000;
     const j = journal.filter((e: any) => new Date(e.date).getTime() > weekAgo).length;
     const m = Array.isArray(moods) ? moods.filter((e: any) => (typeof e.date === "string" ? new Date(e.date).getTime() : e.date) > weekAgo).length : 0;
-    const blooms = Math.floor(garden.streak / 7);
-    return { j, m, blooms };
+    return { j, m };
   })();
 
   return (
@@ -151,21 +186,21 @@ export default function Home() {
           <p className="text-muted-foreground uppercase tracking-widest text-xs font-medium">{format(today, "EEEE, MMMM do")}</p>
           <h1 className="text-4xl md:text-5xl font-serif text-foreground">
             {getGreeting()},<br />
-            <span className="text-primary italic">{user?.name || "Beautiful"}</span>
+            <span className="text-primary italic">{greetingSuffix}</span>
           </h1>
           {user?.pronouns && (
             <p className="text-xs uppercase tracking-widest text-muted-foreground/80 mt-1" data-testid="text-pronouns-badge">
               {user.pronouns}
             </p>
           )}
-          {/* Cycle Goddess Title */}
+          {/* Cycle Title */}
           {cycleInfo.phase !== "unknown" && (
             <motion.p
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               className="text-sm font-medium text-primary/80 mt-1"
             >
-              {cycleInfo.title} · Cycle Day {cycleInfo.day}
+              {isMale ? `Partner is in her ${cycleInfo.phase} phase` : `${cycleInfo.title} · Cycle Day ${cycleInfo.day}`}
             </motion.p>
           )}
         </div>
@@ -203,14 +238,54 @@ export default function Home() {
         </Link>
       )}
 
-      {/* Founding member badge */}
+      {/* Founding member banner */}
       <FoundersBanner />
+
+      {/* Partner Status Card (Male Only) */}
+      {isMale && partnerData?.linked && (
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+          <Link href="/period">
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white p-5 rounded-3xl shadow-lg cursor-pointer group hover:shadow-xl transition-all border border-blue-400/30">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white/20 p-2.5 rounded-2xl backdrop-blur-sm">
+                    <Users className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-blue-100 text-xs font-bold uppercase tracking-wider">Partner Status</p>
+                    <h3 className="text-xl font-serif">{partnerData.partner.nickname || partnerData.partner.name}</h3>
+                  </div>
+                </div>
+                <Badge className="bg-white/20 hover:bg-white/30 text-white border-none backdrop-blur-sm">Synced 🌹</Badge>
+              </div>
+              
+              {partnerData.partnerData?.cycle ? (
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md">
+                    <p className="text-[10px] text-blue-100 uppercase tracking-widest mb-1">Current Phase</p>
+                    <p className="font-bold text-lg">{cycleInfo.phase.charAt(0).toUpperCase() + cycleInfo.phase.slice(1)}</p>
+                  </div>
+                  <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md">
+                    <p className="text-[10px] text-blue-100 uppercase tracking-widest mb-1">How to Help</p>
+                    <p className="text-xs italic leading-tight">Tap to see care tips for this phase →</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 flex items-center gap-2 text-blue-100 text-sm italic">
+                  <Info className="w-4 h-4" />
+                  <span>Waiting for partner to share cycle data...</span>
+                </div>
+              )}
+            </div>
+          </Link>
+        </motion.div>
+      )}
 
       {/* ROSA Garden + Wellness Score Row */}
       <div className="grid grid-cols-2 gap-4">
         {/* ROSA Garden */}
         <motion.div
-          className="bg-gradient-to-br from-rose-50 to-pink-50 border border-rose-100 rounded-3xl p-5"
+          className={cn("bg-gradient-to-br border rounded-3xl p-5", isMale ? "from-blue-50 to-slate-50 border-blue-100" : "from-rose-50 to-pink-50 border-rose-100")}
           whileTap={{ scale: 0.97 }}
         >
           <div className="flex justify-between items-start mb-3">
@@ -272,7 +347,7 @@ export default function Home() {
               <button
                 key={a.id}
                 onClick={() => setShareAch(a)}
-                className="flex items-center gap-1.5 bg-card border border-border/50 hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-full px-3 py-1.5 text-sm transition-colors"
+                className={cn("flex items-center gap-1.5 bg-card border border-border/50 rounded-full px-3 py-1.5 text-sm transition-colors", isMale ? "hover:border-blue-300 hover:bg-blue-50" : "hover:border-rose-300 hover:bg-rose-50")}
                 data-testid={`share-ach-${a.id}`}
               >
                 <span>{a.emoji}</span>
@@ -284,19 +359,13 @@ export default function Home() {
       )}
 
       {/* Weekly Recap */}
-      <section className="rounded-3xl bg-gradient-to-r from-rose-200 to-pink-200 dark:from-rose-900/40 dark:to-pink-900/40 p-5 border border-rose-300/60 shadow-sm">
-        <p className="text-xs uppercase tracking-widest text-rose-800 dark:text-rose-200 mb-3 font-semibold">This week, you bloomed 🌹</p>
+      <section className={cn("rounded-3xl p-5 border shadow-sm", isMale ? "bg-gradient-to-r from-blue-200 to-slate-200 dark:from-blue-900/40 dark:to-slate-900/40 border-blue-300/60" : "bg-gradient-to-r from-rose-200 to-pink-200 dark:from-rose-900/40 dark:to-pink-900/40 border-rose-300/60")}>
+        <p className={cn("text-xs uppercase tracking-widest mb-3 font-semibold", isMale ? "text-blue-800 dark:text-blue-200" : "text-rose-800 dark:text-rose-200")}>This week, you bloomed 🌹</p>
         <div className="grid grid-cols-3 gap-3">
-          <div className="text-center"><p className="text-3xl font-bold text-rose-900 dark:text-rose-100">{weeklyRecap.j}</p><p className="text-xs text-rose-800 dark:text-rose-200 font-medium mt-0.5">journal entries</p></div>
-          <div className="text-center"><p className="text-3xl font-bold text-pink-900 dark:text-pink-100">{weeklyRecap.m}</p><p className="text-xs text-pink-800 dark:text-pink-200 font-medium mt-0.5">moods logged</p></div>
+          <div className="text-center"><p className={cn("text-3xl font-bold", isMale ? "text-blue-900 dark:text-blue-100" : "text-rose-900 dark:text-rose-100")}>{weeklyRecap.j}</p><p className={cn("text-xs font-medium mt-0.5", isMale ? "text-blue-800 dark:text-blue-200" : "text-rose-800 dark:text-rose-200")}>journal entries</p></div>
+          <div className="text-center"><p className={cn("text-3xl font-bold", isMale ? "text-slate-900 dark:text-slate-100" : "text-pink-900 dark:text-pink-100")}>{weeklyRecap.m}</p><p className={cn("text-xs font-medium mt-0.5", isMale ? "text-slate-800 dark:text-slate-200" : "text-pink-800 dark:text-pink-200")}>moods logged</p></div>
           <div className="text-center"><p className="text-3xl font-bold text-amber-900 dark:text-amber-100">{garden.streak}🔥</p><p className="text-xs text-amber-800 dark:text-amber-200 font-medium mt-0.5">day streak</p></div>
         </div>
-        {garden.roses >= 175 && (
-          <div className="mt-4 p-3 rounded-2xl bg-white/70 dark:bg-black/30 border border-rose-300/60">
-            <p className="text-sm font-serif text-rose-900 dark:text-rose-100">🎉 You've earned the <strong>Founders Garden 50% discount!</strong></p>
-            <p className="text-xs text-rose-800 dark:text-rose-200 mt-1">Use code <span className="font-mono font-bold">GARDEN175</span> at checkout · half-price ROSA Premium forever 🌹</p>
-          </div>
-        )}
       </section>
 
       {/* ROSA Daily Whisper */}
@@ -346,8 +415,8 @@ export default function Home() {
         <div className="flex items-center gap-3">
           <Flower2 className="w-5 h-5 text-primary" />
           <div>
-            <p className="text-sm font-medium">You're part of a sisterhood 🌹</p>
-            <p className="text-xs text-muted-foreground">Thousands of women using ROSA right now</p>
+            <p className="text-sm font-medium">{isMale ? "You're part of the ROSA family 🌹" : "You're part of a sisterhood 🌹"}</p>
+            <p className="text-xs text-muted-foreground">{isMale ? "Thousands of people using ROSA right now" : "Thousands of women using ROSA right now"}</p>
           </div>
         </div>
       </motion.div>
@@ -355,7 +424,7 @@ export default function Home() {
       {/* Founder Note */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="text-center px-4">
         <p className="text-xs text-muted-foreground italic leading-relaxed">
-          ROSA was built by Aiswarya Saji — a woman who struggled just like you, and created this space so you never have to feel alone.
+          ROSA was built by Aiswarya Saji — to create a safe, supportive space where everyone belongs and no one has to feel alone.
         </p>
       </motion.div>
 
@@ -367,7 +436,7 @@ export default function Home() {
         bigText={shareAch?.emoji || "🌹"}
         smallText={shareAch?.description || "Earned in ROSA"}
         emoji="🏆"
-        variant="amber"
+        variant={isMale ? "blue" : "amber"}
         authorName={user?.name}
       />
     </motion.div>

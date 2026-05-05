@@ -77,11 +77,40 @@ export default function SettingsPage() {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!user) return;
     const updated = { ...user, name: form.name, gender: form.gender, pronouns: form.pronouns, personalityTags: form.personalityTags };
+    
+    // Optimistic update
     setUser(updated);
-    toast({ title: "Saved!", description: "Your profile has been updated." });
+    
+    try {
+      const res = await fetch(apiUrl("/api/auth/profile"), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${user.authToken}`,
+        },
+        body: JSON.stringify({
+          name: form.name,
+          gender: form.gender,
+          pronouns: form.pronouns,
+        }),
+      });
+      
+      if (!res.ok) {
+        throw new Error("Failed to save to server");
+      }
+      
+      toast({ title: "Saved!", description: "Your profile has been updated." });
+    } catch (e) {
+      console.error("Settings save error:", e);
+      toast({ 
+        title: "Partial save", 
+        description: "Updated locally, but could not sync with server. Please check your connection.",
+        variant: "destructive" 
+      });
+    }
   };
 
   const handleLogout = async () => {

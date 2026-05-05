@@ -938,7 +938,7 @@ router.post("/set-nickname", requireSession, async (req: any, res) => {
   } catch (err: any) { console.error("set-nickname error:", err?.message); return res.status(500).json({ error: err?.message || "Server error" }); }
 });
 
-router.put("/profile", requireSession, async (req: any, res) => {
+router.put("/auth/profile", requireSession, async (req: any, res) => {
   try {
     const email = req.session.email;
     const { bio, name, accountType, gender, pronouns, dateOfBirth } = req.body;

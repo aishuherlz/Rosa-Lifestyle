@@ -14,12 +14,15 @@ import { loadSession } from "@/lib/auth-storage";
 
 export default function SignIn() {
   const [, setLocation] = useLocation();
-  const { user, setUser, signInWith } = useUser();
+  const { user, setUser, signInWith, isLoading } = useUser();
 
   // If already logged in OR valid remembered session exists, redirect to home
   useEffect(() => {
+    if (isLoading) return; // Wait for UserContext to finish initial refresh
+    
     if (user && user.authToken && !user.guestMode) {
-      if (!user.gender) {
+      if (!user.gender || user.gender === "unspecified") {
+        // Only ask if truly missing
         setStep("gender");
         return;
       }
@@ -29,11 +32,9 @@ export default function SignIn() {
     // Check for valid remembered session even if user state not loaded yet
     const session = loadSession();
     if (session && session.rememberMe) {
-      // Valid remembered session — redirect to home, user-context will validate it
-      // Note: If gender is missing, home will redirect back here and we'll catch it above
       setLocation("/");
     }
-  }, [user]);
+  }, [user, isLoading]);
   const [step, setStep] = useState<"auth" | "verify" | "gender" | "pronouns" | "onboarding">("auth");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -204,12 +205,13 @@ export default function SignIn() {
         setPendingAnonymousName(null);
       }
       // If returning user AND has gender, skip gender/pronouns/onboarding completely
-      if (!data.isNewUser && data.gender) {
+      const hasProfile = data.gender && data.gender !== "unspecified";
+      if (!data.isNewUser && (hasProfile || data.pronouns)) {
         // Sign them in directly
         signInWith({
           name: data.name || name.trim(),
           emailOrPhone: email.trim().toLowerCase(),
-          gender: data.gender,
+          gender: data.gender || "unspecified",
           pronouns: data.pronouns || "",
           guestMode: false,
           joinedAt: data.joinedAt || new Date().toISOString(),
@@ -227,7 +229,7 @@ export default function SignIn() {
         });
         setLocation("/");
       } else {
-        // New user OR returning user with missing profile data
+        // New user OR returning user with truly missing profile data
         setStep("gender");
       }
     } catch {
@@ -628,7 +630,7 @@ export default function SignIn() {
             >
               <div className="text-center space-y-2">
                 <h2 className="text-3xl font-serif text-primary">How do you identify?</h2>
-                <p className="text-muted-foreground">ROSA is built for women, but everyone is welcome.</p>
+                <p className="text-muted-foreground">ROSA is built for everyone to find their sanctuary.</p>
               </div>
 
               <div className="grid gap-4">

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FloatingChat, ROSA_TOGGLE_CHAT_EVENT } from "@/components/chatbot/floating-chat";
+import { useUser } from "@/lib/user-context";
 import { useSubscription } from "@/lib/subscription-context";
 import { useGarden } from "@/lib/garden-context";
 import { useNightMode } from "@/lib/night-mode-context";
@@ -78,10 +79,23 @@ const MOBILE_NAV: MobileTab[] = [
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
+  const { user } = useUser();
   const { plan, daysLeftInTrial } = useSubscription();
   const { garden } = useGarden();
   const { isNight } = useNightMode();
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
+
+  const dynamicNavItems = NAV_ITEMS.map(item => {
+    if (item.href === "/period" && isMale) {
+      return { ...item, label: "Partner Cycle" };
+    }
+    if (item.href === "/sos" && isMale) {
+      return { ...item, label: "Partner Support" };
+    }
+    return item;
+  });
 
   // Auto-close the drawer whenever the route changes — without this it stays
   // open after the user picks a destination.
@@ -210,7 +224,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </div>
 
       <nav className={cn("flex-1 overflow-y-auto pb-2 space-y-0.5", collapsed ? "px-2 pt-2" : "px-4 pt-2")}>
-        {NAV_ITEMS.map((item) => <NavLink key={item.href} item={item} collapsed={collapsed} />)}
+        {dynamicNavItems.map((item) => <NavLink key={item.href} item={item} collapsed={collapsed} />)}
 
         <div className="pt-3 mt-3 border-t border-border/50 space-y-0.5">
           {FOOTER_NAV_ITEMS.map((item) => (

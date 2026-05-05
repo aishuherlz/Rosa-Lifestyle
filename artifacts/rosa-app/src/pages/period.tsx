@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, addDays, differenceInDays, parseISO, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns";
-import { Plus, Droplets, Activity, Heart, Flower, ChevronLeft, ChevronRight, Stamp, Video, Zap, Salad, Dumbbell, Moon, Sun, Flame, Wind } from "lucide-react";
+import { Plus, Droplets, Activity, Heart, Flower, ChevronLeft, ChevronRight, Stamp, Video, Zap, Salad, Dumbbell, Moon, Sun, Flame, Wind, Users, Info, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,9 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { cn } from "@/lib/utils";
 import { PartnerShareToggle } from "@/components/partner-share-toggle";
 import { CycleHealthQuestionnaire } from "@/components/cycle-health-questionnaire";
+import { useUser } from "@/lib/user-context";
+import { useSync } from "@/hooks/use-sync";
+import { apiUrl } from "@/lib/api";
 
 type CycleProfile = {
   avgCycleLength: number;
@@ -65,6 +68,11 @@ type PhaseInfo = {
   energy: string;
   videoTitle: string;
   videoUrl: string;
+  maleSupport: {
+    title: string;
+    tips: string[];
+    care: string[];
+  };
 };
 
 const PHASE_INFO: Record<string, PhaseInfo> = {
@@ -82,6 +90,15 @@ const PHASE_INFO: Record<string, PhaseInfo> = {
     selfCare: ["Heating pad on abdomen 🔥", "Warm bath with Epsom salts 🛁", "Castor oil massage", "Early bedtime", "Journal your feelings 📓"],
     videoTitle: "Gentle Yoga for Period Pain",
     videoUrl: "https://www.youtube.com/results?search_query=gentle+yoga+for+period+pain",
+    maleSupport: {
+      title: "How to Support Her",
+      tips: [
+        "Be extra patient & empathetic today.",
+        "Take over more household tasks/chores.",
+        "Avoid heavy social plans — she needs rest."
+      ],
+      care: ["Bring her a heating pad 🔥", "Stock up on dark chocolate 🍫", "Make a warm soup 🍲"]
+    }
   },
   follicular: {
     name: "Follicular Phase",
@@ -97,6 +114,15 @@ const PHASE_INFO: Record<string, PhaseInfo> = {
     selfCare: ["Skin care refresh ✨", "Plan your goals 📋", "Connect with friends 👯‍♀️", "Start a creative project 🎨", "Morning walks in sunlight 🌞"],
     videoTitle: "Energising Workout for Follicular Phase",
     videoUrl: "https://www.youtube.com/results?search_query=follicular+phase+workout+energy",
+    maleSupport: {
+      title: "How to Support Her",
+      tips: [
+        "Encourage her new ideas and projects.",
+        "Plan a fun, active date together.",
+        "She has more energy — join her for a walk."
+      ],
+      care: ["Plan a weekend adventure 🗺️", "Try a new restaurant together 🍴", "Bring her fresh flowers 💐"]
+    }
   },
   ovulation: {
     name: "Ovulation Phase",
@@ -112,6 +138,15 @@ const PHASE_INFO: Record<string, PhaseInfo> = {
     selfCare: ["Schedule important meetings 📅", "Go on a date 💕", "Public speaking or presentations", "Vision boarding 🗺️", "Celebrate yourself 🎉"],
     videoTitle: "Peak Performance Workout",
     videoUrl: "https://www.youtube.com/results?search_query=ovulation+phase+peak+performance+workout",
+    maleSupport: {
+      title: "How to Support Her",
+      tips: [
+        "Plan a special romantic evening.",
+        "Give her plenty of compliments — she's glowing!",
+        "Support her social plans and gatherings."
+      ],
+      care: ["Book a dinner date 🕯️", "Write her a love note 💌", "Take a sunset walk 🌅"]
+    }
   },
   luteal: {
     name: "Luteal Phase",
@@ -127,6 +162,15 @@ const PHASE_INFO: Record<string, PhaseInfo> = {
     selfCare: ["Set boundaries & say no 🙅‍♀️", "Organise your space 🏠", "Creative solo projects 🎨", "Deep sleep hygiene 😴", "Reduce social commitments"],
     videoTitle: "Calming Luteal Phase Yoga",
     videoUrl: "https://www.youtube.com/results?search_query=luteal+phase+yoga+PMS+relief",
+    maleSupport: {
+      title: "How to Support Her",
+      tips: [
+        "Don't take irritability personally — it's hormonal.",
+        "Keep the environment calm and quiet.",
+        "Offer to do the chores so she can relax."
+      ],
+      care: ["Snack prep (sweet potato/oats) 🍠", "Dim the lights for a cozy night 🌙", "Give her space if she needs it 🧘"]
+    }
   },
 };
 
@@ -138,6 +182,8 @@ function getPhaseKey(cycleDay: number): keyof typeof PHASE_INFO {
 }
 
 export default function PeriodPage() {
+  const { user, getAuthHeaders } = useUser();
+  const { syncData } = useSync();
   const [cycleProfile, setCycleProfile] = useLocalStorage<CycleProfile | null>("rosa_cycle_profile", null);
   const [cycleLogs, setCycleLogs] = useLocalStorage<CycleLog[]>("rosa_cycle_logs", []);
   const [open, setOpen] = useState(false);
@@ -148,17 +194,46 @@ export default function PeriodPage() {
     symptoms: [] as string[], notes: "", flow: "medium" as CycleLog["flow"], mood: "",
   });
 
-  // Show questionnaire if not completed yet — AFTER all hooks
-  if (!cycleProfile?.completed) {
+  const [partnerData, setPartnerData] = useState<any>(null);
+  const [isPartnerLoading, setIsPartnerLoading] = useState(false);
+
+  const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
+
+  useEffect(() => {
+    if (isMale) {
+      fetchPartnerData();
+    }
+  }, [isMale]);
+
+  const fetchPartnerData = async () => {
+    setIsPartnerLoading(true);
+    try {
+      const res = await fetch(apiUrl("/api/partner/shared-data"), { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (data.linked && data.sharePrefs?.cycle) {
+        setPartnerData(data);
+      }
+    } catch (e) {
+      console.error("[PERIOD] Failed to fetch partner data:", e);
+    } finally {
+      setIsPartnerLoading(false);
+    }
+  };
+
+  // Show questionnaire if not completed yet AND user is female
+  if (!isMale && !cycleProfile?.completed) {
     return (
       <CycleHealthQuestionnaire
-        onComplete={(profile) => setCycleProfile(profile)}
+        onComplete={(profile) => {
+          setCycleProfile(profile);
+          syncData("cycle", { profile, logs: cycleLogs });
+        }}
         existing={cycleProfile || undefined}
       />
     );
   }
 
-  const lastCycle = cycleLogs[0];
+  const lastCycle = isMale ? partnerData?.partnerData?.cycle?.logs?.[0] : cycleLogs[0];
   const today = new Date();
 
   let cycleDay: number | null = null;
@@ -183,11 +258,15 @@ export default function PeriodPage() {
 
   const phase = PHASE_INFO[phaseKey];
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const entry: CycleLog = { id: Date.now().toString(), ...form, cycleLength: parseInt(form.cycleLength) };
-    setCycleLogs([entry, ...cycleLogs]);
+    const newLogs = [entry, ...cycleLogs];
+    setCycleLogs(newLogs);
     setOpen(false);
     setForm({ periodStart: "", periodEnd: "", cycleLength: "28", symptoms: [], notes: "", flow: "medium", mood: "" });
+    
+    // Sync to backend
+    await syncData("cycle", { profile: cycleProfile, logs: newLogs });
   };
 
   const toggleSymptom = (s: string) => {
@@ -199,94 +278,103 @@ export default function PeriodPage() {
     if (!lastCycle) return "";
     const ps = parseISO(lastCycle.periodStart);
     const pe = lastCycle.periodEnd ? parseISO(lastCycle.periodEnd) : addDays(ps, 4);
-    if (isWithinInterval(day, { start: ps, end: pe })) return "bg-rose-400 text-white rounded-full";
+    if (isWithinInterval(day, { start: ps, end: pe })) return isMale ? "bg-blue-400 text-white rounded-full" : "bg-rose-400 text-white rounded-full";
     if (ovulationStart && ovulationEnd && isWithinInterval(day, { start: ovulationStart, end: ovulationEnd })) return "bg-amber-400 text-white rounded-full";
-    if (nextPeriod && isSameDay(day, nextPeriod)) return "bg-rose-200 text-rose-800 rounded-full ring-2 ring-rose-400";
+    if (nextPeriod && isSameDay(day, nextPeriod)) return isMale ? "bg-blue-200 text-blue-800 rounded-full ring-2 ring-blue-400" : "bg-rose-200 text-rose-800 rounded-full ring-2 ring-rose-400";
     return "";
   };
 
-  const TABS = [
-    { id: "tracker", label: "Tracker", icon: Droplets },
-    { id: "guide", label: "Phase Guide", icon: Zap },
-    { id: "passport", label: "Passport", icon: Stamp },
-  ] as const;
+  const TABS = isMale 
+    ? [{ id: "tracker", label: "Partner Tracker", icon: Users }, { id: "guide", label: "Care Guide", icon: Heart }] as const
+    : [
+        { id: "tracker", label: "Tracker", icon: Droplets },
+        { id: "guide", label: "Phase Guide", icon: Zap },
+        { id: "passport", label: "Passport", icon: Stamp },
+      ] as const;
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-serif text-foreground">Cycle Tracker</h1>
-            <p className="text-muted-foreground mt-1">Know your body, love yourself.</p>
-            <div className="mt-2"><PartnerShareToggle feature="cycle" compact /></div>
+            <h1 className="text-3xl font-serif text-foreground">
+              {isMale ? "Partner's Cycle" : "Cycle Tracker"}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              {isMale ? "Understand and support her journey." : "Know your body, love yourself."}
+            </p>
+            {!isMale && <div className="mt-2"><PartnerShareToggle feature="cycle" compact /></div>}
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90" data-testid="button-log-period">
-                <Plus className="w-4 h-4 mr-1" /> Log Period
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle className="font-serif text-xl">Log Your Cycle</DialogTitle></DialogHeader>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Period Start</Label>
-                    <Input type="date" value={form.periodStart} onChange={e => setForm(f => ({ ...f, periodStart: e.target.value }))} />
+          
+          {!isMale && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary hover:bg-primary/90" data-testid="button-log-period">
+                  <Plus className="w-4 h-4 mr-1" /> Log Period
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                <DialogHeader><DialogTitle className="font-serif text-xl">Log Your Cycle</DialogTitle></DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Period Start</Label>
+                      <Input type="date" value={form.periodStart} onChange={e => setForm(f => ({ ...f, periodStart: e.target.value }))} />
+                    </div>
+                    <div>
+                      <Label>Period End</Label>
+                      <Input type="date" value={form.periodEnd} onChange={e => setForm(f => ({ ...f, periodEnd: e.target.value }))} />
+                    </div>
                   </div>
                   <div>
-                    <Label>Period End</Label>
-                    <Input type="date" value={form.periodEnd} onChange={e => setForm(f => ({ ...f, periodEnd: e.target.value }))} />
+                    <Label>Average Cycle Length (days)</Label>
+                    <Input type="number" value={form.cycleLength} onChange={e => setForm(f => ({ ...f, cycleLength: e.target.value }))} min="21" max="35" />
                   </div>
-                </div>
-                <div>
-                  <Label>Average Cycle Length (days)</Label>
-                  <Input type="number" value={form.cycleLength} onChange={e => setForm(f => ({ ...f, cycleLength: e.target.value }))} min="21" max="35" />
-                </div>
-                <div>
-                  <Label className="mb-2 block">Flow</Label>
-                  <div className="flex gap-2">
-                    {FLOW_OPTIONS.map(fo => (
-                      <button key={fo.value} onClick={() => setForm(f => ({ ...f, flow: fo.value as CycleLog["flow"] }))}
-                        className={cn("flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-all", form.flow === fo.value ? "border-primary bg-primary/10" : "border-border")}>
-                        <span className={cn("w-3 h-3 rounded-full inline-block mr-1.5", fo.color)} />{fo.label}
-                      </button>
-                    ))}
+                  <div>
+                    <Label className="mb-2 block">Flow</Label>
+                    <div className="flex gap-2">
+                      {FLOW_OPTIONS.map(fo => (
+                        <button key={fo.value} onClick={() => setForm(f => ({ ...f, flow: fo.value as CycleLog["flow"] }))}
+                          className={cn("flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-all", form.flow === fo.value ? "border-primary bg-primary/10" : "border-border")}>
+                          <span className={cn("w-3 h-3 rounded-full inline-block mr-1.5", fo.color)} />{fo.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <Label className="mb-2 block">Mood</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {MOODS.map(m => (
-                      <button key={m} onClick={() => setForm(f => ({ ...f, mood: f.mood === m ? "" : m }))}
-                        className={cn("px-3 py-1 rounded-full text-xs border transition-all", form.mood === m ? "bg-primary text-white border-primary" : "border-border")}>
-                        {m}
-                      </button>
-                    ))}
+                  <div>
+                    <Label className="mb-2 block">Mood</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {MOODS.map(m => (
+                        <button key={m} onClick={() => setForm(f => ({ ...f, mood: f.mood === m ? "" : m }))}
+                          className={cn("px-3 py-1 rounded-full text-xs border transition-all", form.mood === m ? "bg-primary text-white border-primary" : "border-border")}>
+                          {m}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <Label className="mb-2 block">Symptoms</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {SYMPTOMS.map(s => (
-                      <label key={s} className="flex items-center gap-2 text-sm cursor-pointer">
-                        <Checkbox checked={form.symptoms.includes(s)} onCheckedChange={() => toggleSymptom(s)} />
-                        {s}
-                      </label>
-                    ))}
+                  <div>
+                    <Label className="mb-2 block">Symptoms</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {SYMPTOMS.map(s => (
+                        <label key={s} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox checked={form.symptoms.includes(s)} onCheckedChange={() => toggleSymptom(s)} />
+                          {s}
+                        </label>
+                      ))}
+                    </div>
                   </div>
+                  <Button onClick={handleSave} className="w-full bg-primary" disabled={!form.periodStart}>Save Cycle</Button>
                 </div>
-                <Button onClick={handleSave} className="w-full bg-primary" disabled={!form.periodStart}>Save Cycle</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </motion.div>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-muted/40 p-1 rounded-2xl">
         {TABS.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
             className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-sm font-medium transition-all",
               activeTab === tab.id ? "bg-background shadow-sm text-foreground" : "text-muted-foreground")}>
             <tab.icon className="w-4 h-4" />{tab.label}
@@ -297,20 +385,41 @@ export default function PeriodPage() {
       <AnimatePresence mode="wait">
         {activeTab === "tracker" && (
           <motion.div key="tracker" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-6">
+            
+            {isMale && !partnerData && !isPartnerLoading && (
+              <Card className="bg-blue-50 border-blue-100 p-6 text-center">
+                <Users className="w-10 h-10 text-blue-400 mx-auto mb-3" />
+                <h3 className="text-xl font-serif text-blue-900 mb-2">Connect with your Partner</h3>
+                <p className="text-blue-700 text-sm mb-4">
+                  When your partner shares her cycle with you, you'll see her current phase, 
+                  care tips, and a shared calendar here.
+                </p>
+                <Link href="/partner">
+                  <Button className="bg-blue-600 hover:bg-blue-700">Go to Partner Settings</Button>
+                </Link>
+              </Card>
+            )}
+
             {/* Phase banner */}
             {lastCycle && (
               <motion.div className={cn("p-5 rounded-2xl border", phase.bg, phase.borderColor)}>
                 <div className="flex items-center gap-3 mb-2">
                   <span className="text-3xl">{phase.emoji}</span>
                   <div>
-                    <p className={cn("font-semibold text-lg", phase.textColor)}>{phase.name}</p>
-                    <p className="text-muted-foreground text-sm">{phase.tagline}</p>
+                    <p className={cn("font-semibold text-lg", phase.textColor)}>
+                      {isMale ? `Partner is in ${phase.name}` : phase.name}
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                      {isMale ? `"${phase.tagline}"` : phase.tagline}
+                    </p>
                   </div>
-                  {cycleDay && <Badge variant="outline" className="ml-auto">{`Day ${cycleDay}`}</Badge>}
+                  {cycleDay && <Badge variant="outline" className={cn("ml-auto", isMale ? "border-blue-200" : "")}>{`Day ${cycleDay}`}</Badge>}
                 </div>
                 <div className="flex items-center gap-2 mt-3">
                   <Zap className={cn("w-4 h-4", phase.textColor)} />
-                  <p className={cn("text-sm", phase.textColor)}>{phase.energy}</p>
+                  <p className={cn("text-sm", phase.textColor)}>
+                    {isMale ? `Her Energy: ${phase.energy}` : phase.energy}
+                  </p>
                 </div>
               </motion.div>
             )}
@@ -318,7 +427,7 @@ export default function PeriodPage() {
             {lastCycle ? (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
-                  { label: "Cycle Day", value: cycleDay ? `Day ${cycleDay}` : "—", icon: <Droplets className="w-5 h-5 text-rose-500" />, sub: phase.name, subColor: phase.textColor },
+                  { label: isMale ? "Her Cycle Day" : "Cycle Day", value: cycleDay ? `Day ${cycleDay}` : "—", icon: <Droplets className={cn("w-5 h-5", isMale ? "text-blue-500" : "text-rose-500")} />, sub: phase.name, subColor: phase.textColor },
                   { label: "Next Period", value: nextPeriod ? format(nextPeriod, "MMM d") : "—", icon: <Activity className="w-5 h-5 text-violet-500" />, sub: nextPeriod ? `In ${Math.max(0, differenceInDays(nextPeriod, today))} days` : "" },
                   { label: "Ovulation Window", value: ovulationStart ? `${format(ovulationStart, "MMM d")} – ${format(ovulationEnd!, "MMM d")}` : "—", icon: <Flower className="w-5 h-5 text-amber-500" />, sub: "Fertile window" },
                   { label: "Pregnancy Chance", value: pregnancyProb, icon: <Heart className="w-5 h-5 text-pink-500" />, sub: "Based on cycle phase" },
@@ -339,7 +448,7 @@ export default function PeriodPage() {
                   </motion.div>
                 ))}
               </div>
-            ) : (
+            ) : !isMale && (
               <Card className="border-dashed border-2 border-border text-center py-12">
                 <CardContent>
                   <Droplets className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
@@ -352,7 +461,9 @@ export default function PeriodPage() {
             <Card className="border-border/50 shadow-sm">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="font-serif text-lg">Cycle Calendar</CardTitle>
+                  <CardTitle className="font-serif text-lg">
+                    {isMale ? "Partner's Calendar" : "Cycle Calendar"}
+                  </CardTitle>
                   <div className="flex gap-2">
                     <Button size="icon" variant="ghost" onClick={() => setCurrentMonth(m => new Date(m.getFullYear(), m.getMonth() - 1))}>
                       <ChevronLeft className="w-4 h-4" />
@@ -377,36 +488,77 @@ export default function PeriodPage() {
                   ))}
                 </div>
                 <div className="flex gap-4 mt-4 text-xs text-muted-foreground justify-center flex-wrap">
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-rose-400 inline-block" /> Period</span>
+                  <span className="flex items-center gap-1"><span className={cn("w-3 h-3 rounded-full inline-block", isMale ? "bg-blue-400" : "bg-rose-400")} /> Period</span>
                   <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-400 inline-block" /> Ovulation</span>
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-rose-200 ring-1 ring-rose-400 inline-block" /> Next Period</span>
+                  <span className="flex items-center gap-1"><span className={cn("w-3 h-3 rounded-full ring-1 inline-block", isMale ? "bg-blue-200 ring-blue-400" : "bg-rose-200 ring-rose-400")} /> Next Period</span>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Cycle history */}
-            {cycleLogs.length > 0 && (
-              <div>
-                <h2 className="text-xl font-serif mb-3">Cycle History</h2>
-                <div className="space-y-2">
-                  {cycleLogs.map(log => (
-                    <Card key={log.id} className="border-border/50">
-                      <CardContent className="pt-4 pb-3 flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-sm">{format(parseISO(log.periodStart), "MMM d, yyyy")}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Cycle: {log.cycleLength} days
-                            {log.flow && ` · ${log.flow} flow`}
-                            {log.mood && ` · ${log.mood}`}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-1 justify-end">
-                          {log.symptoms.slice(0, 3).map(s => <Badge key={s} variant="outline" className="text-xs">{s}</Badge>)}
-                          {log.symptoms.length > 3 && <Badge variant="outline" className="text-xs">+{log.symptoms.length - 3}</Badge>}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+            {/* Male Care Section */}
+            {isMale && lastCycle && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                <h3 className="text-xl font-serif flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-500" />
+                  Care Tips for this Phase
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card className="bg-primary/5 border-primary/10">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm uppercase tracking-wider text-primary font-sans">{phase.maleSupport.title}</CardTitle></CardHeader>
+                    <CardContent>
+                      <ul className="space-y-2">
+                        {phase.maleSupport.tips.map((tip, i) => (
+                          <li key={i} className="text-sm flex items-start gap-2 italic">
+                            <span className="text-primary font-bold">•</span>
+                            {tip}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-amber-50/50 border-amber-100">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm uppercase tracking-wider text-amber-700 font-sans">Care Ideas</CardTitle></CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-2">
+                        {phase.maleSupport.care.map((item, i) => (
+                          <Badge key={i} variant="outline" className="bg-white text-amber-800 border-amber-200 py-1.5 px-3 rounded-xl font-medium">
+                            {item}
+                          </Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Male Educational Section (Unlinked) */}
+            {isMale && !lastCycle && (
+              <div className="space-y-6">
+                <h3 className="text-xl font-serif text-center pt-4">General Knowledge</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 rounded-xl bg-rose-50 text-rose-600"><Info className="w-5 h-5" /></div>
+                      <p className="font-bold">What are the 4 phases?</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      A woman's cycle is more than just a period. It's a month-long dance of 4 phases: 
+                      Menstrual, Follicular, Ovulation, and Luteal. Each phase brings different 
+                      energy, mood, and needs.
+                    </p>
+                  </Card>
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 rounded-xl bg-blue-50 text-blue-600"><Heart className="w-5 h-5" /></div>
+                      <p className="font-bold">Why support matters</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Tracking your partner's cycle allows you to be more empathetic. 
+                      Knowing when she's likely to feel low energy or high energy helps you 
+                      be the best partner possible.
+                    </p>
+                  </Card>
                 </div>
               </div>
             )}
@@ -424,7 +576,7 @@ export default function PeriodPage() {
                       <CardTitle className={cn("font-serif text-lg", phaseKey === key && info.textColor)}>{info.name}</CardTitle>
                       <p className="text-xs text-muted-foreground">{info.tagline}</p>
                     </div>
-                    {phaseKey === key && <Badge className="ml-auto bg-primary/90 text-white">You are here</Badge>}
+                    {phaseKey === key && <Badge className="ml-auto bg-primary/90 text-white">{isMale ? "Partner is here" : "You are here"}</Badge>}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -442,23 +594,32 @@ export default function PeriodPage() {
                       </ul>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1 mb-2"><Heart className="w-3 h-3" /> Care</p>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1 mb-2"><Heart className="w-3 h-3" /> {isMale ? "Support" : "Care"}</p>
                       <ul className="space-y-1">
-                        {info.selfCare.map(s => <li key={s} className="text-xs text-foreground">{s}</li>)}
+                        {(isMale ? info.maleSupport.tips : info.selfCare).map(s => <li key={s} className="text-xs text-foreground">{s}</li>)}
                       </ul>
                     </div>
                   </div>
-                  <a href={info.videoUrl} target="_blank" rel="noopener noreferrer"
-                    className={cn("flex items-center gap-2 text-xs px-3 py-2 rounded-xl border transition-all hover:opacity-80 w-fit", info.textColor, info.borderColor, info.bg)}>
-                    <Video className="w-3.5 h-3.5" /> Watch: {info.videoTitle}
-                  </a>
+                  {!isMale && (
+                    <a href={info.videoUrl} target="_blank" rel="noopener noreferrer"
+                      className={cn("flex items-center gap-2 text-xs px-3 py-2 rounded-xl border transition-all hover:opacity-80 w-fit", info.textColor, info.borderColor, info.bg)}>
+                      <Video className="w-3.5 h-3.5" /> Watch: {info.videoTitle}
+                    </a>
+                  )}
+                  {isMale && (
+                    <div className="pt-2">
+                       <p className="text-xs font-bold text-primary flex items-center gap-1">
+                         <Sparkles className="w-3 h-3" /> Essential Care: {info.maleSupport.care.join(", ")}
+                       </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
           </motion.div>
         )}
 
-        {activeTab === "passport" && (
+        {!isMale && activeTab === "passport" && (
           <motion.div key="passport" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-5">
             <div className="text-center py-4">
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-rose-400 to-pink-600 flex items-center justify-center mx-auto mb-3 shadow-lg">
@@ -502,12 +663,6 @@ export default function PeriodPage() {
                     </motion.div>
                   );
                 })}
-                {/* Empty slots */}
-                {Array.from({ length: Math.max(0, 12 - cycleLogs.length) }).map((_, i) => (
-                  <div key={`empty-${i}`} className="aspect-square rounded-2xl border-2 border-dashed border-border flex items-center justify-center">
-                    <p className="text-muted-foreground text-lg">+</p>
-                  </div>
-                ))}
               </div>
             ) : (
               <Card className="border-dashed border-2 border-border text-center py-10">
@@ -517,37 +672,10 @@ export default function PeriodPage() {
                 </CardContent>
               </Card>
             )}
-
-            <Card className="border-rose-200 bg-rose-50/50">
-              <CardContent className="pt-4 pb-4">
-                <h3 className="font-serif text-base font-semibold mb-2 text-rose-700">Passport Milestones</h3>
-                <div className="space-y-2">
-                  {[
-                    { label: "First Stamp", need: 1, emoji: "🌹", desc: "Log your first cycle" },
-                    { label: "3-Month Streak", need: 3, emoji: "⭐", desc: "3 cycles logged" },
-                    { label: "Half Year", need: 6, emoji: "🌸", desc: "6 cycles logged" },
-                    { label: "Annual Badge", need: 12, emoji: "🏅", desc: "A full year of tracking" },
-                    { label: "Cycle Goddess", need: 24, emoji: "👑", desc: "2 years of self-knowledge" },
-                  ].map(m => (
-                    <div key={m.label} className={cn("flex items-center gap-3 p-2 rounded-xl", cycleLogs.length >= m.need ? "bg-rose-100" : "opacity-50")}>
-                      <span className="text-xl">{m.emoji}</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">{m.label}</p>
-                        <p className="text-xs text-muted-foreground">{m.desc}</p>
-                      </div>
-                      {cycleLogs.length >= m.need ? (
-                        <Badge className="bg-rose-500 text-white text-xs">Earned</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">{m.need - cycleLogs.length} to go</Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
           </motion.div>
         )}
       </AnimatePresence>
     </div>
   );
 }
+

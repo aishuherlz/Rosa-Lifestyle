@@ -168,6 +168,23 @@
   --ring: 340 35% 55%;
 }
 
+/* MALE THEME OVERRIDES */
+.male {
+  --primary: 210 50% 45%; /* Slate blue */
+  --secondary: 210 20% 90%; /* Soft blue-gray */
+  --ring: 210 50% 45%;
+  --sidebar-primary: 210 50% 45%;
+  --sidebar-accent: 210 20% 90%;
+}
+
+.dark.male {
+  --primary: 210 50% 55%; /* Lighter blue for dark mode */
+  --secondary: 210 20% 25%;
+  --ring: 210 50% 55%;
+  --sidebar-primary: 210 50% 55%;
+  --sidebar-accent: 210 20% 25%;
+}
+
 @layer base {
   * {
     @apply border-border;

@@ -137,7 +137,8 @@ export default function PartnerPage() {
   const [partnerData, setPartnerData] = useLocalStorage<any>("rosa_partner", null);
   const [activePhase, setActivePhase] = useState<keyof typeof PHASE_GUIDE>("menstrual");
   const [tab, setTab] = useState("guide");
-  const isPartnerUser = user?.gender === "male" || user?.gender === "man";
+  const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
+  const isPartnerUser = isMale || user?.gender?.toLowerCase() === "non-binary" || user?.gender?.toLowerCase() === "inclusive";
   const [sharePrefs, setSharePrefs] = useLocalStorage<Record<string, boolean>>("rosa_share_prefs_v2", {
     cycle: false, mood: false, wishlist: false, milestones: false,
     fitness: false, travel: false, food: false, skin: false, sleep: false, journal: false, goals: false
@@ -498,7 +499,7 @@ export default function PartnerPage() {
           {isPartnerUser && (
             <Card className="border-[#E8C4B8] bg-gradient-to-br from-[#FDF6F0] to-[#FBEAF0]">
               <CardHeader>
-                <CardTitle className="text-[#8B4F6E] text-base">For Him — Wellness Guide 💙</CardTitle>
+                <CardTitle className="text-[#8B4F6E] text-base">Wellness Guide for You {isMale ? "💙" : "🌹"}</CardTitle>
                 <p className="text-xs text-[#9E7B8A]">Resources to help you show up as your best self</p>
               </CardHeader>
               <CardContent className="space-y-3">

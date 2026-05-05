@@ -57,18 +57,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [hasSeenIntro, setHasSeenIntroState] = useState(false);
 
   // On boot: rehydrate the user profile from local/session storage and, if a
-  // valid session token exists, validate it with the server. If the server
-  // says it's expired/revoked, log the user out so they don't get stuck on a
-  // dashboard whose API calls all 401.
+  // valid session token exists, validate it with the server.
   useEffect(() => {
     const session = loadSession();
-    // Profile is mirrored in both storages so it follows the session storage
-    // mode the user picked (sessionStorage if they didn't tick Remember Me).
     let storedProfile = localStorage.getItem(PROFILE_KEY) || sessionStorage.getItem(PROFILE_KEY);
+    
     if (storedProfile) {
       try {
         const parsed = JSON.parse(storedProfile) as User;
-        // If we have a session, prefer the session's authoritative token.
         if (session) {
           parsed.authToken = session.token;
           parsed.deviceId = session.deviceId;
@@ -76,9 +72,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
           parsed.expiresAt = session.expiresAt;
           parsed.emailVerified = true;
         } else if (!parsed.guestMode && parsed.authToken) {
-          // Profile says verified but session storage was cleared (or token
-          // expired). Treat as logged out: keep them in the app as guest? No —
-          // the safer thing is to clear the profile so they re-verify.
           parsed.authToken = null;
           parsed.deviceId = null;
           parsed.emailVerified = false;
@@ -93,10 +86,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     if (introSeen === "true") setHasSeenIntroState(true);
 
     // If we loaded a session, ping /api/auth/me to confirm it's still valid.
-    // We also use this round trip to opportunistically refresh server-owned
-    // fields on the cached profile (e.g. the permanent anonymousName, which
-    // may have been backfilled by the server for a user who signed in before
-    // the column existed).
+    // We also use this round trip to refresh profile fields (gender, pronouns, etc).
     if (session) {
       fetch(apiUrl("/api/auth/me"), { headers: { Authorization: `Bearer ${session.token}` } })
         .then(async (r) => {
@@ -111,7 +101,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
             return;
           }
           if (!r.ok) return;
-          const body = await r.json().catch(() => null) as { user?: { anonymousName?: string | null; rosaId?: string | null; partnerInviteCode?: string | null; nickname?: string | null; nicknameChanges?: number; bio?: string | null; profilePhotoUrl?: string | null; gender?: string | null; pronouns?: string | null } | null } | null;
+          const body = await r.json().catch(() => null);
           const serverUser = body?.user;
           if (!serverUser) return;
           setUserState((prev) => {
@@ -135,11 +125,24 @@ export function UserProvider({ children }: { children: ReactNode }) {
             return next;
           });
         })
-        .catch(() => { /* network blip — keep current state */ });
+        .catch(() => { /* network blip — keep current state */ })
+        .finally(() => setIsLoading(false));
+    } else {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   }, []);
+
+  // Monitor gender to apply theme class
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
+      if (isMale) {
+        document.body.classList.add("male");
+      } else {
+        document.body.classList.remove("male");
+      }
+    }
+  }, [user?.gender]);
 
   const persistProfile = (newUser: User | null) => {
     if (!newUser) {
@@ -186,9 +189,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }
     }
     
-    // Clear user-specific data from localStorage
     scopedStorage.clearUserCache();
-    
     clearSession();
     try { localStorage.removeItem(PROFILE_KEY); sessionStorage.removeItem(PROFILE_KEY); } catch {}
     sessionStorage.removeItem("rosa_intro_seen");
