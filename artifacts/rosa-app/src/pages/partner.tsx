@@ -170,7 +170,17 @@ export default function PartnerPage() {
     try {
       const res = await fetch(apiUrl("/api/partner/shared-data"), { headers: getAuthHeaders() });
       const data = await res.json();
-      if (data.linked) setLivePartnerData(data);
+      if (data.linked) {
+        setLivePartnerData(data);
+        // Sync to local storage for other components
+        setPartnerData({
+          partnerName: data.partner?.name,
+          partnerNickname: data.partner?.nickname,
+          linked: true
+        });
+      } else {
+        setPartnerData(null);
+      }
     } catch {}
   };
 
@@ -178,7 +188,7 @@ export default function PartnerPage() {
     setSavingPrefs(true);
     try {
       if (livePartnerData?.partner) {
-        await fetch(apiUrl("/api/partner/share-prefs"), {
+        const res = await fetch(apiUrl("/api/partner/share-prefs"), {
           method: "PUT",
           headers: { "Content-Type": "application/json", ...getAuthHeaders() },
           body: JSON.stringify({
@@ -190,6 +200,7 @@ export default function PartnerPage() {
             shareGoals: sharePrefs.goals,
           }),
         });
+        if (!res.ok) throw new Error("Could not save preferences");
       }
       toast({ title: "Sharing preferences saved! 🌹", description: "Your partner will see your selected data." });
     } catch {
@@ -202,6 +213,14 @@ export default function PartnerPage() {
     if (user?.authToken) {
       fetchNotifications();
       fetchPartnerData();
+      
+      // Polling for real-time updates (e.g. if partner accepts link while we are on the page)
+      const interval = setInterval(() => {
+        fetchPartnerData();
+        fetchNotifications();
+      }, 10000); // 10 seconds
+      
+      return () => clearInterval(interval);
     }
   }, [user]);
 
