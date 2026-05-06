@@ -42,22 +42,28 @@ const VIDEOS: Record<string, Video[]> = {
     { id: "Yi41bVWX7N4", title: "Setting Boundaries Like a Queen", channel: "Therapy in a Nutshell", topic: "Boundaries", duration: "12 min", embed: "https://www.youtube.com/embed/Yi41bVWX7N4", thumb: "https://i.ytimg.com/vi/Yi41bVWX7N4/hqdefault.jpg", description: "Saying no without guilt." },
   ],
   body: [
-    { id: "ZAJwRyvY2vg", title: "Hormones & Skin — Cycle Acne Explained", channel: "Dr Dray", topic: "Skin", duration: "11 min", embed: "https://www.youtube.com/embed/ZAJwRyvY2vg", thumb: "https://i.ytimg.com/vi/ZAJwRyvY2vg/hqdefault.jpg", description: "Why your skin breaks out before your period." },
-    { id: "fZKnQA-2JhA", title: "Pelvic Floor Health 101", channel: "Vagina University", topic: "Pelvic Health", duration: "8 min", embed: "https://www.youtube.com/embed/fZKnQA-2JhA", thumb: "https://i.ytimg.com/vi/fZKnQA-2JhA/hqdefault.jpg", description: "Kegels, posture, and why this matters at every age." },
     { id: "8hdM9KdDpA8", title: "Perimenopause & Menopause Demystified", channel: "Dr Mary Claire Haver", topic: "Menopause", duration: "15 min", embed: "https://www.youtube.com/embed/8hdM9KdDpA8", thumb: "https://i.ytimg.com/vi/8hdM9KdDpA8/hqdefault.jpg", description: "What to expect from your 30s through 60s." },
+  ],
+  support: [
+    { id: "G_6Yv8_aQks", title: "How to Support Your Partner During Her Period", channel: "Men's Health", topic: "Support", duration: "8 min", embed: "https://www.youtube.com/embed/G_6Yv8_aQks", thumb: "https://i.ytimg.com/vi/G_6Yv8_aQks/hqdefault.jpg", description: "Practical ways to be there when she needs it most." },
+    { id: "M0u_7I9e0yI", title: "Understanding the Menstrual Cycle (for Men)", channel: "Planned Parenthood", topic: "Education", duration: "6 min", embed: "https://www.youtube.com/embed/M0u_7I9e0yI", thumb: "https://i.ytimg.com/vi/M0u_7I9e0yI/hqdefault.jpg", description: "A simple guide to what's happening and why it matters." },
+    { id: "7JW7g8jEOyA", title: "Emotional Intelligence in Relationships", channel: "Psychology In Seattle", topic: "Relationships", duration: "14 min", embed: "https://www.youtube.com/embed/7JW7g8jEOyA", thumb: "https://i.ytimg.com/vi/7JW7g8jEOyA/hqdefault.jpg", description: "Building empathy and understanding with your partner." },
   ],
 };
 
-const TABS = [
-  { id: "cycle", label: "Cycle & Periods", icon: Flower2, color: "rose" },
+const GET_TABS = (isMale: boolean) => [
+  { id: isMale ? "support" : "cycle", label: isMale ? "Support Her" : "Cycle & Periods", icon: Flower2, color: isMale ? "blue" : "rose" },
   { id: "sexed", label: "Sex Ed", icon: Heart, color: "pink" },
-  { id: "fertility", label: "Fertility", icon: Baby, color: "amber" },
   { id: "mental", label: "Mind", icon: Brain, color: "violet" },
-  { id: "body", label: "Body", icon: Sparkles, color: "emerald" },
+  { id: "fertility", label: "Fertility", icon: Baby, color: "amber" },
+  { id: "body", label: isMale ? "Wellness" : "Body", icon: Sparkles, color: "emerald" },
 ];
 
 export default function WisdomPage() {
-  const [tab, setTab] = useState("cycle");
+  const { user } = useUser();
+  const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
+  const tabs = GET_TABS(isMale);
+  const [tab, setTab] = useState(isMale ? "support" : "cycle");
   const [playing, setPlaying] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
@@ -71,7 +77,7 @@ export default function WisdomPage() {
     <div className="min-h-full p-4 md:p-8 space-y-6 max-w-6xl mx-auto pb-24">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-serif text-foreground flex items-center gap-2">
-          <BookOpen className="w-7 h-7 text-rose-500" /> ROSA Wisdom
+          <BookOpen className={`w-7 h-7 ${isMale ? "text-blue-500" : "text-rose-500"}`} /> ROSA Wisdom
         </h1>
         <p className="text-muted-foreground mt-1">Real, science-backed education on your body, mind & relationships 🌹</p>
       </motion.div>
@@ -84,14 +90,14 @@ export default function WisdomPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full grid grid-cols-2 md:grid-cols-5 h-auto">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <TabsTrigger key={t.id} value={t.id} className="flex items-center gap-1.5 py-2.5" data-testid={`tab-${t.id}`}>
               <t.icon className="w-4 h-4" /> <span className="text-xs md:text-sm">{t.label}</span>
             </TabsTrigger>
           ))}
         </TabsList>
 
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <TabsContent key={t.id} value={t.id} className="mt-6">
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered(VIDEOS[t.id]).map((v) => (
@@ -104,7 +110,7 @@ export default function WisdomPage() {
                         <>
                           <img src={v.thumb} alt={v.title} className="w-full h-full object-cover" loading="lazy" />
                           <div className="absolute inset-0 bg-black/30 flex items-center justify-center hover:bg-black/40 transition-colors">
-                            <div className="w-14 h-14 rounded-full bg-rose-500 flex items-center justify-center shadow-xl">
+                            <div className={`w-14 h-14 rounded-full ${isMale ? "bg-blue-500" : "bg-rose-500"} flex items-center justify-center shadow-xl`}>
                               <span className="text-white text-2xl ml-1">▶</span>
                             </div>
                           </div>
@@ -133,9 +139,9 @@ export default function WisdomPage() {
         ))}
       </Tabs>
 
-      <Card className="bg-gradient-to-br from-rose-50 to-pink-50 border-rose-200">
+      <Card className={`bg-gradient-to-br ${isMale ? "from-blue-50 to-indigo-50 border-blue-200" : "from-rose-50 to-pink-50 border-rose-200"}`}>
         <CardContent className="pt-5">
-          <p className="text-sm text-rose-900 font-serif">🌹 Knowledge is power, sister.</p>
+          <p className={`text-sm ${isMale ? "text-blue-900" : "text-rose-900"} font-serif`}>🌹 Knowledge is power.</p>
           <p className="text-xs text-muted-foreground mt-1">Videos are sourced from trusted channels — TED-Ed, Planned Parenthood, board-certified MDs, and licensed therapists. Always consult your own healthcare provider for medical questions.</p>
         </CardContent>
       </Card>

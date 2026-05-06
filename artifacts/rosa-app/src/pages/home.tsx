@@ -23,26 +23,30 @@ import { cn } from "@/lib/utils";
 
 type PeriodData = { lastPeriodDate?: string; cycleLength?: number };
 
-function getCyclePhase(periodData: PeriodData): { phase: string; title: string; day: number } {
+function getCyclePhase(periodData: PeriodData, isMale: boolean): { phase: string; title: string; day: number } {
   if (!periodData.lastPeriodDate) return { phase: "unknown", title: "Your sanctuary awaits 🌹", day: 0 };
   const start = new Date(periodData.lastPeriodDate);
   const today = new Date();
   const dayOfCycle = Math.floor((today.getTime() - start.getTime()) / 86400000) % (periodData.cycleLength || 28);
-  if (dayOfCycle <= 5) return { phase: "menstruation", title: "Rest and Restore Queen 👑", day: dayOfCycle + 1 };
-  if (dayOfCycle <= 13) return { phase: "follicular", title: "Fresh Start Energy ✨", day: dayOfCycle + 1 };
-  if (dayOfCycle <= 16) return { phase: "ovulation", title: "In Your Power Era 🔥", day: dayOfCycle + 1 };
-  return { phase: "luteal", title: "Warrior Mode 💪", day: dayOfCycle + 1 };
+  if (dayOfCycle <= 5) return { phase: "menstruation", title: isMale ? "Support and Restore 🌹" : "Rest and Restore Queen 👑", day: dayOfCycle + 1 };
+  if (dayOfCycle <= 13) return { phase: "follicular", title: isMale ? "Active Energy ✨" : "Fresh Start Energy ✨", day: dayOfCycle + 1 };
+  if (dayOfCycle <= 16) return { phase: "ovulation", title: isMale ? "Peak Power Era 🔥" : "In Your Power Era 🔥", day: dayOfCycle + 1 };
+  return { phase: "luteal", title: isMale ? "Patience and Care 💪" : "Warrior Mode 💪", day: dayOfCycle + 1 };
 }
 
-const DAILY_QUOTES = [
-  { text: "A woman is the full circle. Within her is the power to create, nurture and transform.", author: "Diane Mariechild" },
-  { text: "She believed she could, so she did.", author: "R.S. Grey" },
+const GET_DAILY_QUOTES = (isMale: boolean) => [
+  { text: "A woman is the full circle. Within her is the power to create, nurture and transform.", author: "Diane Mariechild", femaleOnly: true },
+  { text: "Strength does not come from winning. Your struggles develop your strengths.", author: "Arnold Schwarzenegger", maleOnly: true },
+  { text: "She believed she could, so she did.", author: "R.S. Grey", femaleOnly: true },
+  { text: "It is not the mountain we conquer, but ourselves.", author: "Sir Edmund Hillary", maleOnly: true },
   { text: "You are enough. A thousand times enough.", author: "Unknown" },
   { text: "Your self-worth is determined by you. You don't have to depend on someone telling you who you are.", author: "Beyoncé" },
   { text: "I am not afraid of storms, for I am learning how to sail my ship.", author: "Louisa May Alcott" },
-  { text: "One is not born a woman, one becomes one.", author: "Simone de Beauvoir" },
+  { text: "The greatest glory in living lies not in never falling, but in rising every time we fall.", author: "Nelson Mandela" },
+  { text: "One is not born a woman, one becomes one.", author: "Simone de Beauvoir", femaleOnly: true },
+  { text: "Hardships often prepare ordinary people for an extraordinary destiny.", author: "C.S. Lewis", maleOnly: true },
   { text: "The most courageous act is still to think for yourself. Aloud.", author: "Coco Chanel" },
-];
+].filter(q => isMale ? !q.femaleOnly : !q.maleOnly);
 
 export default function Home() {
   const { user, getAuthHeaders } = useUser();
@@ -59,15 +63,16 @@ export default function Home() {
   const [isPartnerLoading, setIsPartnerLoading] = useState(false);
 
   const today = new Date();
-  const quote = DAILY_QUOTES[today.getDate() % DAILY_QUOTES.length];
   const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
+  const quotes = GET_DAILY_QUOTES(isMale);
+  const quote = quotes[today.getDate() % quotes.length];
   
   const cycleInfo = isMale && partnerData?.partnerData?.cycle?.logs?.[0] 
     ? getCyclePhase({ 
         lastPeriodDate: partnerData.partnerData.cycle.logs[0].periodStart,
         cycleLength: partnerData.partnerData.cycle.logs[0].cycleLength 
-      })
-    : getCyclePhase(periodData);
+      }, true)
+    : getCyclePhase(periodData, false);
 
   const todayStr = format(today, "yyyy-MM-dd");
   const alreadyCheckedIn = garden.lastCheckIn === todayStr;

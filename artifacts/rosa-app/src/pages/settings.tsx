@@ -326,20 +326,24 @@ export default function SettingsPage() {
       </Card>
 
       {/* Beta / Founders Program */}
-      <Card className="border-rose-200/60 bg-gradient-to-br from-rose-50/40 to-pink-50/40 dark:from-rose-950/20 dark:to-pink-950/20 shadow-sm">
+      <Card className={`shadow-sm ${
+        user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man"
+          ? "border-blue-200/60 bg-gradient-to-br from-blue-50/40 to-teal-50/40 dark:from-blue-950/20 dark:to-teal-950/20"
+          : "border-rose-200/60 bg-gradient-to-br from-rose-50/40 to-pink-50/40 dark:from-rose-950/20 dark:to-pink-950/20"
+      }`}>
         <CardHeader className="pb-2">
           <CardTitle className="font-serif text-lg flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-rose-600" /> Beta & Founders Program
+            <Sparkles className={`w-5 h-5 ${user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man" ? "text-blue-600" : "text-rose-600"}`} /> Beta & Founders Program
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            ROSA is in our 3-month beta with our founding sisters. You can opt out anytime.
+            ROSA is in our 3-month beta with our founding members. You can opt out anytime.
           </p>
           <div className="flex items-center justify-between py-2 border-b border-border/30">
             <div>
               <p className="text-sm font-medium">Join the beta program</p>
-              <p className="text-xs text-muted-foreground">Be one of our founding sisters & enter the Lucky 10 raffle</p>
+              <p className="text-xs text-muted-foreground">Be one of our founding members & enter the Lucky 10 raffle</p>
             </div>
             <Switch
               checked={betaOptIn}
@@ -348,7 +352,8 @@ export default function SettingsPage() {
                 if (!v) { setBetaUpdates(false); setBetaSurveys(false); }
                 else { setBetaUpdates(true); setBetaSurveys(true); }
                 try { window.dispatchEvent(new Event("rosa-beta-optin-changed")); } catch {}
-                toast({ title: v ? "Welcome to the beta 🌹" : "You've opted out", description: v ? "You're entered into the Lucky 10 raffle and will see beta features." : "Beta banners and surveys are hidden. You can re-join anytime." });
+                const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
+                toast({ title: v ? (isMale ? "Welcome to the beta 👑" : "Welcome to the beta 🌹") : "You've opted out", description: v ? "You're entered into the Lucky 10 raffle and will see beta features." : "Beta banners and surveys are hidden. You can re-join anytime." });
               }}
               data-testid="switch-beta-optin"
             />

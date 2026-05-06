@@ -81,22 +81,24 @@ export default function Intro() {
           <h1 className="text-8xl md:text-[10rem] font-serif font-medium tracking-wide text-white/90 mb-4">
             ROSA
           </h1>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: phase === "image" ? 0 : 1 }}
-            transition={{ delay: phase === "image" ? 0 : 1.0, duration: 1.0, ease: SOFT }}
-            className="text-white/75 text-lg md:text-xl font-light tracking-widest italic mb-6"
-          >
-            An app made for women, by women
-          </motion.p>
-          <motion.p
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: phase === "image" ? 0 : 1, y: phase === "image" ? 6 : 0 }}
-            transition={{ delay: phase === "image" ? 0 : 1.6, duration: 1.0, ease: SOFT }}
-            className="text-white/50 text-sm font-light max-w-xs mx-auto leading-relaxed"
-          >
-            Built by Aiswarya Saji — a woman who struggled just like you
-          </motion.p>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: phase === "image" ? 0 : 1 }}
+              transition={{ delay: phase === "image" ? 0 : 1.0, duration: 1.0, ease: SOFT }}
+              className="text-white/75 text-lg md:text-xl font-light tracking-widest italic mb-6"
+            >
+              {user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man" ? "An app made for everyone, by women" : "An app made for women, by women"}
+            </motion.p>
+            <motion.p
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: phase === "image" ? 0 : 1, y: phase === "image" ? 6 : 0 }}
+              transition={{ delay: phase === "image" ? 0 : 1.6, duration: 1.0, ease: SOFT }}
+              className="text-white/50 text-sm font-light max-w-xs mx-auto leading-relaxed"
+            >
+              {user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man" 
+                ? "Built by Aiswarya Saji — a woman who created this sanctuary for you" 
+                : "Built by Aiswarya Saji — a woman who struggled just like you"}
+            </motion.p>
         </motion.div>
 
         <motion.div

@@ -28,15 +28,15 @@ function genCode(): string {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
-const GAME_PROMPTS = [
+const GET_GAME_PROMPTS = (isMale: boolean) => [
   "🌹 What's one tiny win you had today?",
   "🌹 If your week had a soundtrack, what's the title track?",
   "🌹 Drop one thing you'd tell your 16-year-old self.",
   "🌹 What's lighting you up this week?",
-  "🌹 One soft girl ritual you swear by?",
+  "🌹 One ritual you swear by?",
   "🌹 Describe today in three emojis.",
   "🌹 What boundary are you proud of holding lately?",
-  "🌹 Compliment the sister who posts after you 💗",
+  isMale ? "🌹 Compliment the person who posts after you 💗" : "🌹 Compliment the sister who posts after you 💗",
 ];
 const CONFIDENCE_CARDS = [
   "✨ You are exactly where you're meant to be.",
@@ -48,17 +48,17 @@ const CONFIDENCE_CARDS = [
   "✨ You're allowed to take up space.",
   "✨ Slow is still moving forward, sister.",
 ];
-const GAMES = [
-  { id: "rose-roulette", name: "Rose Roulette 🌹", desc: "Daily prompt every sister answers — see today's at the top of each lounge." },
-  { id: "two-truths", name: "Two Truths & a Rose 🥀", desc: "Post 3 things — 2 true, 1 false. Sisters guess which is the rose (lie)." },
+const GET_GAMES = (isMale: boolean) => [
+  { id: "rose-roulette", name: "Rose Roulette 🌹", desc: isMale ? "Daily prompt everyone answers — see today's at the top of each lounge." : "Daily prompt every sister answers — see today's at the top of each lounge." },
+  { id: "two-truths", name: "Two Truths & a Rose 🥀", desc: isMale ? "Post 3 things — 2 true, 1 false. People guess which is the rose (lie)." : "Post 3 things — 2 true, 1 false. Sisters guess which is the rose (lie)." },
   { id: "confidence-cards", name: "Confidence Cards ✨", desc: "Pull a daily affirmation card. Reply with how you'll embody it today." },
   { id: "compliment-chain", name: "Compliment Chain 💖", desc: "Reply to the message above with a genuine compliment. Keep the chain alive." },
 ];
 
-function ConfidenceCard() {
+function ConfidenceCard({ isMale }: { isMale: boolean }) {
   const cards = [
     "I am the love I've been searching for 💗",
-    "My softness is my strength 🌸",
+    isMale ? "My strength is my foundation 🛡️" : "My softness is my strength 🌸",
     "I trust my journey, even the bends 🌿",
     "I deserve to take up space ✨",
     "My voice matters today 🎙️",
@@ -67,9 +67,9 @@ function ConfidenceCard() {
   ];
   const [card, setCard] = useState(() => cards[Math.floor(Math.random() * cards.length)]);
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-rose-100 via-pink-50 to-amber-50 border border-rose-200 p-6 text-center">
-      <p className="text-xs uppercase tracking-widest text-rose-600 mb-3">Your card today</p>
-      <p className="font-serif text-xl text-rose-900 leading-relaxed">{card}</p>
+    <div className={`rounded-2xl bg-gradient-to-br ${isMale ? "from-blue-100 via-teal-50 to-emerald-50 border-blue-200" : "from-rose-100 via-pink-50 to-amber-50 border-rose-200"} border p-6 text-center`}>
+      <p className={`text-xs uppercase tracking-widest ${isMale ? "text-blue-600" : "text-rose-600"} mb-3`}>Your card today</p>
+      <p className={`font-serif text-xl ${isMale ? "text-blue-900" : "text-rose-900"} leading-relaxed`}>{card}</p>
       <Button size="sm" variant="outline" className="mt-4" onClick={() => setCard(cards[Math.floor(Math.random() * cards.length)])}>
         <Sparkles className="w-3.5 h-3.5 mr-1" /> Pull another
       </Button>
@@ -79,6 +79,7 @@ function ConfidenceCard() {
 
 export default function CirclesPage() {
   const { user } = useUser();
+  const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
   const { toast } = useToast();
   const me = user?.name || "You";
 
@@ -140,7 +141,7 @@ export default function CirclesPage() {
     if (!newName.trim()) return;
     const c: Circle = { id: Date.now().toString(), name: newName.trim(), code: genCode(), createdBy: me, members: [me], messages: [], createdAt: Date.now() };
     setCircles([c, ...circles]); setActiveId(c.id); setNewName(""); setCreateOpen(false);
-    toast({ title: "Circle created 🌸", description: `Share code ${c.code} to invite up to 9 sisters.` });
+    toast({ title: "Circle created 🌸", description: `Share code ${c.code} to invite up to 9 ${isMale ? "members" : "sisters"}.` });
   }
   function joinCircle() {
     const code = joinCode.trim().toUpperCase();
@@ -220,7 +221,7 @@ export default function CirclesPage() {
       if (d.ok) {
         setCreatePubOpen(false); setPubName(""); setPubTopic(""); setPubEmoji("🌹");
         await refreshPublicList(); setActivePublicId(d.circle.id);
-        toast({ title: "Lounge created 🌹", description: "Open to all ROSA sisters." });
+        toast({ title: "Lounge created 🌹", description: isMale ? "Open to all ROSA members." : "Open to all ROSA sisters." });
       }
     } catch { toast({ title: "Couldn't create" }); }
   }
@@ -229,9 +230,11 @@ export default function CirclesPage() {
     <div className="min-h-full p-4 md:p-8 space-y-6 max-w-5xl mx-auto pb-24">
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-serif text-foreground flex items-center gap-2">
-          <Users className="w-7 h-7 text-rose-500" /> ROSA Circles
+          <Users className={`w-7 h-7 ${isMale ? "text-blue-500" : "text-rose-500"}`} /> ROSA Circles
         </h1>
-        <p className="text-muted-foreground mt-1">Public lounges for all sisters · private circles for your inner crew · games to bond 💝</p>
+        <p className="text-muted-foreground mt-1">
+          {isMale ? "Public lounges for everyone · private circles for your crew · games to bond 💝" : "Public lounges for all sisters · private circles for your inner crew · games to bond 💝"}
+        </p>
       </motion.div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
@@ -244,36 +247,36 @@ export default function CirclesPage() {
         {/* PUBLIC LOUNGES */}
         <TabsContent value="public" className="mt-4">
           {(() => {
-            const sisters = ["Aaliyah 🌹","Sofia ✨","Priya 🌸","Mei 💗","Zara 🦋","Camila 🌙","Aisha 👑","Jade 🍓","Naomi 🌿","Luna 💎"];
+            const names = isMale ? ["Liam 🌹", "Noah ✨", "Elijah 🌸", "James 💗", "Lucas 🦋", "Mason 🌙", "Ethan 👑", "Logan 🌿", "Alexander 💎"] : ["Aaliyah 🌹","Sofia ✨","Priya 🌸","Mei 💗","Zara 🦋","Camila 🌙","Aisha 👑","Jade 🍓","Naomi 🌿","Luna 💎"];
             const today = new Date().getDate();
-            const sister = sisters[today % sisters.length];
+            const spotlightName = names[today % names.length];
             return (
-              <div className="rounded-2xl bg-gradient-to-r from-rose-100 to-pink-100 p-4 mb-3 border border-rose-200">
-                <p className="text-xs uppercase tracking-widest text-rose-600">Sister Spotlight ✨ Today</p>
-                <p className="font-serif text-lg text-rose-900 mt-1">{sister}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Most kind energy in the lounges this week — drop her a 🌹</p>
+              <div className={`rounded-2xl bg-gradient-to-r ${isMale ? "from-blue-100 to-indigo-100 border-blue-200" : "from-rose-100 to-pink-100 border-rose-200"} p-4 mb-3 border`}>
+                <p className={`text-xs uppercase tracking-widest ${isMale ? "text-blue-600" : "text-rose-600"}`}>{isMale ? "Member Spotlight ✨ Today" : "Sister Spotlight ✨ Today"}</p>
+                <p className={`font-serif text-lg ${isMale ? "text-blue-900" : "text-rose-900"} mt-1`}>{spotlightName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Most kind energy in the lounges this week — drop a 🌹</p>
               </div>
             );
           })()}
           <div className="flex justify-between items-center mb-3">
-            <p className="text-sm text-muted-foreground">{publicList.length} lounges · open to every ROSA sister 🌍</p>
+            <p className="text-sm text-muted-foreground">{publicList.length} lounges · {isMale ? "open to everyone 🌍" : "open to every ROSA sister 🌍"}</p>
             <Dialog open={createPubOpen} onOpenChange={setCreatePubOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="bg-rose-500 hover:bg-rose-600 text-white"><Plus className="w-4 h-4 mr-1" /> New lounge</Button>
+                <Button size="sm" className={isMale ? "bg-blue-500 hover:bg-blue-600 text-white" : "bg-rose-500 hover:bg-rose-600 text-white"}><Plus className="w-4 h-4 mr-1" /> New lounge</Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle className="font-serif">Open a public lounge 🌹</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle className="font-serif">{isMale ? "Open a public lounge 🌹" : "Open a public lounge 🌹"}</DialogTitle></DialogHeader>
                 <div className="space-y-3">
-                  <div><Label>Lounge name</Label><Input value={pubName} onChange={e => setPubName(e.target.value)} placeholder="e.g. Soft Girl Era" maxLength={50} /></div>
-                  <div><Label>Topic / vibe</Label><Input value={pubTopic} onChange={e => setPubTopic(e.target.value)} placeholder="What sisters can expect here" maxLength={200} /></div>
+                  <div><Label>Lounge name</Label><Input value={pubName} onChange={e => setPubName(e.target.value)} placeholder="e.g. Wellness Hub" maxLength={50} /></div>
+                  <div><Label>Topic / vibe</Label><Input value={pubTopic} onChange={e => setPubTopic(e.target.value)} placeholder={isMale ? "What people can expect here" : "What sisters can expect here"} maxLength={200} /></div>
                   <div><Label>Emoji</Label>
                     <div className="flex gap-1 flex-wrap">
                       {["🌹","🌸","💖","✨","👑","🌈","🦋","🌙","☁️","🍓","🌿","💎"].map(e => (
-                        <button key={e} type="button" onClick={() => setPubEmoji(e)} className={`text-xl rounded-lg p-1.5 ${pubEmoji === e ? "bg-rose-100 ring-2 ring-rose-400" : "hover:bg-muted"}`}>{e}</button>
+                        <button key={e} type="button" onClick={() => setPubEmoji(e)} className={`text-xl rounded-lg p-1.5 ${pubEmoji === e ? (isMale ? "bg-blue-100 ring-2 ring-blue-400" : "bg-rose-100 ring-2 ring-rose-400") : "hover:bg-muted"}`}>{e}</button>
                       ))}
                     </div>
                   </div>
-                  <Button onClick={createPublic} className="w-full bg-rose-500 hover:bg-rose-600 text-white">Open the doors 🌸</Button>
+                  <Button onClick={createPublic} className={`w-full ${isMale ? "bg-blue-500 hover:bg-blue-600" : "bg-rose-500 hover:bg-rose-600"} text-white`}>Open the doors 🌸</Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -282,7 +285,7 @@ export default function CirclesPage() {
           <div className="grid md:grid-cols-3 gap-4">
             <div className="md:col-span-1 space-y-2 max-h-[600px] overflow-y-auto pr-1">
               {publicList.map(c => (
-                <Card key={c.id} className={`cursor-pointer transition-all ${activePublicId === c.id ? "border-rose-400 bg-rose-50/60" : "hover:bg-muted/40"}`}
+                <Card key={c.id} className={`cursor-pointer transition-all ${activePublicId === c.id ? (isMale ? "border-blue-400 bg-blue-50/60" : "border-rose-400 bg-rose-50/60") : "hover:bg-muted/40"}`}
                   onClick={() => setActivePublicId(c.id)}>
                   <CardContent className="p-3">
                     <div className="flex items-start gap-2">
@@ -316,14 +319,14 @@ export default function CirclesPage() {
                       <div>
                         <CardTitle className="font-serif flex items-center gap-2">{activePublic.emoji} {activePublic.name}</CardTitle>
                         <p className="text-xs text-muted-foreground mt-0.5">{activePublic.topic}</p>
-                        <p className="text-[11px] text-muted-foreground mt-1">👥 {activePublic.members.length} sisters here</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">👥 {activePublic.members.length} {isMale ? "members" : "sisters"} here</p>
                       </div>
                       <ShareButton title="Join me on ROSA 🌹" text={`Come join "${activePublic.name}" lounge on ROSA — ${activePublic.topic}`} />
                     </div>
                     {activePublic.gameOfTheDay && (
-                      <div className="mt-3 rounded-xl bg-gradient-to-r from-rose-100 to-pink-50 border border-rose-200 p-3">
-                        <p className="text-[10px] uppercase tracking-widest text-rose-600 font-semibold mb-1">🌹 Rose Roulette · today's prompt</p>
-                        <p className="text-sm text-rose-900 font-serif italic">{activePublic.gameOfTheDay}</p>
+                      <div className={`mt-3 rounded-xl bg-gradient-to-r ${isMale ? "from-blue-100 to-indigo-50 border-blue-200" : "from-rose-100 to-pink-50 border-rose-200"} p-3 border`}>
+                        <p className={`text-[10px] uppercase tracking-widest ${isMale ? "text-blue-600" : "text-rose-600"} font-semibold mb-1`}>🌹 Rose Roulette · today's prompt</p>
+                        <p className={`text-sm ${isMale ? "text-blue-900" : "text-rose-900"} font-serif italic`}>{activePublic.gameOfTheDay}</p>
                       </div>
                     )}
                   </CardHeader>
@@ -332,7 +335,7 @@ export default function CirclesPage() {
                       {activePublic.messages.length === 0 && <p className="text-xs text-muted-foreground italic text-center py-6">Be the first to share 💝</p>}
                       {activePublic.messages.map(m => (
                         <div key={m.id} className={`flex ${m.author === me && !m.anonymous ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[80%] rounded-2xl px-3 py-2 ${m.author === me && !m.anonymous ? "bg-rose-500 text-white" : "bg-muted"}`}>
+                          <div className={`max-w-[80%] rounded-2xl px-3 py-2 ${m.author === me && !m.anonymous ? (isMale ? "bg-blue-600 text-white" : "bg-rose-500 text-white") : "bg-muted"}`}>
                             <p className="text-[11px] font-semibold opacity-80 mb-0.5">{m.author}</p>
                             <p className="text-sm whitespace-pre-line">{m.text}</p>
                             <div className="flex items-center justify-between mt-1 text-[10px] opacity-70">
@@ -347,12 +350,12 @@ export default function CirclesPage() {
                     <div className="flex items-center gap-2 text-xs">
                       <Switch checked={anonymous} onCheckedChange={setAnonymous} id="anon" />
                       <label htmlFor="anon" className="text-muted-foreground select-none cursor-pointer">
-                        Post as <span className="font-semibold text-rose-600">A Sister 🌹</span> (anonymous)
+                        Post as <span className={`font-semibold ${isMale ? "text-blue-600" : "text-rose-600"}`}>{isMale ? "A Member 🌹" : "A Sister 🌹"}</span> (anonymous)
                       </label>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       <Button size="sm" variant="outline" className="text-xs h-7 rounded-full"
-                        onClick={() => setPublicDraft(d => (d ? d + " " : "") + GAME_PROMPTS[Math.floor(Math.random() * GAME_PROMPTS.length)])}>
+                        onClick={() => setPublicDraft(d => (d ? d + " " : "") + GET_GAME_PROMPTS(isMale)[Math.floor(Math.random() * GET_GAME_PROMPTS(isMale).length)])}>
                         🌹 Drop a prompt
                       </Button>
                       <Button size="sm" variant="outline" className="text-xs h-7 rounded-full"
@@ -375,7 +378,7 @@ export default function CirclesPage() {
                       </div>
                     )}
                     <div className="flex gap-2">
-                      <label className="cursor-pointer flex items-center text-rose-500 hover:text-rose-700 border border-rose-200 rounded-lg px-2 py-2 bg-white/70">
+                      <label className={`cursor-pointer flex items-center ${isMale ? "text-blue-500 hover:text-blue-700 border-blue-200" : "text-rose-500 hover:text-rose-700 border-rose-200"} border rounded-lg px-2 py-2 bg-white/70`}>
                         📷
                         <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => {
                           const file = e.target.files?.[0];
@@ -386,7 +389,7 @@ export default function CirclesPage() {
                         }} />
                       </label>
                       <Input value={publicDraft} onChange={e => setPublicDraft(e.target.value)} placeholder="Share with the lounge..." onKeyDown={e => { if (e.key === "Enter") sendPublic(); }} />
-                      <Button onClick={sendPublic} className="bg-rose-500 hover:bg-rose-600 text-white"><Send className="w-4 h-4" /></Button>
+                      <Button onClick={sendPublic} className={isMale ? "bg-blue-500 hover:bg-blue-600 text-white" : "bg-rose-500 hover:bg-rose-600 text-white"}><Send className="w-4 h-4" /></Button>
                     </div>
                     <p className="text-[10px] text-muted-foreground">🌹 = a rose · sent to her profile (anonymous roses don't count to a name)</p>
                   </CardContent>
@@ -404,14 +407,14 @@ export default function CirclesPage() {
           <div className="flex flex-wrap gap-2">
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-rose-500 hover:bg-rose-600 text-white"><Plus className="w-4 h-4 mr-1" /> Create circle</Button>
+                <Button className={isMale ? "bg-blue-500 hover:bg-blue-600 text-white" : "bg-rose-500 hover:bg-rose-600 text-white"}><Plus className="w-4 h-4 mr-1" /> Create circle</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle className="font-serif">New private circle</DialogTitle></DialogHeader>
                 <div className="space-y-3">
                   <Label>Circle name</Label>
-                  <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Soul Sisters" maxLength={40} />
-                  <Button onClick={createCircle} className="w-full bg-rose-500 hover:bg-rose-600 text-white">Create 🌸</Button>
+                  <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Inner Crew" maxLength={40} />
+                  <Button onClick={createCircle} className={`w-full ${isMale ? "bg-blue-500 hover:bg-blue-600" : "bg-rose-500 hover:bg-rose-600"} text-white`}>Create 🌸</Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -422,16 +425,16 @@ export default function CirclesPage() {
                 <div className="space-y-3">
                   <Label>Invite code</Label>
                   <Input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={6} className="font-mono tracking-widest text-center text-lg" />
-                  <Button onClick={joinCircle} className="w-full bg-rose-500 hover:bg-rose-600 text-white">Join 💕</Button>
+                  <Button onClick={joinCircle} className={`w-full ${isMale ? "bg-blue-500 hover:bg-blue-600" : "bg-rose-500 hover:bg-rose-600"} text-white`}>Join 💕</Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
           <div className="grid md:grid-cols-3 gap-4">
             <div className="md:col-span-1 space-y-2">
-              {circles.length === 0 && <p className="text-sm text-muted-foreground italic">No circles yet — create your first sisterhood ✨</p>}
+              {circles.length === 0 && <p className="text-sm text-muted-foreground italic">{isMale ? "No circles yet — create your first community ✨" : "No circles yet — create your first sisterhood ✨"}</p>}
               {circles.map(c => (
-                <Card key={c.id} className={`cursor-pointer transition-all ${activeId === c.id ? "border-rose-400 bg-rose-50/50" : "hover:bg-muted/40"}`} onClick={() => setActiveId(c.id)}>
+                <Card key={c.id} className={`cursor-pointer transition-all ${activeId === c.id ? (isMale ? "border-blue-400 bg-blue-50/50" : "border-rose-400 bg-rose-50/50") : "hover:bg-muted/40"}`} onClick={() => setActiveId(c.id)}>
                   <CardContent className="p-3">
                     <div className="flex justify-between items-start">
                       <div className="min-w-0 flex-1">
@@ -471,7 +474,7 @@ export default function CirclesPage() {
                       {active.messages.length === 0 && <p className="text-xs text-muted-foreground italic text-center py-6">Be the first to share 💝</p>}
                       {active.messages.map(m => (
                         <div key={m.id} className={`flex ${m.author === me ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[75%] rounded-2xl px-3 py-2 ${m.author === me ? "bg-rose-500 text-white" : "bg-muted"}`}>
+                          <div className={`max-w-[75%] rounded-2xl px-3 py-2 ${m.author === me ? (isMale ? "bg-blue-600 text-white" : "bg-rose-500 text-white") : "bg-muted"}`}>
                             {m.author !== me && <p className="text-[11px] font-semibold opacity-80 mb-0.5">{m.author}</p>}
                             <p className="text-sm whitespace-pre-line">{m.text}</p>
                             <div className="flex items-center justify-between mt-1 text-[10px] opacity-70">
@@ -484,7 +487,7 @@ export default function CirclesPage() {
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       <Button size="sm" variant="outline" className="text-xs h-7 rounded-full"
-                        onClick={() => setDraft(d => (d ? d + " " : "") + GAME_PROMPTS[Math.floor(Math.random() * GAME_PROMPTS.length)])}>
+                        onClick={() => setDraft(d => (d ? d + " " : "") + GET_GAME_PROMPTS(isMale)[Math.floor(Math.random() * GET_GAME_PROMPTS(isMale).length)])}>
                         🌹 Drop a prompt
                       </Button>
                       <Button size="sm" variant="outline" className="text-xs h-7 rounded-full"
@@ -498,7 +501,7 @@ export default function CirclesPage() {
                     </div>
                     <div className="flex gap-2">
                       <Input value={draft} onChange={e => setDraft(e.target.value)} placeholder="Share what's on your heart..." onKeyDown={e => { if (e.key === "Enter") send(); }} />
-                      <Button onClick={send} className="bg-rose-500 hover:bg-rose-600 text-white"><Send className="w-4 h-4" /></Button>
+                      <Button onClick={send} className={isMale ? "bg-blue-500 hover:bg-blue-600 text-white" : "bg-rose-500 hover:bg-rose-600 text-white"}><Send className="w-4 h-4" /></Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -509,18 +512,18 @@ export default function CirclesPage() {
 
         {/* GAMES */}
         <TabsContent value="games" className="mt-4 space-y-4">
-          <ConfidenceCard />
+          <ConfidenceCard isMale={isMale} />
           <div className="grid md:grid-cols-2 gap-3">
-            {GAMES.map(g => (
+            {GET_GAMES(isMale).map(g => (
               <Card key={g.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
-                  <h3 className="font-serif text-lg text-rose-700">{g.name}</h3>
+                  <h3 className={`font-serif text-lg ${isMale ? "text-blue-700" : "text-rose-700"}`}>{g.name}</h3>
                   <p className="text-sm text-muted-foreground mt-1">{g.desc}</p>
                 </CardContent>
               </Card>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground italic text-center">More games dropping every week 🌹 · play them inside any public lounge</p>
+          <p className="text-xs text-muted-foreground italic text-center">More games dropping every week 🌹 · play them inside any lounge</p>
         </TabsContent>
       </Tabs>
     </div>

@@ -210,7 +210,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <p className="text-xs text-muted-foreground mt-1 tracking-widest uppercase">
               Your Sanctuary
             </p>
-            <div className="mt-3 bg-rose-50 dark:bg-rose-950/30 rounded-xl px-3 py-2 flex items-center justify-between">
+            <div className={cn("mt-3 rounded-xl px-3 py-2 flex items-center justify-between", isMale ? "bg-blue-50 dark:bg-blue-950/30" : "bg-rose-50 dark:bg-rose-950/30")}>
               <span className="text-xs text-muted-foreground">🌹 {garden.roses} roses</span>
               <span className="text-xs text-orange-500 font-medium">🔥 {garden.streak} streak</span>
             </div>
@@ -267,9 +267,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
           </Link>
           <Link href="/">
-            <div className="cursor-pointer flex items-center gap-1 bg-rose-50 dark:bg-rose-950/40 rounded-full px-2.5 py-1 text-xs">
+            <div className={cn("cursor-pointer flex items-center gap-1 rounded-full px-2.5 py-1 text-xs", isMale ? "bg-blue-50 dark:bg-blue-950/40" : "bg-rose-50 dark:bg-rose-950/40")}>
               <span>🌹</span>
-              <span className="font-medium text-rose-700 dark:text-rose-300">{garden.roses}</span>
+              <span className={cn("font-medium", isMale ? "text-blue-700 dark:text-blue-300" : "text-rose-700 dark:text-rose-300")}>{garden.roses}</span>
               <span className="text-orange-500 ml-1">🔥{garden.streak}</span>
             </div>
           </Link>

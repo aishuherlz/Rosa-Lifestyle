@@ -41,16 +41,21 @@ export function FoundersBanner() {
     const isLifetime = stored.tier === "lifetime";
     const isBetaOnly = !isFirst100 && !isFirst500 && !isLifetime && stored.beta;
     if (!isFirst100 && !isFirst500 && !isLifetime && !isBetaOnly) return null;
+    const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
     return (
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-amber-100 via-rose-50 to-pink-100 border border-amber-300 rounded-2xl p-4 shadow-sm"
+        className={`border rounded-2xl p-4 shadow-sm ${
+          isMale 
+            ? "bg-gradient-to-r from-blue-100 via-teal-50 to-sky-100 border-blue-300"
+            : "bg-gradient-to-r from-amber-100 via-rose-50 to-pink-100 border-amber-300"
+        }`}
         data-testid="founders-banner">
         <div className="flex items-start gap-3">
           <Crown className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="font-serif text-amber-900 text-sm font-semibold">
               You're ROSA {isBetaOnly ? "Beta" : "Founding"} Member <span className="font-bold">#{stored.number}</span> 👑
-              {stored.raffleWinner && <span className="ml-2 text-rose-600">· Lucky 10 winner 🎁</span>}
+              {stored.raffleWinner && <span className={`ml-2 ${isMale ? "text-blue-600" : "text-rose-600"}`}>· Lucky 10 winner 🎁</span>}
             </p>
             <p className="text-xs text-amber-800 mt-0.5">
               {isLifetime
@@ -69,9 +74,14 @@ export function FoundersBanner() {
 
   // Public scarcity banner — encourages signups
   if (status && (status.spotsLeftFirst500 > 0 || status.betaActive)) {
+    const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
     return (
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-amber-50 to-rose-50 border border-amber-200 rounded-2xl p-3.5 text-center"
+        className={`border rounded-2xl p-3.5 text-center ${
+          isMale 
+            ? "bg-gradient-to-r from-blue-50 to-teal-50 border-blue-200"
+            : "bg-gradient-to-r from-amber-50 to-rose-50 border-amber-200"
+        }`}
         data-testid="founders-scarcity-banner">
         <p className="text-amber-800 text-xs font-medium">
           🌹 <strong>Founding Member Offer</strong> ·{" "}
@@ -80,7 +90,7 @@ export function FoundersBanner() {
             : status.spotsLeftFirst500 > 0
             ? `${status.spotsLeftFirst500} spots left for 3 months FREE`
             : `Beta program closes in ${status.betaDaysLeft || 0} days`}
-          {status.betaActive && <span className="block mt-1 text-rose-700">✨ All beta sisters entered to win — 10 picked at random for a surprise gift 🎁</span>}
+          {status.betaActive && <span className={`block mt-1 ${isMale ? "text-blue-700" : "text-rose-700"}`}>✨ All beta members entered to win — 10 picked at random for a surprise gift 🎁</span>}
         </p>
       </motion.div>
     );

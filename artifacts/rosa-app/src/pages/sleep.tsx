@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Moon, Play, Pause, Mic, MicOff, BedDouble, Clock, AudioLines, Sparkles, Info, AlertCircle, Trash2, Volume2 } from "lucide-react";
+import { useUser } from "@/lib/user-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,7 +37,7 @@ const SLEEP_VIDEOS = [
   { id: "DWOHcGF1Tmc", title: "4-7-8 Breathing for Falling Asleep Fast", channel: "Dr Andrew Weil", duration: "4 min", thumb: "https://i.ytimg.com/vi/DWOHcGF1Tmc/hqdefault.jpg" },
 ];
 
-const SLEEP_TIPS = [
+const GET_SLEEP_TIPS = (isMale: boolean) => [
   { emoji: "🌙", title: "Honour your wind-down hour", text: "Dim the lights one hour before bed — your melatonin is shy and waits for darkness." },
   { emoji: "📵", title: "Park your phone outside the bedroom", text: "Even on Do Not Disturb, the urge to check it activates a stress response. Use a real alarm clock." },
   { emoji: "☕", title: "No caffeine after 2pm", text: "Caffeine has a 6-hour half-life — that 4pm latte is still half-active when you're trying to sleep." },
@@ -44,10 +45,12 @@ const SLEEP_TIPS = [
   { emoji: "🌡️", title: "Keep your room cool (16–19°C / 60–67°F)", text: "Your core temperature drops as you fall asleep — a cool room helps it happen faster." },
   { emoji: "📓", title: "Brain dump before bed", text: "Write tomorrow's worries on paper. Tell your mind: 'we'll deal with this tomorrow.'" },
   { emoji: "🌿", title: "Magnesium glycinate, not melatonin", text: "Magnesium calms the nervous system without grogginess. Talk to your doctor about dosing." },
-  { emoji: "👯", title: "Track your cycle's effect", text: "You sleep worst in the late luteal phase (days before period). Be extra gentle then." },
+  { emoji: isMale ? "🫂" : "👯", title: isMale ? "Support her cycle" : "Track your cycle's effect", text: isMale ? "Women often sleep worst in the late luteal phase (days before period). Be extra patient and supportive during this time." : "You sleep worst in the late luteal phase (days before period). Be extra gentle then." },
 ];
 
 export default function SleepPage() {
+  const { user } = useUser();
+  const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
   const { toast } = useToast();
   const [logs, setLogs] = useLocalStorage<SleepLog[]>("rosa_sleep_logs", []);
   const [recordPref, setRecordPref] = useLocalStorage<"ask" | "yes" | "no">("rosa_sleep_record_pref", "ask");
@@ -176,7 +179,10 @@ export default function SleepPage() {
 
     if (timer > 0) {
       if (timerRef.current) window.clearTimeout(timerRef.current);
-      timerRef.current = window.setTimeout(() => { stopSound(); toast({ title: "Sleep timer ended 🌙", description: "Sweet dreams, sister." }); }, timer * 60 * 1000);
+      timerRef.current = window.setTimeout(() => { 
+        stopSound(); 
+        toast({ title: "Sleep timer ended 🌙", description: isMale ? "Sweet dreams. 🌙" : "Sweet dreams, sister." }); 
+      }, timer * 60 * 1000);
     }
   }
 
@@ -490,7 +496,7 @@ export default function SleepPage() {
         {/* TIPS */}
         <TabsContent value="tips" className="mt-6">
           <div className="grid sm:grid-cols-2 gap-3">
-            {SLEEP_TIPS.map((t, i) => (
+            {GET_SLEEP_TIPS(isMale).map((t, i) => (
               <Card key={i} className="border-border/50">
                 <CardContent className="pt-5">
                   <div className="flex items-start gap-3">

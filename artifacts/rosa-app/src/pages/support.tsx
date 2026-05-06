@@ -7,25 +7,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { apiUrl } from "@/lib/api";
+import { useUser } from "@/lib/user-context";
 
 const SUPPORT_EMAIL = "rosainclusivelifestyle@gmail.com";
 
 type ContactType = "support" | "feedback" | "bug" | "feature";
 
-const TYPES: { id: ContactType; label: string; icon: any; subject: string; placeholder: string }[] = [
-  { id: "support", label: "Get Support", icon: HelpCircle, subject: "ROSA Support", placeholder: "What can we help you with, sister?" },
+const GET_TYPES = (isMale: boolean) => [
+  { id: "support", label: "Get Support", icon: HelpCircle, subject: "ROSA Support", placeholder: isMale ? "What can we help you with?" : "What can we help you with, sister?" },
   { id: "feedback", label: "Feedback", icon: Heart, subject: "ROSA Feedback 💌", placeholder: "How is ROSA making you feel? What do you love? What could bloom better?" },
   { id: "bug", label: "Report Bug", icon: Bug, subject: "ROSA Bug Report 🐞", placeholder: "What page were you on? What did you expect vs what happened?" },
   { id: "feature", label: "Feature Idea", icon: Sparkles, subject: "ROSA Feature Request ✨", placeholder: "Tell us your idea — we read every single one." },
 ];
 
 export default function SupportPage() {
+  const { user } = useUser();
+  const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [type, setType] = useState<ContactType>("support");
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const active = TYPES.find(t => t.id === type)!;
+  const active = GET_TYPES(isMale).find(t => t.id === type)!;
 
   const handleSubmit = async () => {
     if (!form.name || !form.email || !form.message || sending) return;
@@ -60,19 +63,19 @@ export default function SupportPage() {
     <div className="min-h-full p-4 md:p-8 space-y-6 max-w-2xl mx-auto pb-24">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-serif text-foreground">Support & Feedback</h1>
-        <p className="text-muted-foreground mt-1">We read every message, sister 🌹</p>
+        <p className="text-muted-foreground mt-1">{isMale ? "We read every message 🌹" : "We read every message, sister 🌹"}</p>
       </motion.div>
 
       <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
-        <Card className="border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-900/20 dark:to-pink-900/20 shadow-sm">
+        <Card className={`${isMale ? "border-blue-200 bg-gradient-to-br from-blue-50 to-teal-50 dark:from-blue-900/20 dark:to-teal-900/20" : "border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-900/20 dark:to-pink-900/20"} shadow-sm`}>
           <CardContent className="pt-6 text-center">
-            <Heart className="w-10 h-10 text-rose-500 mx-auto mb-3" />
+            <Heart className={`w-10 h-10 ${isMale ? "text-blue-500" : "text-rose-500"} mx-auto mb-3`} />
             <p className="font-serif text-xl text-foreground mb-2">Made with love, for you</p>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              ROSA was built by a woman, for women. Every feature was crafted with care.
+              {isMale ? "ROSA was built by a woman, for everyone. Every feature was crafted with care." : "ROSA was built by a woman, for women. Every feature was crafted with care."}
               Your voice shapes what blooms next.
             </p>
-            <div className="mt-4 flex items-center justify-center gap-2 text-rose-600 dark:text-rose-400 font-medium">
+            <div className={`mt-4 flex items-center justify-center gap-2 ${isMale ? "text-blue-600 dark:text-blue-400" : "text-rose-600 dark:text-rose-400"} font-medium`}>
               <Mail className="w-4 h-4" />
               <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:underline" data-testid="link-support-email">
                 {SUPPORT_EMAIL}
@@ -91,11 +94,11 @@ export default function SupportPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {TYPES.map(t => (
+              {GET_TYPES(isMale).map(t => (
                 <button key={t.id} onClick={() => setType(t.id)}
-                  className={`flex flex-col items-center gap-1 p-3 rounded-2xl border transition-all ${type === t.id ? "border-rose-400 bg-rose-50 dark:bg-rose-900/30 ring-2 ring-rose-300" : "border-border hover:border-rose-300"}`}
+                  className={`flex flex-col items-center gap-1 p-3 rounded-2xl border transition-all ${type === t.id ? (isMale ? "border-blue-400 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-300" : "border-rose-400 bg-rose-50 dark:bg-rose-900/30 ring-2 ring-rose-300") : (isMale ? "border-border hover:border-blue-300" : "border-border hover:border-rose-300")}`}
                   data-testid={`type-${t.id}`}>
-                  <t.icon className="w-5 h-5 text-rose-500" />
+                  <t.icon className={`w-5 h-5 ${isMale ? "text-blue-500" : "text-rose-500"}`} />
                   <span className="text-xs font-medium">{t.label}</span>
                 </button>
               ))}
@@ -134,7 +137,7 @@ export default function SupportPage() {
           <Card className="border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 shadow-sm text-center py-8">
             <CardContent>
               <div className="text-4xl mb-3">💌</div>
-              <h3 className="font-serif text-xl mb-2">Sent with love, sister 🌹</h3>
+              <h3 className="font-serif text-xl mb-2">{isMale ? "Sent with love 🌹" : "Sent with love, sister 🌹"}</h3>
               <p className="text-muted-foreground text-sm">Your message landed safely with the ROSA team. We'll reply to <strong>{form.email}</strong> within 48 hours 🌹</p>
               <Button variant="outline" className="mt-4" onClick={() => { setSent(false); setForm({ name: "", email: "", subject: "", message: "" }); setError(null); }} data-testid="button-send-another">Send Another</Button>
             </CardContent>

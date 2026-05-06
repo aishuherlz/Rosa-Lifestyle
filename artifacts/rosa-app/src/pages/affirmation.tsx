@@ -6,9 +6,9 @@ import { Heart, Share2, RefreshCw, Sparkles } from "lucide-react";
 import { useUser } from "@/lib/user-context";
 import { useToast } from "@/hooks/use-toast";
 
-const AFFIRMATIONS = [
+const GET_AFFIRMATIONS = (isMale: boolean) => [
   { text: "You are the entire ocean in a drop.", author: "Rumi", color: "from-rose-400 to-pink-300" },
-  { text: "She believed she could, so she did.", author: "R.S. Grey", color: "from-amber-400 to-rose-300" },
+  { text: isMale ? "You believed you could, so you did." : "She believed she could, so she did.", author: "R.S. Grey", color: "from-amber-400 to-rose-300" },
   { text: "You are allowed to be both a masterpiece and a work in progress.", author: "Sophia Bush", color: "from-violet-400 to-pink-300" },
   { text: "Your softness is not your weakness — it's your superpower.", author: "ROSA", color: "from-pink-400 to-rose-300" },
   { text: "Bloom where you are planted, but also know when to transplant yourself.", author: "ROSA", color: "from-emerald-400 to-rose-300" },
@@ -18,29 +18,31 @@ const AFFIRMATIONS = [
   { text: "Trust yourself. You've survived 100% of your worst days.", author: "ROSA", color: "from-rose-400 to-purple-300" },
   { text: "Romanticise your morning. Romanticise your tea. Romanticise your existence.", author: "ROSA", color: "from-amber-300 to-pink-400" },
   { text: "Boundaries are the distance at which I can love you and me simultaneously.", author: "Prentis Hemphill", color: "from-violet-500 to-pink-300" },
-  { text: "She is fierce, she is graceful, she is everything in between.", author: "ROSA", color: "from-rose-500 to-violet-400" },
+  { text: isMale ? "You are fierce, you are graceful, you are everything in between." : "She is fierce, she is graceful, she is everything in between.", author: "ROSA", color: "from-rose-500 to-violet-400" },
   { text: "Your only job today is to take soft care of yourself.", author: "ROSA", color: "from-pink-300 to-amber-200" },
   { text: "You are someone's answered prayer.", author: "ROSA", color: "from-rose-400 to-emerald-300" },
-  { text: "Let her be soft. Let her be loud. Let her be everything she wants to be.", author: "ROSA", color: "from-fuchsia-400 to-rose-300" },
+  { text: isMale ? "Let yourself be soft. Let yourself be loud. Let yourself be everything you want to be." : "Let her be soft. Let her be loud. Let her be everything she wants to be.", author: "ROSA", color: "from-fuchsia-400 to-rose-300" },
 ];
 
-function dailyIndex() {
+function dailyIndex(count: number) {
   const d = new Date();
   const seed = d.getFullYear() * 1000 + d.getMonth() * 31 + d.getDate();
-  return seed % AFFIRMATIONS.length;
+  return seed % count;
 }
 
 export default function AffirmationPage() {
   const { user } = useUser();
+  const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
+  const affirmations = GET_AFFIRMATIONS(isMale);
   const { toast } = useToast();
-  const [index, setIndex] = useState(dailyIndex());
+  const [index, setIndex] = useState(dailyIndex(affirmations.length));
   const [direction, setDirection] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
-  const a = AFFIRMATIONS[index];
+  const a = affirmations[index];
 
   const swipe = (dir: number) => {
     setDirection(dir);
-    setIndex((i) => (i + dir + AFFIRMATIONS.length) % AFFIRMATIONS.length);
+    setIndex((i) => (i + dir + affirmations.length) % affirmations.length);
   };
 
   const onDrag = (_: any, info: PanInfo) => {
@@ -61,9 +63,9 @@ export default function AffirmationPage() {
     <div className="min-h-full p-4 md:p-8 space-y-6 max-w-2xl mx-auto pb-24">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-serif text-foreground flex items-center gap-2">
-          <Sparkles className="w-7 h-7 text-rose-500" /> Daily Affirmation
+          <Sparkles className={`w-7 h-7 ${isMale ? "text-blue-500" : "text-rose-500"}`} /> Daily Affirmation
         </h1>
-        <p className="text-muted-foreground mt-1">Swipe for a new card · share with your sisters 🌹</p>
+        <p className="text-muted-foreground mt-1">{isMale ? "Swipe for a new card · share with your community 🌹" : "Swipe for a new card · share with your sisters 🌹"}</p>
       </motion.div>
 
       <div className="relative h-[420px] flex items-center justify-center select-none">
@@ -90,7 +92,7 @@ export default function AffirmationPage() {
                 <p className="text-sm opacity-90">— {a.author}</p>
               </div>
               <div className="flex items-center justify-between text-xs uppercase tracking-widest opacity-80">
-                <span>For {user?.name || "you"}, sister</span>
+                <span>For {user?.name || "you"}{!isMale && ", sister"}</span>
                 <span>ROSA · {new Date().toLocaleDateString()}</span>
               </div>
             </Card>
@@ -100,7 +102,7 @@ export default function AffirmationPage() {
 
       <div className="flex justify-center gap-3">
         <Button variant="outline" onClick={() => swipe(-1)} data-testid="button-prev"><RefreshCw className="w-4 h-4 mr-1 rotate-180" /> Previous</Button>
-        <Button onClick={share} className="bg-rose-500 hover:bg-rose-600 text-white" data-testid="button-share">
+        <Button onClick={share} className={isMale ? "bg-blue-500 hover:bg-blue-600 text-white" : "bg-rose-500 hover:bg-rose-600 text-white"} data-testid="button-share">
           <Share2 className="w-4 h-4 mr-1" /> Share
         </Button>
         <Button variant="outline" onClick={() => swipe(1)} data-testid="button-next">Next <RefreshCw className="w-4 h-4 ml-1" /></Button>

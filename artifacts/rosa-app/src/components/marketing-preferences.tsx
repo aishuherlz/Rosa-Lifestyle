@@ -70,7 +70,7 @@ export function MarketingPreferences() {
       toast({
         title: "Saved 🌹",
         description:
-          next === "yes" ? "You're on the list, sister." :
+          next === "yes" ? (user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man" ? "You're on the list. 🌹" : "You're on the list, sister.") :
           next === "never" ? "We'll never email you promotions." :
           "We'll ask you again later.",
       });
