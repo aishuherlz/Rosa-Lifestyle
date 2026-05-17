@@ -84,7 +84,7 @@ export default function QuotesPage() {
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-serif text-foreground">Daily Quotes</h1>
@@ -144,7 +144,7 @@ export default function QuotesPage() {
         <h2 className="text-lg font-serif mb-3">Quote Collection</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {filteredQuotes.map((quote, i) => (
-            <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+            <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}>
               <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="pt-5 pb-4">
                   <p className="text-sm font-serif italic text-foreground/90 leading-relaxed mb-3">"{quote.text}"</p>

@@ -74,7 +74,7 @@ export default function JournalPage() {
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6 max-w-2xl pb-24">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-serif text-foreground flex items-center gap-2">
@@ -200,7 +200,7 @@ export default function JournalPage() {
 
       <div className="space-y-4">
         {filtered.map((entry) => (
-          <motion.div key={entry.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <motion.div key={entry.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <Card className="border-border/50 overflow-hidden hover:shadow-md transition-shadow">
               {entry.photo && (
                 <img src={entry.photo} alt="" className="w-full h-40 object-cover" />

@@ -132,7 +132,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6 max-w-2xl pb-24">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <h1 className="text-3xl font-serif text-foreground">Settings</h1>
         <p className="text-muted-foreground mt-1">Make ROSA your own.</p>
       </motion.div>

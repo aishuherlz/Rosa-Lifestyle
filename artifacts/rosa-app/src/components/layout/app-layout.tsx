@@ -104,15 +104,22 @@ export function AppLayout({ children }: { children: ReactNode }) {
   // Auto-close the drawer whenever the route changes
   useEffect(() => { setDrawerOpen(false); }, [location]);
 
-  // Save scroll position when leaving, restore when returning to a route
+  // Save scroll position when leaving, restore when returning to a route.
+  // RAF delay ensures Framer Motion's entrance animation (y:10→0) finishes
+  // before we restore scrollTop — otherwise the animation layout pass resets it.
   useEffect(() => {
     const el = mainRef.current;
     if (!el) return;
-    // Restore saved position for this route (start at 0 for new routes)
-    el.scrollTop = scrollPositions.current[location] ?? 0;
+    const saved = scrollPositions.current[location] ?? 0;
+    const raf = requestAnimationFrame(() => {
+      el.scrollTop = saved;
+    });
     const onScroll = () => { scrollPositions.current[location] = el.scrollTop; };
     el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener("scroll", onScroll);
+    };
   }, [location]);
 
   // Lock background scroll while the drawer is open (Radix Sheet handles

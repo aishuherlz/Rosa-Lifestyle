@@ -89,7 +89,7 @@ export default function RemindersPage() {
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <h1 className="text-3xl font-serif text-foreground">Reminders</h1>
         <p className="text-muted-foreground mt-1">Never forget what matters.</p>
       </motion.div>
@@ -166,7 +166,7 @@ export default function RemindersPage() {
 
       {/* Day panel */}
       {selectedDate && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <Card className="border-border/50 shadow-sm">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">

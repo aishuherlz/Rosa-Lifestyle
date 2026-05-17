@@ -209,7 +209,7 @@ function SurveysInner() {
   return (
     <div className="min-h-screen pb-24">
       <div className="px-4 py-6 max-w-lg mx-auto">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
           <h1 className="font-serif text-2xl font-medium text-foreground">Surveys</h1>
           <p className="text-muted-foreground text-sm mt-1">Honest check-ins for your inner life</p>
         </motion.div>

@@ -57,7 +57,7 @@ export default function SkinPage() {
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6 max-w-2xl pb-24">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <h1 className="text-3xl font-serif text-foreground flex items-center gap-2">
           <Sparkles className="w-7 h-7 text-primary" /> Skin Tracker
         </h1>

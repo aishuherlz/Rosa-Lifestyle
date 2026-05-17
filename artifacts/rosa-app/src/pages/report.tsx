@@ -98,7 +98,7 @@ export default function ReportPage() {
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-3xl font-serif text-foreground">ROSA {view === "month" ? "Report" : "Wrapped"}</h1>
@@ -133,7 +133,7 @@ export default function ReportPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {cards.map((c, i) => (
-          <motion.div key={c.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+          <motion.div key={c.label} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}>
             <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="pt-5 pb-5">
                 <div className="flex items-center gap-2">{c.icon}<p className="text-xs uppercase font-semibold text-muted-foreground">{c.label}</p></div>

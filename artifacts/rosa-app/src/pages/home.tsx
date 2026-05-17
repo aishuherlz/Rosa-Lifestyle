@@ -83,6 +83,8 @@ export default function Home() {
       }, true)
     : getCyclePhase(periodData, false);
 
+  const todayStr = format(today, "yyyy-MM-dd");
+  const alreadyCheckedIn = garden.lastCheckIn === todayStr;
 
   const greetingSuffix = isMale ? "Sir" : (user?.name || "Beautiful");
 
@@ -216,7 +218,7 @@ export default function Home() {
       {showTutorial && (
         <Tutorial onComplete={closeTutorial} />
       )}
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 md:p-10 space-y-7 max-w-4xl mx-auto pb-24">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-5 md:p-10 space-y-7 max-w-4xl mx-auto pb-24">
 
       {/* Header */}
       <header className="flex justify-between items-end">
@@ -355,10 +357,10 @@ export default function Home() {
           </div>
           <button
             onClick={handleCheckIn}
-            disabled={checkedInToday}
-            className={`w-full text-xs py-2 rounded-xl font-medium transition-all ${checkedInToday ? "bg-emerald-100 text-emerald-700" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
+            disabled={alreadyCheckedIn}
+            className={`w-full text-xs py-2 rounded-xl font-medium transition-all ${alreadyCheckedIn ? "bg-emerald-100 text-emerald-700" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
           >
-            {checkedInToday ? "✓ Checked in today" : "+ Daily Check-in"}
+            {alreadyCheckedIn ? "✓ Checked in today" : "+ Daily Check-in"}
           </button>
         </motion.div>
 

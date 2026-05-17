@@ -75,7 +75,7 @@ export default function WisdomPage() {
 
   return (
     <div className="min-h-full p-4 md:p-8 space-y-6 max-w-6xl mx-auto pb-24">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <h1 className="text-3xl font-serif text-foreground flex items-center gap-2">
           <BookOpen className={`w-7 h-7 ${isMale ? "text-blue-500" : "text-rose-500"}`} /> ROSA Wisdom
         </h1>
