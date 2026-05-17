@@ -46,6 +46,10 @@ type UserContextType = {
   getAuthHeaders: () => Record<string, string>;
   // Hard logout: clears storage AND attempts a server-side device revoke.
   logout: (opts?: { revokeServerSide?: boolean }) => Promise<void>;
+  // Tutorial state lives in context so it survives route changes
+  showTutorial: boolean;
+  openTutorial: () => void;
+  closeTutorial: () => void;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -54,6 +58,15 @@ const PROFILE_KEY = "rosa_user";
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Tutorial state lives in context (not in Home) so it survives route changes
+  const [showTutorial, setShowTutorial] = useState(false);
+  const openTutorial = () => setShowTutorial(true);
+  const closeTutorial = () => {
+    setShowTutorial(false);
+    try { localStorage.setItem("rosa_tutorial_done", "true"); } catch {}
+  };
+
   const [hasSeenIntro, setHasSeenIntroState] = useState(() => {
     // Read synchronously on first render to avoid race condition where
     // ProtectedRoute redirects remembered users to /intro before useEffect fires
@@ -184,6 +197,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
     };
     setUserState(merged);
     persistProfile(merged);
+
+    // Auto-show tutorial for new users (joined within last 3 days, never seen tutorial)
+    const tutorialDone = localStorage.getItem("rosa_tutorial_done");
+    const joinedAt = newUser.joinedAt ? new Date(newUser.joinedAt).getTime() : 0;
+    const isNew = !tutorialDone && joinedAt > Date.now() - 1000 * 60 * 60 * 24 * 3;
+    if (isNew) setShowTutorial(true);
   };
 
   const logout = async (opts?: { revokeServerSide?: boolean }) => {
@@ -223,6 +242,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
       signInWith,
       getAuthHeaders: getAuthHeader,
       logout,
+      showTutorial,
+      openTutorial,
+      closeTutorial,
     }}>
       {children}
     </UserContext.Provider>

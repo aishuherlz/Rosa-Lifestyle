@@ -53,6 +53,7 @@ const GET_DAILY_QUOTES = (isMale: boolean) => [
 
 export default function Home() {
   const { user, getAuthHeaders } = useUser();
+  const { showTutorial, openTutorial, closeTutorial } = useUser();
   const { plan, daysLeftInTrial, isPremium } = useSubscription();
   const { garden, checkIn, wellnessScore } = useGarden();
   const [weather, setWeather] = useState<{ temp: number; code: number } | null>(null);
@@ -73,19 +74,6 @@ export default function Home() {
   // garden.lastCheckIn is stored in localStorage via garden-context
   const checkedInToday = garden.lastCheckIn === todayStr;
 
-  // Tutorial shows for new users OR when replay is triggered from Settings
-  const [showTutorial, setShowTutorial] = useState(() => {
-    const done = scopedStorage.getItem("rosa_tutorial_done");
-    const joinedRecently = user?.joinedAt && (Date.now() - new Date(user.joinedAt).getTime()) < 1000 * 60 * 60 * 24 * 3;
-    return !done && !!joinedRecently;
-  });
-
-  // Listen for tutorial replay trigger from Settings
-  useEffect(() => {
-    const handler = () => setShowTutorial(true);
-    window.addEventListener("rosa:replay-tutorial", handler);
-    return () => window.removeEventListener("rosa:replay-tutorial", handler);
-  }, []);
   const quote = quotes[today.getDate() % quotes.length];
   
   const cycleInfo = isMale && partnerData?.partnerData?.cycle?.logs?.[0] 
@@ -95,6 +83,8 @@ export default function Home() {
       }, true)
     : getCyclePhase(periodData, false);
 
+  const todayStr = format(today, "yyyy-MM-dd");
+  const alreadyCheckedIn = garden.lastCheckIn === todayStr;
 
   const greetingSuffix = isMale ? "Sir" : (user?.name || "Beautiful");
 
@@ -226,7 +216,7 @@ export default function Home() {
   return (
     <>
       {showTutorial && (
-        <Tutorial onComplete={() => setShowTutorial(false)} />
+        <Tutorial onComplete={closeTutorial} />
       )}
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 md:p-10 space-y-7 max-w-4xl mx-auto pb-24">
 
@@ -367,10 +357,10 @@ export default function Home() {
           </div>
           <button
             onClick={handleCheckIn}
-            disabled={checkedInToday}
-            className={`w-full text-xs py-2 rounded-xl font-medium transition-all ${checkedInToday ? "bg-emerald-100 text-emerald-700" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
+            disabled={alreadyCheckedIn}
+            className={`w-full text-xs py-2 rounded-xl font-medium transition-all ${alreadyCheckedIn ? "bg-emerald-100 text-emerald-700" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
           >
-            {checkedInToday ? "✓ Checked in today" : "+ Daily Check-in"}
+            {alreadyCheckedIn ? "✓ Checked in today" : "+ Daily Check-in"}
           </button>
         </motion.div>
 

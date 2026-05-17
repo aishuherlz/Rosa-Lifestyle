@@ -6,7 +6,7 @@ import {
   Crown, Utensils, ClipboardList, Timer, BookHeart, Target,
   FlameKindling, Sparkles, Mail, Moon, Globe, Activity, FileText,
   Sunrise, AlertCircle, Flower2, Menu, MessageCircle, User,
-  BedDouble, Lightbulb, HeartHandshake,
+  BedDouble, Lightbulb, UserHeart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FloatingChat, ROSA_TOGGLE_CHAT_EVENT } from "@/components/chatbot/floating-chat";
@@ -45,7 +45,7 @@ const NAV_ITEMS = [
   { href: "/surveys", label: "Surveys", icon: ClipboardList },
   { href: "/quotes", label: "Quotes", icon: Quote },
   { href: "/circles", label: "Circles", icon: Globe },
-  { href: "/friends", label: "Friends", icon: HeartHandshake },
+  { href: "/friends", label: "Friends", icon: UserHeart },
   { href: "/health-sync", label: "Health Sync", icon: Activity },
   { href: "/report", label: "ROSA Report", icon: FileText },
   { href: "/sanctuary", label: "Sanctuary", icon: Moon },
@@ -86,6 +86,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { isNight } = useNightMode();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
+  // Persist scroll positions per route so navigating back restores position
+  const scrollPositions = useRef<Record<string, number>>({});
 
   const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
 
@@ -102,8 +104,16 @@ export function AppLayout({ children }: { children: ReactNode }) {
   // Auto-close the drawer whenever the route changes
   useEffect(() => { setDrawerOpen(false); }, [location]);
 
-  // NOTE: We intentionally do NOT reset scroll on route change.
-  // Users expect their scroll position to be preserved when navigating back.
+  // Save scroll position when leaving, restore when returning to a route
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    // Restore saved position for this route (start at 0 for new routes)
+    el.scrollTop = scrollPositions.current[location] ?? 0;
+    const onScroll = () => { scrollPositions.current[location] = el.scrollTop; };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [location]);
 
   // Lock background scroll while the drawer is open (Radix Sheet handles
   // focus, but iOS still scrolls under the overlay otherwise).

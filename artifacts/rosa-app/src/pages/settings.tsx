@@ -42,7 +42,7 @@ type TimezoneSettings = {
 };
 
 export default function SettingsPage() {
-  const { user, setUser, logout } = useUser();
+  const { user, setUser, logout, openTutorial } = useUser();
   const { plan, daysLeftInTrial } = useSubscription();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -433,9 +433,8 @@ export default function SettingsPage() {
             className="w-full border-primary/30 text-primary hover:bg-primary/5"
             onClick={() => {
               scopedStorage.removeItem("rosa_tutorial_done");
-              // Fire event so Home page shows tutorial immediately if already mounted
-              window.dispatchEvent(new Event("rosa:replay-tutorial"));
-              // Navigate to home where the tutorial lives
+              try { localStorage.removeItem("rosa_tutorial_done"); } catch {}
+              openTutorial();
               setLocation("/");
               toast({ title: "Tutorial starting! 🌹", description: "Follow the steps to explore ROSA." });
             }}
