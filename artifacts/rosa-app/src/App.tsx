@@ -59,6 +59,8 @@ export function getIsMale(gender?: string | null): boolean {
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading, hasSeenIntro } = useUser();
 
+  // Always show loading screen while auth is being checked —
+  // never redirect during this window or remembered users get kicked to /intro
   if (isLoading) {
     return (
       <div className="h-screen w-screen bg-background flex items-center justify-center">

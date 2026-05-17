@@ -54,7 +54,15 @@ const PROFILE_KEY = "rosa_user";
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasSeenIntro, setHasSeenIntroState] = useState(false);
+  const [hasSeenIntro, setHasSeenIntroState] = useState(() => {
+    // Read synchronously on first render to avoid race condition where
+    // ProtectedRoute redirects remembered users to /intro before useEffect fires
+    if (typeof window === "undefined") return false;
+    return (
+      localStorage.getItem("rosa_intro_seen") === "true" ||
+      sessionStorage.getItem("rosa_intro_seen") === "true"
+    );
+  });
 
   // On boot: rehydrate the user profile from local/session storage and, if a
   // valid session token exists, validate it with the server.
@@ -82,10 +90,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Use localStorage for intro seen state so returning users skip the splash
-    // even after closing the browser (critical for Remember Me flow)
-    const introSeen = localStorage.getItem("rosa_intro_seen") || sessionStorage.getItem("rosa_intro_seen");
-    if (introSeen === "true") setHasSeenIntroState(true);
+    // introSeen is now read synchronously in useState — no need to read here
 
     // If we loaded a session, ping /api/auth/me to confirm it's still valid.
     // We also use this round trip to refresh profile fields (gender, pronouns, etc).

@@ -12,7 +12,7 @@ import {
   HeartPulse, CalendarHeart, Droplets, CalendarDays,
   Utensils, Dumbbell, Shirt, Map, Timer, Gift, Crown,
   ClipboardList, BookHeart, Target, Sparkles, Moon, FlameKindling, Flower2, Users, Info,
-  BedDouble, Lightbulb, HeartHandshake,
+  BedDouble, Lightbulb, UserHeart,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -69,12 +69,19 @@ export default function Home() {
   const isMale = getIsMale(user?.gender);
   const quotes = GET_DAILY_QUOTES(isMale);
 
-  // Show tutorial for new users who haven't seen it yet
+  // Tutorial shows for new users OR when replay is triggered from Settings
   const [showTutorial, setShowTutorial] = useState(() => {
     const done = scopedStorage.getItem("rosa_tutorial_done");
-    const joinedRecently = user?.joinedAt && (Date.now() - new Date(user.joinedAt).getTime()) < 1000 * 60 * 60 * 24 * 3; // within 3 days
+    const joinedRecently = user?.joinedAt && (Date.now() - new Date(user.joinedAt).getTime()) < 1000 * 60 * 60 * 24 * 3;
     return !done && !!joinedRecently;
   });
+
+  // Listen for tutorial replay trigger from Settings
+  useEffect(() => {
+    const handler = () => setShowTutorial(true);
+    window.addEventListener("rosa:replay-tutorial", handler);
+    return () => window.removeEventListener("rosa:replay-tutorial", handler);
+  }, []);
   const quote = quotes[today.getDate() % quotes.length];
   
   const cycleInfo = isMale && partnerData?.partnerData?.cycle?.logs?.[0] 

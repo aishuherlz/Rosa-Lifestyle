@@ -122,7 +122,12 @@ export default function Landing() {
               Get started free <ArrowRight className="w-4 h-4" />
             </button>
             <button
-              onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const el = document.getElementById("features");
+                if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
               className="flex-1 border border-white/25 text-white font-medium px-8 py-4 rounded-2xl hover:bg-white/10 transition-all"
             >
               See what&apos;s inside

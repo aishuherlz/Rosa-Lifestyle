@@ -6,7 +6,7 @@ import {
   Crown, Utensils, ClipboardList, Timer, BookHeart, Target,
   FlameKindling, Sparkles, Mail, Moon, Globe, Activity, FileText,
   Sunrise, AlertCircle, Flower2, Menu, MessageCircle, User,
-  BedDouble, Lightbulb, HeartHandshake,
+  BedDouble, Lightbulb, UserHeart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FloatingChat, ROSA_TOGGLE_CHAT_EVENT } from "@/components/chatbot/floating-chat";
@@ -45,7 +45,7 @@ const NAV_ITEMS = [
   { href: "/surveys", label: "Surveys", icon: ClipboardList },
   { href: "/quotes", label: "Quotes", icon: Quote },
   { href: "/circles", label: "Circles", icon: Globe },
-  { href: "/friends", label: "Friends", icon: HeartHandshake },
+  { href: "/friends", label: "Friends", icon: UserHeart },
   { href: "/health-sync", label: "Health Sync", icon: Activity },
   { href: "/report", label: "ROSA Report", icon: FileText },
   { href: "/sanctuary", label: "Sanctuary", icon: Moon },
@@ -102,11 +102,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
   // Auto-close the drawer whenever the route changes
   useEffect(() => { setDrawerOpen(false); }, [location]);
 
-  // Scroll main content to top on every route change — fixes the scroll reset bug
-  // where navigating back to Home kept the previous page's scroll position
-  useEffect(() => {
-    mainRef.current?.scrollTo({ top: 0, behavior: "instant" });
-  }, [location]);
+  // NOTE: We intentionally do NOT reset scroll on route change.
+  // Users expect their scroll position to be preserved when navigating back.
 
   // Lock background scroll while the drawer is open (Radix Sheet handles
   // focus, but iOS still scrolls under the overlay otherwise).

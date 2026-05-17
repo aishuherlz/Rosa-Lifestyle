@@ -433,7 +433,11 @@ export default function SettingsPage() {
             className="w-full border-primary/30 text-primary hover:bg-primary/5"
             onClick={() => {
               scopedStorage.removeItem("rosa_tutorial_done");
-              toast({ title: "Tutorial reset! 🌹", description: "Head to Home to replay the tutorial." });
+              // Fire event so Home page shows tutorial immediately if already mounted
+              window.dispatchEvent(new Event("rosa:replay-tutorial"));
+              // Navigate to home where the tutorial lives
+              setLocation("/");
+              toast({ title: "Tutorial starting! 🌹", description: "Follow the steps to explore ROSA." });
             }}
           >
             🌹 Replay Tutorial
