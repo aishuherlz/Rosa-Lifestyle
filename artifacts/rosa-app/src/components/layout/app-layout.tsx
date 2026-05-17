@@ -6,7 +6,7 @@ import {
   Crown, Utensils, ClipboardList, Timer, BookHeart, Target,
   FlameKindling, Sparkles, Mail, Moon, Globe, Activity, FileText,
   Sunrise, AlertCircle, Flower2, Menu, MessageCircle, User,
-  BedDouble, Lightbulb, UserHeart,
+  BedDouble, Lightbulb, HeartHandshake,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FloatingChat, ROSA_TOGGLE_CHAT_EVENT } from "@/components/chatbot/floating-chat";
@@ -45,7 +45,7 @@ const NAV_ITEMS = [
   { href: "/surveys", label: "Surveys", icon: ClipboardList },
   { href: "/quotes", label: "Quotes", icon: Quote },
   { href: "/circles", label: "Circles", icon: Globe },
-  { href: "/friends", label: "Friends", icon: UserHeart },
+  { href: "/friends", label: "Friends", icon: HeartHandshake },
   { href: "/health-sync", label: "Health Sync", icon: Activity },
   { href: "/report", label: "ROSA Report", icon: FileText },
   { href: "/sanctuary", label: "Sanctuary", icon: Moon },
