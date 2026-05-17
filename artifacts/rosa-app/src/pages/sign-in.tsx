@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/lib/user-context";
@@ -8,157 +8,93 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { OnboardingQuiz } from "@/components/onboarding/onboarding-quiz";
 import { apiUrl } from "@/lib/api";
-import { scopedStorage } from "@/lib/scoped-storage";
 import type { StoredSession } from "@/lib/auth-storage";
-import { loadSession } from "@/lib/auth-storage";
+
+type Flow = "choice" | "login" | "signup" | "verify" | "gender" | "pronouns" | "onboarding";
 
 export default function SignIn() {
   const [, setLocation] = useLocation();
-  const { user, setUser, signInWith, isLoading } = useUser();
+  const { setUser, signInWith } = useUser();
 
-  // If already logged in OR valid remembered session exists, redirect to home
-  useEffect(() => {
-    if (isLoading) return; // Wait for UserContext to finish initial refresh
-    
-    if (user && user.authToken && !user.guestMode) {
-      if (!user.gender || user.gender === "unspecified") {
-        // Only ask if truly missing
-        setStep("gender");
-        return;
-      }
-      setLocation("/");
-      return;
-    }
-    // Check for valid remembered session even if user state not loaded yet
-    const session = loadSession();
-    if (session && session.rememberMe) {
-      setLocation("/");
-    }
-  }, [user, isLoading]);
-  const [step, setStep] = useState<"auth" | "verify" | "gender" | "pronouns" | "onboarding">("auth");
+  const [flow, setFlow] = useState<Flow>("choice");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [gender, setGender] = useState("");
   const [pronouns, setPronouns] = useState("");
   const [customPronouns, setCustomPronouns] = useState("");
-  const savedDeviceId = typeof window !== "undefined" ? localStorage.getItem("rosa_device_id") : null;
-  // Default to TRUE for all users — seamless login is opt-out, not opt-in.
-  // A new user who doesn't uncheck this will get trusted-device treatment from their very first login.
   const [rememberMe, setRememberMe] = useState(true);
-  const isDeviceRemembered = !!savedDeviceId;
-  // Marketing email consent. Default "later" so we don't auto-opt anyone in
-  // (CAN-SPAM/GDPR friendly) and so users who don't notice the choice can be
-  // gently re-asked from the Settings page.
-  // Marketing email consent. Default "later" so we don't auto-opt anyone in
-  // (CAN-SPAM/GDPR friendly) and so users who don't notice the choice can be
-  // gently re-asked from the Settings page.
-  const savedMarketing = scopedStorage.getItem("rosa_marketing_pref") as "yes" | "later" | "never" | null;
-  const [marketingOptIn, setMarketingOptIn] = useState<"yes" | "later" | "never">(savedMarketing || "later");
-  const hasAnsweredMarketing = savedMarketing === "yes" || savedMarketing === "never";
-
-  // Verification step state
+  const [marketingOptIn, setMarketingOptIn] = useState<"yes" | "later" | "never">("later");
+  const [dob, setDob] = useState("");
+  const [partnerCode, setPartnerCode] = useState("");
   const [code, setCode] = useState("");
   const [pendingSession, setPendingSession] = useState<StoredSession | null>(null);
-  // The server-minted permanent Rose Wall pen name; held between the verify
-  // step and the final signInWith() call so it lands in the user profile in
-  // one atomic write (no flicker, no extra fetch).
   const [pendingAnonymousName, setPendingAnonymousName] = useState<string | null>(null);
-  const [partnerCode, setPartnerCode] = useState("");
-  const [isExistingUser, setIsExistingUser] = useState(false);
-  const [checkingEmail, setCheckingEmail] = useState(false);
-  const [dob, setDob] = useState("");
-  const [ageError, setAgeError] = useState<string | null>(null);
+  const [isNewUser, setIsNewUser] = useState(false);
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [devCode, setDevCode] = useState<string | null>(null);
+  const [ageError, setAgeError] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
 
-  // Countdown for the resend button so users can't spam send-code.
-  useEffect(() => {
-    if (resendIn <= 0) return;
-    const t = setInterval(() => setResendIn((s) => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(t);
-  }, [resendIn]);
-
-  function isEmail(s: string): boolean {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
-  }
-
-  // Check if email belongs to existing user
-  const checkIfExisting = async (emailVal: string) => {
-    if (!emailVal || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal.trim())) return;
-    setCheckingEmail(true);
-    try {
-      const res = await fetch(apiUrl("/api/auth/check-existing"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailVal.trim().toLowerCase() }),
-      });
-      const data = await res.json();
-      setIsExistingUser(!!data.exists);
-    } catch {}
-    setCheckingEmail(false);
-  };
-
-  async function sendCode(): Promise<boolean> {
-    setError(null); setInfo(null); setDevCode(null);
-    if (!isEmail(email)) {
-      setError("Please enter a valid email address.");
-      return false;
-    }
+  const sendCode = async () => {
+    setError(null);
     setSending(true);
     try {
       const res = await fetch(apiUrl("/api/auth/send-code"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ destination: email.trim().toLowerCase(), name, deviceId: savedDeviceId || undefined }),
+        body: JSON.stringify({
+          destination: email.trim().toLowerCase(),
+          name: name.trim(),
+          rememberMe,
+          marketingOptIn,
+        }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        setError(data?.error || "Couldn't send code. Please try again.");
+      if (!res.ok) {
+        setError(data?.error || "Could not send code. Try again.");
         return false;
       }
-      
-      // Seamless Login Bypass
-      if (data.verified) {
-        signInWith({
-          name: data.name || name.trim(),
-          emailOrPhone: email.trim().toLowerCase(),
-          gender: data.gender || "unspecified",
-          pronouns: data.pronouns || "",
-          guestMode: false,
-          joinedAt: data.joinedAt || new Date().toISOString(),
-          personalityTags: [],
-          anonymousName: data.anonymousName || null,
-          partnerInviteCode: data.partnerInviteCode || null,
-          rosaId: data.rosaId || null,
-          nickname: data.nickname || null,
-        }, {
-          token: data.token,
-          email: email.trim().toLowerCase(),
-          deviceId: data.deviceId,
-          expiresAt: data.expiresAt,
-          rememberMe: !!data.rememberMe,
-        });
-        setLocation("/");
-        return false; // prevent UI from moving to "verify" step
-      }
-
-      setInfo(data.message || "Code sent to your email.");
-      if (data.devCode) setDevCode(String(data.devCode));
-      setResendIn(30);
+      setInfo("Check your email for a 6-digit code 🌹");
+      setResendIn(60);
       return true;
     } catch {
-      setError("Network error. Please check your connection and try again.");
+      setError("Network error. Please try again.");
       return false;
     } finally {
       setSending(false);
     }
-  }
+  };
 
-  async function verifyCode(): Promise<void> {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    const ok = await sendCode();
+    if (ok) setFlow("verify");
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !name) return;
+    // Age check
+    if (dob) {
+      const birth = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+      if (age < 15) {
+        setAgeError("You must be at least 15 years old to join ROSA 🌹");
+        return;
+      }
+    }
+    setAgeError(null);
+    const ok = await sendCode();
+    if (ok) { setIsNewUser(true); setFlow("verify"); }
+  };
+
+  const verifyCode = async () => {
     setError(null);
     if (!/^\d{6}$/.test(code.trim())) {
       setError("Please enter the 6-digit code from your email.");
@@ -176,6 +112,7 @@ export default function SignIn() {
           marketingOptIn,
           name: name.trim(),
           partnerCode: partnerCode.trim() || undefined,
+          dateOfBirth: dob || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -183,8 +120,6 @@ export default function SignIn() {
         setError(data?.error || "Incorrect code. Please try again.");
         return;
       }
-      // Stash the full session so handleSavePronouns can persist it atomically
-      // alongside the rest of the profile (name/gender/pronouns).
       if (typeof data.token === "string" && data.deviceId && data.expiresAt) {
         setPendingSession({
           token: data.token,
@@ -193,31 +128,20 @@ export default function SignIn() {
           expiresAt: data.expiresAt,
           rememberMe: !!data.rememberMe,
         });
-      } else {
-        setPendingSession(null);
       }
-      // Capture the permanent Rose Wall pen name the server minted (or
-      // backfilled) for this account, so we can persist it alongside the
-      // profile when the user finishes onboarding.
-      if (typeof data.anonymousName === "string") {
-        setPendingAnonymousName(data.anonymousName);
-      } else {
-        setPendingAnonymousName(null);
-      }
-      // If returning user AND has gender, skip gender/pronouns/onboarding completely
-      const hasProfile = data.gender && data.gender !== "unspecified";
-      if (!data.isNewUser && (hasProfile || data.pronouns)) {
-        // Sign them in directly
+      if (typeof data.anonymousName === "string") setPendingAnonymousName(data.anonymousName);
+
+      // RETURNING USER — skip gender/pronouns
+      if (data.isReturningUser && data.gender) {
         signInWith({
           name: data.name || name.trim(),
           emailOrPhone: email.trim().toLowerCase(),
-          gender: data.gender || "unspecified",
+          gender: data.gender,
           pronouns: data.pronouns || "",
           guestMode: false,
           joinedAt: data.joinedAt || new Date().toISOString(),
           personalityTags: [],
           anonymousName: data.anonymousName || null,
-          partnerInviteCode: data.partnerInviteCode || null,
           rosaId: data.rosaId || null,
           nickname: data.nickname || null,
         }, {
@@ -228,58 +152,17 @@ export default function SignIn() {
           rememberMe: !!data.rememberMe,
         });
         setLocation("/");
-      } else {
-        // New user OR returning user with truly missing profile data
-        setStep("gender");
+        return;
       }
+
+      // NEW USER — go through gender/pronouns
+      setFlow("gender");
     } catch {
       setError("Network error. Please try again.");
     } finally {
       setVerifying(false);
     }
-  }
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-
-    // Existing users skip all new-user guards — just send the code
-    if (isExistingUser) {
-      const ok = await sendCode();
-      if (ok) setStep("verify");
-      return;
-    }
-
-    // New user guards
-    if (!name) return;
-    if (!dob) {
-      setAgeError("Please enter your date of birth to continue.");
-      return;
-    }
-    const birthDate = new Date(dob);
-    const today = new Date();
-    const age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    const actualAge = m < 0 || (m === 0 && today.getDate() < birthDate.getDate()) ? age - 1 : age;
-    // Regional age rules
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const isIndia = tz.startsWith("Asia/Kolkata") || tz.startsWith("Asia/Calcutta");
-    const isAsia = tz.startsWith("Asia/");
-    const isAfrica = tz.startsWith("Africa/");
-    const minAge = (isIndia || isAsia || isAfrica) ? 18 : 15;
-    if (actualAge < minAge) {
-      setAgeError(`You must be at least ${minAge} years old to use ROSA in your region.`);
-      return;
-    }
-    if (actualAge > 120) {
-      setAgeError("Please enter a valid date of birth.");
-      return;
-    }
-    setAgeError(null);
-    const ok = await sendCode();
-    if (ok) setStep("verify");
   };
-
 
   const handleGuest = () => {
     setUser({
@@ -298,7 +181,7 @@ export default function SignIn() {
     setGender(g);
     const defaultPronoun = g === "female" ? "she/her" : g === "male" ? "he/him" : g === "non-binary" ? "they/them" : "";
     setPronouns(defaultPronoun);
-    setStep("pronouns");
+    setFlow("pronouns");
   };
 
   const handleSavePronouns = async () => {
@@ -314,12 +197,12 @@ export default function SignIn() {
       anonymousName: pendingAnonymousName,
     }, pendingSession);
 
-    // Save gender and pronouns to database
+    // Save gender to backend
     try {
       if (pendingSession?.token) {
         await fetch(apiUrl("/api/auth/profile"), {
           method: "PUT",
-          headers: { 
+          headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${pendingSession.token}`
           },
@@ -328,22 +211,22 @@ export default function SignIn() {
       }
     } catch {}
 
-    // Check if male/transman without partner — redirect to partner linking
-    const blockedGenders = ["male", "man"];
-    if (blockedGenders.includes(gender.toLowerCase())) {
+    // Male users must link partner first
+    if (gender === "male" || gender === "man") {
       setLocation("/partner");
       return;
     }
 
-    const existingOnboarding = JSON.parse(scopedStorage.getItem("rosa_onboarding") || "{}"); 
-    if (existingOnboarding?.completed) { setLocation("/"); } else { setStep("onboarding"); }
+    const existingOnboarding = JSON.parse(localStorage.getItem("rosa_onboarding") || "{}");
+    if (existingOnboarding?.completed) { setLocation("/"); } else { setFlow("onboarding"); }
   };
 
   const GENDERS = [
-    { id: "female", label: "Female", desc: "She/Her" },
-    { id: "male", label: "Male", desc: "He/Him" },
-    { id: "non-binary", label: "Non-binary", desc: "They/Them" },
-    { id: "inclusive", label: "Inclusive LGBTQ+", desc: "All are welcome" },
+    { id: "female", label: "Female 🌸", desc: "She/Her" },
+    { id: "male", label: "Male 💙", desc: "He/Him" },
+    { id: "non-binary", label: "Non-binary ✨", desc: "They/Them" },
+    { id: "inclusive", label: "LGBTQ+ 🌈", desc: "All are welcome" },
+    { id: "prefer-not", label: "Prefer not to say", desc: "" },
   ];
 
   const PRONOUN_OPTIONS = [
@@ -352,11 +235,11 @@ export default function SignIn() {
     { id: "they/them", label: "They / Them" },
     { id: "she/they", label: "She / They" },
     { id: "he/they", label: "He / They" },
-    { id: "any", label: "Any pronouns are fine" },
-    { id: "custom", label: "Let me write my own" },
+    { id: "any", label: "Any pronouns" },
+    { id: "custom", label: "Write my own" },
   ];
 
-  if (step === "onboarding") {
+  if (flow === "onboarding") {
     return <OnboardingQuiz onComplete={() => setLocation("/")} />;
   }
 
@@ -364,344 +247,197 @@ export default function SignIn() {
     <div className="min-h-[100dvh] w-full flex bg-background items-center justify-center p-4">
       <div className="w-full max-w-md">
         <AnimatePresence mode="wait">
-          {step === "auth" && (
-            <motion.div
-              key="auth"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.5 }}
-              className="space-y-8"
-            >
+
+          {/* CHOICE SCREEN */}
+          {flow === "choice" && (
+            <motion.div key="choice" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-8">
               <div className="text-center space-y-2">
-                <h1 className="text-4xl font-serif text-primary">Welcome to ROSA</h1>
-                <p className="text-muted-foreground">Your personal sanctuary awaits.</p>
+                <h1 className="text-5xl font-serif text-primary">ROSA</h1>
+                <p className="text-muted-foreground">Your personal sanctuary awaits 🌹</p>
               </div>
+              <div className="space-y-3">
+                <Button onClick={() => setFlow("login")} className="w-full h-14 text-base bg-primary text-white rounded-2xl">
+                  Sign In 🌹
+                </Button>
+                <Button onClick={() => setFlow("signup")} variant="outline" className="w-full h-14 text-base border-primary text-primary rounded-2xl">
+                  Create Account ✨
+                </Button>
+                <button onClick={handleGuest} className="w-full text-sm text-muted-foreground text-center py-2 hover:text-primary transition">
+                  Continue as Guest
+                </button>
+              </div>
+            </motion.div>
+          )}
 
-              <form onSubmit={handleSignIn} className="space-y-6 bg-card p-8 rounded-2xl shadow-sm border border-border/50">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      autoComplete="email"
-                      placeholder="hello@example.com"
-                      value={email}
-                      onChange={(e) => { setEmail(e.target.value); checkIfExisting(e.target.value); }}
-                      className="bg-background/50 border-muted focus-visible:ring-primary/30"
-                      required
-                      data-testid="input-signin-email"
-                    />
-                    {checkingEmail && <p className="text-xs text-muted-foreground">Checking...</p>}
-                    {isExistingUser && <p className="text-xs text-green-600">Welcome back! 🌹 Just enter your email to get a code.</p>}
-                    <p className="text-xs text-muted-foreground">We will send a 6-digit code to verify it is you.</p>
-                  </div>
-                  {!isExistingUser && <>
-                    <div className="space-y-2">
-                      <Label htmlFor="name">How should we call you?</Label>
-                      <Input
-                        id="name"
-                        placeholder="Your beautiful name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="bg-background/50 border-muted focus-visible:ring-primary/30"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="dob">Date of Birth</Label>
-                      <Input
-                        id="dob"
-                        type="date"
-                        value={dob}
-                        onChange={(e) => { setDob(e.target.value); setAgeError(null); }}
-                        className="bg-background/50 border-muted focus-visible:ring-primary/30"
-                        max={new Date().toISOString().split("T")[0]}
-                      />
-                      {ageError && <p className="text-xs text-red-500">{ageError}</p>}
-                      <p className="text-xs text-muted-foreground">Must be 15+ to join ROSA (18+ in some regions)</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="partner-code">Partner invite code (optional)</Label>
-                      <Input
-                        id="partner-code"
-                        placeholder="Enter partner ROSA ID e.g. ROSA#1234"
-                        value={partnerCode}
-                        onChange={(e) => setPartnerCode(e.target.value)}
-                        className="bg-background/50 border-muted focus-visible:ring-primary/30"
-                      />
-                      <p className="text-xs text-muted-foreground">Have a partner on ROSA? Enter their ROSA ID to link accounts.</p>
-                    </div>
-                  </>}
-                </div>
-
-                {/* Remember Me — always visible so user can see & change their preference */}
+          {/* LOGIN SCREEN */}
+          {flow === "login" && (
+            <motion.div key="login" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
+              <div className="text-center space-y-2">
+                <h1 className="text-3xl font-serif text-primary">Welcome back 🌹</h1>
+                <p className="text-muted-foreground text-sm">Sign in to your ROSA sanctuary</p>
+              </div>
+              <form onSubmit={handleLogin} className="space-y-4 bg-card p-6 rounded-2xl shadow-sm border border-border/50">
                 <div className="space-y-2">
-                  {isDeviceRemembered && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
-                      <span className="text-green-600 text-sm">✔</span>
-                      <p className="text-xs text-green-700 font-medium">This device is trusted — you won't need to verify again.</p>
-                    </div>
-                  )}
-                  <div className="flex items-start gap-2 pt-1">
-                    <Checkbox
-                      id="remember-me"
-                      checked={rememberMe}
-                      onCheckedChange={(v) => setRememberMe(v === true)}
-                      data-testid="checkbox-remember-me"
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <Label htmlFor="remember-me" className="text-sm cursor-pointer">Remember me on this device</Label>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {rememberMe
-                          ? "✔ Stay signed in for 30 days on this device."
-                          : "You'll be asked to verify next time you log in."}
-                      </p>
-                    </div>
-                  </div>
+                  <Label htmlFor="login-email">Email</Label>
+                  <Input id="login-email" type="email" placeholder="hello@example.com"
+                    value={email} onChange={e => setEmail(e.target.value)}
+                    className="bg-background/50" required />
                 </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox id="login-remember" checked={rememberMe} onCheckedChange={v => setRememberMe(v === true)} />
+                  <Label htmlFor="login-remember" className="text-sm cursor-pointer">Remember me on this device</Label>
+                </div>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <Button type="submit" disabled={sending} className="w-full bg-primary text-white rounded-xl">
+                  {sending ? "Sending code..." : "Send verification code"}
+                </Button>
+              </form>
+              <button onClick={() => setFlow("choice")} className="w-full text-sm text-muted-foreground text-center hover:text-primary transition">
+                ← Back
+              </button>
+            </motion.div>
+          )}
 
-                {/* Marketing email opt-in — three explicit choices so we have
-                    real consent (not a pre-checked dark pattern). "Later" is
-                    default so the Settings page can re-ask gently. */}
-                {(!isExistingUser && !hasAnsweredMarketing) && <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-4 space-y-2">
-                  <Label className="text-sm font-medium text-foreground">
-                    Stay in the loop?
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Promotional offers, exclusive deals, and ROSA updates from <span className="font-medium text-foreground">news@rosainclusive.lifestyle</span>. Your verification codes still come from <span className="font-medium text-foreground">noreply@rosainclusive.lifestyle</span> regardless.
-                  </p>
-                  <div className="grid gap-2 pt-1">
-                    {([
-                      { v: "yes", label: "Yes, sign me up", hint: "I'd love offers and deals 💝" },
-                      { v: "later", label: "Maybe later", hint: "Ask me again from settings" },
-                      { v: "never", label: "No thank you", hint: "Don't ever email me promotions" },
-                    ] as const).map((opt) => (
-                      <label
-                        key={opt.v}
-                        htmlFor={`marketing-${opt.v}`}
-                        className={`flex items-start gap-2 rounded-lg px-3 py-2 cursor-pointer border transition-colors ${
-                          marketingOptIn === opt.v
-                            ? "border-primary/60 bg-primary/[0.08]"
-                            : "border-border/50 hover:border-primary/30 hover:bg-primary/[0.03]"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          id={`marketing-${opt.v}`}
-                          name="marketing-opt-in"
-                          value={opt.v}
-                          checked={marketingOptIn === opt.v}
-                          onChange={() => {
-                            setMarketingOptIn(opt.v);
-                            scopedStorage.setItem("rosa_marketing_pref", opt.v);
-                          }}
-                          data-testid={`radio-marketing-${opt.v}`}
-                          className="mt-1 accent-primary"
-                        />
-                        <div className="leading-tight">
-                          <div className="text-sm">{opt.label}</div>
-                          <div className="text-[11px] text-muted-foreground">{opt.hint}</div>
-                        </div>
-                      </label>
+          {/* SIGNUP SCREEN */}
+          {flow === "signup" && (
+            <motion.div key="signup" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+              <div className="text-center space-y-2">
+                <h1 className="text-3xl font-serif text-primary">Join ROSA 🌹</h1>
+                <p className="text-muted-foreground text-sm">Built by women, for everyone</p>
+              </div>
+              <form onSubmit={handleSignup} className="space-y-4 bg-card p-6 rounded-2xl shadow-sm border border-border/50">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-name">Your name</Label>
+                  <Input id="signup-name" placeholder="Your beautiful name"
+                    value={name} onChange={e => setName(e.target.value)}
+                    className="bg-background/50" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email</Label>
+                  <Input id="signup-email" type="email" placeholder="hello@example.com"
+                    value={email} onChange={e => setEmail(e.target.value)}
+                    className="bg-background/50" required />
+                  <p className="text-xs text-muted-foreground">We will send a verification code</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-dob">Date of birth</Label>
+                  <Input id="signup-dob" type="date"
+                    value={dob} onChange={e => { setDob(e.target.value); setAgeError(null); }}
+                    max={new Date().toISOString().split("T")[0]}
+                    className="bg-background/50" />
+                  {ageError && <p className="text-xs text-red-500">{ageError}</p>}
+                  <p className="text-xs text-muted-foreground">Must be 15+ to join (18+ in some regions)</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="partner-code">Partner invite code (optional)</Label>
+                  <Input id="partner-code" placeholder="ROSA-XXXXX"
+                    value={partnerCode} onChange={e => setPartnerCode(e.target.value)}
+                    className="bg-background/50" />
+                  <p className="text-xs text-muted-foreground">Have a partner on ROSA? Enter their ROSA ID</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Promotional emails</Label>
+                  <div className="space-y-1">
+                    {[
+                      { value: "yes", label: "Yes please 🌹 — send me offers and updates" },
+                      { value: "later", label: "Maybe later" },
+                      { value: "never", label: "Never — no promotional emails" },
+                    ].map(opt => (
+                      <button key={opt.value} type="button"
+                        onClick={() => setMarketingOptIn(opt.value as any)}
+                        className={`w-full text-left p-2 rounded-xl border text-sm transition ${marketingOptIn === opt.value ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}>
+                        {opt.label}
+                      </button>
                     ))}
                   </div>
-                </div>}
-
-                {error && step === "auth" && (
-                  <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2" role="alert">{error}</p>
-                )}
-
-                <div className="space-y-3 pt-2">
-                  <Button
-                    type="submit"
-                    disabled={sending || !email}
-                    className="w-full bg-primary hover:bg-primary/90 text-white rounded-full py-6 text-lg shadow-sm hover:shadow transition-all disabled:opacity-60"
-                    data-testid="button-signin-send-code"
-                  >
-                    {sending ? "Sending..." : isExistingUser ? "Log in to ROSA" : "Send verification code"}
-                  </Button>
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
-                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or</span></div>
-                  </div>
-                  <Button type="button" variant="outline" onClick={handleGuest} className="w-full rounded-full py-6 border-primary/20 text-primary hover:bg-primary/5">
-                    Continue as Guest
-                  </Button>
                 </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox id="signup-remember" checked={rememberMe} onCheckedChange={v => setRememberMe(v === true)} />
+                  <Label htmlFor="signup-remember" className="text-sm cursor-pointer">Remember me on this device</Label>
+                </div>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <Button type="submit" disabled={sending} className="w-full bg-primary text-white rounded-xl">
+                  {sending ? "Sending code..." : "Create my ROSA account"}
+                </Button>
               </form>
+              <button onClick={() => setFlow("choice")} className="w-full text-sm text-muted-foreground text-center hover:text-primary transition">
+                ← Back
+              </button>
             </motion.div>
           )}
 
-          {step === "verify" && (
-            <motion.div
-              key="verify"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.5 }}
-              className="space-y-6"
-            >
+          {/* VERIFY SCREEN */}
+          {flow === "verify" && (
+            <motion.div key="verify" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               <div className="text-center space-y-2">
-                <h2 className="text-3xl font-serif text-primary">Check your email 🌹</h2>
-                <p className="text-muted-foreground">
-                  We sent a 6-digit code to<br />
-                  <span className="font-medium text-foreground break-all">{email}</span>
-                </p>
+                <h1 className="text-3xl font-serif text-primary">Check your email 📧</h1>
+                <p className="text-muted-foreground text-sm">We sent a 6-digit code to {email}</p>
               </div>
-
-              <form
-                onSubmit={(e) => { e.preventDefault(); verifyCode(); }}
-                className="space-y-5 bg-card p-8 rounded-2xl shadow-sm border border-border/50"
-              >
+              <div className="space-y-4 bg-card p-6 rounded-2xl shadow-sm border border-border/50">
                 <div className="space-y-2">
                   <Label htmlFor="code">Verification code</Label>
-                  <Input
-                    id="code"
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    pattern="[0-9]{6}"
-                    maxLength={6}
-                    placeholder="123456"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    className="bg-background/50 border-muted focus-visible:ring-primary/30 text-center text-2xl tracking-[0.5em] font-mono"
-                    autoFocus
-                    required
-                    data-testid="input-verify-code"
-                  />
-                  <p className="text-xs text-muted-foreground text-center">Code expires in 10 minutes.</p>
+                  <Input id="code" placeholder="123456" maxLength={6}
+                    value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ""))}
+                    className="bg-background/50 text-center text-2xl tracking-widest" />
                 </div>
-
-                {info && (
-                  <p className="text-sm text-primary/80 bg-primary/5 rounded-lg px-3 py-2 text-center">{info}</p>
-                )}
-                {devCode && (
-                  <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 text-center">
-                    Dev mode — use code: <span className="font-mono font-bold">{devCode}</span>
-                  </p>
-                )}
-                {error && (
-                  <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2" role="alert">{error}</p>
-                )}
-
-                <Button
-                  type="submit"
-                  disabled={verifying || code.length !== 6}
-                  className="w-full bg-primary hover:bg-primary/90 text-white rounded-full py-6 text-lg disabled:opacity-60"
-                  data-testid="button-verify-code"
-                >
-                  {verifying ? "Verifying…" : "Verify & continue 🌸"}
+                {info && <p className="text-sm text-primary text-center">{info}</p>}
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <Button onClick={verifyCode} disabled={verifying || code.length !== 6} className="w-full bg-primary text-white rounded-xl">
+                  {verifying ? "Verifying..." : "Verify code"}
                 </Button>
-
-                <div className="flex items-center justify-between text-sm pt-2">
-                  <button
-                    type="button"
-                    onClick={() => { setStep("auth"); setCode(""); setError(null); setInfo(null); setDevCode(null); }}
-                    className="text-muted-foreground hover:text-primary transition-colors"
-                    data-testid="button-change-email"
-                  >
-                    ← Change email
-                  </button>
-                  <button
-                    type="button"
-                    disabled={resendIn > 0 || sending}
-                    onClick={sendCode}
-                    className="text-primary hover:underline disabled:text-muted-foreground disabled:no-underline disabled:cursor-not-allowed"
-                    data-testid="button-resend-code"
-                  >
-                    {resendIn > 0 ? `Resend in ${resendIn}s` : sending ? "Sending…" : "Resend code"}
-                  </button>
-                </div>
-              </form>
+                <button onClick={() => { setFlow(isNewUser ? "signup" : "login"); setCode(""); setError(null); }}
+                  className="w-full text-sm text-muted-foreground text-center hover:text-primary transition">
+                  ← Back
+                </button>
+              </div>
             </motion.div>
           )}
 
-          {step === "gender" && (
-            <motion.div
-              key="gender"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.5 }}
-              className="space-y-8"
-            >
+          {/* GENDER SCREEN — NEW USERS ONLY */}
+          {flow === "gender" && (
+            <motion.div key="gender" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               <div className="text-center space-y-2">
-                <h2 className="text-3xl font-serif text-primary">How do you identify?</h2>
-                <p className="text-muted-foreground">ROSA is built for everyone to find their sanctuary.</p>
+                <h1 className="text-3xl font-serif text-primary">How do you identify? 🌹</h1>
+                <p className="text-muted-foreground text-sm">Help us personalise your experience</p>
               </div>
-
-              <div className="grid gap-4">
-                {GENDERS.map((g) => (
-                  <button
-                    key={g.id}
-                    onClick={() => handleSelectGender(g.id)}
-                    className="flex items-center justify-between p-6 rounded-2xl border border-border/50 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all text-left group"
-                    data-testid={`button-gender-${g.id}`}
-                  >
-                    <div>
-                      <h3 className="font-medium text-lg text-foreground group-hover:text-primary transition-colors">{g.label}</h3>
-                      <p className="text-sm text-muted-foreground">{g.desc}</p>
-                    </div>
+              <div className="space-y-3">
+                {GENDERS.map(g => (
+                  <button key={g.id} onClick={() => handleSelectGender(g.id)}
+                    className="w-full p-4 rounded-2xl border border-border text-left hover:border-primary hover:bg-primary/5 transition">
+                    <p className="font-medium text-foreground">{g.label}</p>
+                    {g.desc && <p className="text-sm text-muted-foreground">{g.desc}</p>}
                   </button>
                 ))}
               </div>
             </motion.div>
           )}
 
-          {step === "pronouns" && (
-            <motion.div
-              key="pronouns"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.5 }}
-              className="space-y-6"
-            >
+          {/* PRONOUNS SCREEN — NEW USERS ONLY */}
+          {flow === "pronouns" && (
+            <motion.div key="pronouns" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               <div className="text-center space-y-2">
-                <h2 className="text-3xl font-serif text-primary">Your pronouns 🌹</h2>
-                <p className="text-muted-foreground">So ROSA addresses you the way you deserve.</p>
+                <h1 className="text-3xl font-serif text-primary">Your pronouns 🌹</h1>
+                <p className="text-muted-foreground text-sm">We will use these throughout ROSA</p>
               </div>
-
-              <div className="grid gap-2">
-                {PRONOUN_OPTIONS.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => setPronouns(p.id)}
-                    className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${pronouns === p.id ? "border-primary bg-primary/10 ring-2 ring-primary/30" : "border-border/50 bg-card hover:bg-primary/5"}`}
-                    data-testid={`button-pronoun-${p.id.replace("/", "-")}`}
-                  >
-                    <span className="font-medium">{p.label}</span>
-                    {pronouns === p.id && <span className="text-primary text-xl">✓</span>}
+              <div className="space-y-3">
+                {PRONOUN_OPTIONS.map(p => (
+                  <button key={p.id} onClick={() => setPronouns(p.id)}
+                    className={`w-full p-4 rounded-2xl border text-left transition ${pronouns === p.id ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary"}`}>
+                    {p.label}
                   </button>
                 ))}
+                {pronouns === "custom" && (
+                  <Input placeholder="Enter your pronouns"
+                    value={customPronouns} onChange={e => setCustomPronouns(e.target.value)}
+                    className="bg-background/50" />
+                )}
+                <Button onClick={handleSavePronouns} disabled={!pronouns} className="w-full bg-primary text-white rounded-xl">
+                  Continue →
+                </Button>
               </div>
-
-              {pronouns === "custom" && (
-                <div className="space-y-2">
-                  <Label htmlFor="custom-pronouns">Your pronouns</Label>
-                  <Input
-                    id="custom-pronouns"
-                    placeholder="e.g. ze/zir, fae/faer"
-                    value={customPronouns}
-                    onChange={(e) => setCustomPronouns(e.target.value)}
-                    data-testid="input-custom-pronouns"
-                  />
-                </div>
-              )}
-
-              <Button
-                onClick={handleSavePronouns}
-                disabled={!pronouns || (pronouns === "custom" && !customPronouns.trim())}
-                className="w-full bg-primary hover:bg-primary/90 text-white rounded-full py-6 text-lg"
-                data-testid="button-save-pronouns"
-              >
-                Continue 🌸
-              </Button>
             </motion.div>
           )}
+
         </AnimatePresence>
       </div>
     </div>
