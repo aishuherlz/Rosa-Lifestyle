@@ -69,6 +69,8 @@ export function saveSession(session: StoredSession): void {
     target.setItem(REMEMBER_KEY, session.rememberMe ? "1" : "0");
     if (session.rememberMe) {
       localStorage.setItem("rosa_device_id", session.deviceId);
+      // Store email so we can auto-submit for remembered users on next visit
+      localStorage.setItem("rosa_last_email", session.email);
     }
     // Don't leave a stale token in the other storage.
     other.removeItem(STORAGE_KEY);

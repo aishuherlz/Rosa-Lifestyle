@@ -57,7 +57,6 @@ export default function Home() {
   const { garden, checkIn, wellnessScore } = useGarden();
   const [weather, setWeather] = useState<{ temp: number; code: number } | null>(null);
   const [periodData] = useLocalStorage<PeriodData>("rosa_period", {});
-  const [checkedInToday, setCheckedInToday] = useState(false);
   const [showCelebration, setShowCelebration] = useState<string | null>(null);
   const [shareAch, setShareAch] = useState<{ id: string; emoji: string; title: string; description?: string } | null>(null);
   const { toast } = useToast();
@@ -66,8 +65,13 @@ export default function Home() {
   const [isPartnerLoading, setIsPartnerLoading] = useState(false);
 
   const today = new Date();
+  const todayStr = format(today, "yyyy-MM-dd");
   const isMale = getIsMale(user?.gender);
   const quotes = GET_DAILY_QUOTES(isMale);
+
+  // Read check-in state from garden context so it persists across page reloads
+  // garden.lastCheckIn is stored in localStorage via garden-context
+  const checkedInToday = garden.lastCheckIn === todayStr;
 
   // Tutorial shows for new users OR when replay is triggered from Settings
   const [showTutorial, setShowTutorial] = useState(() => {
@@ -170,8 +174,11 @@ export default function Home() {
   };
 
   const handleCheckIn = () => {
+    if (checkedInToday) {
+      toast({ title: "Already checked in today 🌹", description: "Come back tomorrow to keep your streak!" });
+      return;
+    }
     const { newStreak, celebration } = checkIn();
-    setCheckedInToday(true);
     if (celebration === "confetti") {
       confetti({ particleCount: 100, spread: 80, colors: ["#be185d", "#f9a8d4", "#fbbf24"] });
       toast({ title: "7-day streak! 🎉", description: "You're on fire! Keep going." });
