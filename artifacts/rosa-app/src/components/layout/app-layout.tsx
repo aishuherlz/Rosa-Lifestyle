@@ -1,11 +1,12 @@
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Home, HeartPulse, CalendarHeart, Users, Gift, Map, Shirt,
   CalendarDays, Dumbbell, Quote, MessageSquareHeart, Settings,
   Crown, Utensils, ClipboardList, Timer, BookHeart, Target,
   FlameKindling, Sparkles, Mail, Moon, Globe, Activity, FileText,
-  Sunrise, AlertCircle, Flower2, Menu, X, MessageCircle, User,
+  Sunrise, AlertCircle, Flower2, Menu, MessageCircle, User,
+  BedDouble, Lightbulb, UserHeart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FloatingChat, ROSA_TOGGLE_CHAT_EVENT } from "@/components/chatbot/floating-chat";
@@ -44,16 +45,16 @@ const NAV_ITEMS = [
   { href: "/surveys", label: "Surveys", icon: ClipboardList },
   { href: "/quotes", label: "Quotes", icon: Quote },
   { href: "/circles", label: "Circles", icon: Globe },
-  { href: "/friends", label: "Friends", icon: Users },
+  { href: "/friends", label: "Friends", icon: UserHeart },
   { href: "/health-sync", label: "Health Sync", icon: Activity },
   { href: "/report", label: "ROSA Report", icon: FileText },
   { href: "/sanctuary", label: "Sanctuary", icon: Moon },
-  { href: "/wisdom", label: "Wisdom", icon: BookHeart },
+  { href: "/wisdom", label: "Wisdom", icon: Lightbulb },
   { href: "/affirmation", label: "Affirmation", icon: Sunrise },
   { href: "/rose-wall", label: "Rose Wall", icon: Flower2 },
   { href: "/rose-quiz", label: "Rose Quiz", icon: Sparkles },
   { href: "/sos", label: "Period SOS", icon: AlertCircle },
-  { href: "/sleep", label: "Sleep", icon: Moon },
+  { href: "/sleep", label: "Sleep", icon: BedDouble },
 ];
 
 const FOOTER_NAV_ITEMS = [
@@ -84,6 +85,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { garden } = useGarden();
   const { isNight } = useNightMode();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
 
   const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
 
@@ -97,9 +99,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
     return item;
   });
 
-  // Auto-close the drawer whenever the route changes — without this it stays
-  // open after the user picks a destination.
+  // Auto-close the drawer whenever the route changes
   useEffect(() => { setDrawerOpen(false); }, [location]);
+
+  // Scroll main content to top on every route change — fixes the scroll reset bug
+  // where navigating back to Home kept the previous page's scroll position
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, behavior: "instant" });
+  }, [location]);
 
   // Lock background scroll while the drawer is open (Radix Sheet handles
   // focus, but iOS still scrolls under the overlay otherwise).
@@ -266,7 +273,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               </span>
             </div>
           </Link>
-          <Link href="/">
+          <Link href="/report">
             <div className={cn("cursor-pointer flex items-center gap-1 rounded-full px-2.5 py-1 text-xs", isMale ? "bg-blue-50 dark:bg-blue-950/40" : "bg-rose-50 dark:bg-rose-950/40")}>
               <span>🌹</span>
               <span className={cn("font-medium", isMale ? "text-blue-700 dark:text-blue-300" : "text-rose-700 dark:text-rose-300")}>{garden.roses}</span>
@@ -294,6 +301,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* ---- Main content ---- */}
       <main
+        ref={mainRef}
         className={cn(
           "flex-1 overflow-y-auto w-full mx-auto",
           // Account for the fixed bottom nav on mobile so content isn't

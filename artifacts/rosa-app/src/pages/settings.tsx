@@ -16,6 +16,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { TrustedDevices } from "@/components/trusted-devices";
 import { MarketingPreferences } from "@/components/marketing-preferences";
 import { RosaProfileCard } from "@/components/rosa-profile-card";
+import { scopedStorage } from "@/lib/scoped-storage";
 import { forgetDevice } from "@/lib/auth-storage";
 
 const PERSONALITY_TAGS = ["feminist", "spiritual", "adventurous", "gentle", "bold", "self-love", "strength", "growth"];
@@ -158,7 +159,8 @@ export default function SettingsPage() {
                     onClick={() => {
                       forgetDevice();
                       toast({ title: "Device trust removed", description: "You'll need to verify your email next time." });
-                      window.location.reload();
+                      // Use logout instead of reload to stay in SPA context
+                      logout();
                     }}
                   >
                     Remove trust
@@ -416,6 +418,32 @@ export default function SettingsPage() {
 
       {/* Trusted Devices — only shows for verified email users */}
       <TrustedDevices />
+
+      {/* Help & Tutorial */}
+      <Card className="border-border/50 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="font-serif text-lg flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" /> Help &amp; Tutorial
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">New to ROSA or want a refresher? Replay the onboarding tutorial anytime.</p>
+          <Button
+            variant="outline"
+            className="w-full border-primary/30 text-primary hover:bg-primary/5"
+            onClick={() => {
+              scopedStorage.removeItem("rosa_tutorial_done");
+              toast({ title: "Tutorial reset! 🌹", description: "Head to Home to replay the tutorial." });
+            }}
+          >
+            🌹 Replay Tutorial
+          </Button>
+          <div className="text-xs text-muted-foreground space-y-1 pt-1">
+            <p>• The tutorial will appear next time you visit Home</p>
+            <p>• You can skip it again at any time</p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Sign out */}
       <Card className="border-destructive/20 shadow-sm">

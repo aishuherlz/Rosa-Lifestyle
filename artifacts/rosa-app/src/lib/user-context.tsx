@@ -82,7 +82,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const introSeen = sessionStorage.getItem("rosa_intro_seen");
+    // Use localStorage for intro seen state so returning users skip the splash
+    // even after closing the browser (critical for Remember Me flow)
+    const introSeen = localStorage.getItem("rosa_intro_seen") || sessionStorage.getItem("rosa_intro_seen");
     if (introSeen === "true") setHasSeenIntroState(true);
 
     // If we loaded a session, ping /api/auth/me to confirm it's still valid.
@@ -192,13 +194,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
     scopedStorage.clearUserCache();
     clearSession();
     try { localStorage.removeItem(PROFILE_KEY); sessionStorage.removeItem(PROFILE_KEY); } catch {}
+    // Keep intro seen so returning users don't see splash again — only clear on explicit device forget
     sessionStorage.removeItem("rosa_intro_seen");
     setUserState(null);
   };
 
   const setHasSeenIntro = (val: boolean) => {
     setHasSeenIntroState(val);
-    sessionStorage.setItem("rosa_intro_seen", String(val));
+    // Persist to localStorage so remembered users skip splash after browser restart
+    try {
+      localStorage.setItem("rosa_intro_seen", String(val));
+      sessionStorage.setItem("rosa_intro_seen", String(val));
+    } catch {}
   };
 
   return (
