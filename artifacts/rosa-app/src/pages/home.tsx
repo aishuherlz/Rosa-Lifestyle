@@ -95,8 +95,6 @@ export default function Home() {
       }, true)
     : getCyclePhase(periodData, false);
 
-  const todayStr = format(today, "yyyy-MM-dd");
-  const alreadyCheckedIn = garden.lastCheckIn === todayStr;
 
   const greetingSuffix = isMale ? "Sir" : (user?.name || "Beautiful");
 
@@ -369,10 +367,10 @@ export default function Home() {
           </div>
           <button
             onClick={handleCheckIn}
-            disabled={alreadyCheckedIn}
-            className={`w-full text-xs py-2 rounded-xl font-medium transition-all ${alreadyCheckedIn ? "bg-emerald-100 text-emerald-700" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
+            disabled={checkedInToday}
+            className={`w-full text-xs py-2 rounded-xl font-medium transition-all ${checkedInToday ? "bg-emerald-100 text-emerald-700" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
           >
-            {alreadyCheckedIn ? "✓ Checked in today" : "+ Daily Check-in"}
+            {checkedInToday ? "✓ Checked in today" : "+ Daily Check-in"}
           </button>
         </motion.div>
 
