@@ -12,7 +12,7 @@ import {
   HeartPulse, CalendarHeart, Droplets, CalendarDays,
   Utensils, Dumbbell, Shirt, Map, Timer, Gift, Crown,
   ClipboardList, BookHeart, Target, Sparkles, Moon, FlameKindling, Flower2, Users, Info,
-  BedDouble, Lightbulb, UserHeart,
+  BedDouble, Lightbulb, HeartHandshake,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
