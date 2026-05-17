@@ -25,16 +25,20 @@ const SOFT = [0.32, 0.72, 0.32, 1] as const;
 
 export default function Intro() {
   const [, setLocation] = useLocation();
-  const { setHasSeenIntro, user } = useUser();
+  const { setHasSeenIntro, user, isLoading } = useUser();
   const [phase, setPhase] = useState<"image" | "logo" | "out">("image");
   const [imgUrl] = useState(() => UNSPLASH_IMAGES[Math.floor(Math.random() * UNSPLASH_IMAGES.length)]);
+
+  // Only compute gender after auth has finished loading to avoid flicker
+  const isMale = !isLoading && (user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man");
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase("logo"), 2200);
     const t2 = setTimeout(() => setPhase("out"), 4600);
     const t3 = setTimeout(() => {
       setHasSeenIntro(true);
-      setLocation(user ? "/" : "/sign-in");
+      // Existing users go straight to app, new visitors see the landing page
+      setLocation(user ? "/" : "/landing");
     }, 5600);
     return () => [t1, t2, t3].forEach(clearTimeout);
   }, [setHasSeenIntro, user, setLocation]);

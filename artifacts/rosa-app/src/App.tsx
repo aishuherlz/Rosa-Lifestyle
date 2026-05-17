@@ -10,9 +10,11 @@ import { NightModeProvider } from "@/lib/night-mode-context";
 import { AppLayout } from "@/components/layout/app-layout";
 import NotFound from "@/pages/not-found";
 
+import Landing from "@/pages/landing";
 import Intro from "@/pages/intro";
 import SignIn from "@/pages/sign-in";
 import Home from "@/pages/home";
+import MaleDashboard from "@/pages/male-dashboard";
 import MoodPage from "@/pages/mood";
 import PeriodPage from "@/pages/period";
 import PartnerPage from "@/pages/partner";
@@ -47,6 +49,13 @@ import SleepPage from "@/pages/sleep";
 
 const queryClient = new QueryClient();
 
+// Centralised isMale helper — single source of truth used throughout the app
+export function getIsMale(gender?: string | null): boolean {
+  if (!gender) return false;
+  const g = gender.toLowerCase().trim();
+  return g === "male" || g === "man";
+}
+
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading, hasSeenIntro } = useUser();
 
@@ -68,21 +77,35 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   );
 }
 
-function Router() {
+// Extracted named component — avoids creating new function reference on every render
+function HomeRoute() {
   const { user } = useUser();
+  if (!user) return <Redirect to="/sign-in" />;
+  // Guests or users without gender info → generic home
+  if (!user.gender || user.gender === "unspecified") return <Home />;
+  // Male users → dedicated male dashboard
+  if (getIsMale(user.gender)) return <MaleDashboard />;
+  return <Home />;
+}
 
+// Rose Wall is women-only — male users are redirected
+function RoseWallRoute() {
+  const { user } = useUser();
+  if (user && getIsMale(user.gender)) return <Redirect to="/" />;
+  return <RoseWallPage />;
+}
+
+function Router() {
   return (
     <Switch>
+      <Route path="/landing" component={Landing} />
       <Route path="/intro" component={Intro} />
       <Route path="/sign-in" component={SignIn} />
 
       <Route path="/">
-        <ProtectedRoute
-          component={() => {
-            if (user && !user.gender && !user.guestMode) return <Redirect to="/sign-in" />;
-            return <Home />;
-          }}
-        />
+        {() => (
+          <ProtectedRoute component={HomeRoute} />
+        )}
       </Route>
       <Route path="/mood">{() => <ProtectedRoute component={MoodPage} />}</Route>
       <Route path="/period">{() => <ProtectedRoute component={PeriodPage} />}</Route>
@@ -112,18 +135,21 @@ function Router() {
       <Route path="/wisdom">{() => <ProtectedRoute component={WisdomPage} />}</Route>
       <Route path="/affirmation">{() => <ProtectedRoute component={AffirmationPage} />}</Route>
       <Route path="/sos">{() => <ProtectedRoute component={SOSPage} />}</Route>
-      <Route path="/rose-wall">{() => <ProtectedRoute component={RoseWallPage} />}</Route>
+      <Route path="/rose-wall">{() => <ProtectedRoute component={RoseWallRoute} />}</Route>
       <Route path="/rose-quiz">{() => <ProtectedRoute component={RoseQuizPage} />}</Route>
       <Route path="/sleep">{() => <ProtectedRoute component={SleepPage} />}</Route>
 
       <Route>
-        {user ? (
-          <AppLayout>
+        {() => {
+          const { user } = useUser();
+          return user ? (
+            <AppLayout>
+              <NotFound />
+            </AppLayout>
+          ) : (
             <NotFound />
-          </AppLayout>
-        ) : (
-          <NotFound />
-        )}
+          );
+        }}
       </Route>
     </Switch>
   );

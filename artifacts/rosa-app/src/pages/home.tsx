@@ -11,7 +11,8 @@ import {
   CloudRain, Sun, Cloud, Wind,
   HeartPulse, CalendarHeart, Droplets, CalendarDays,
   Utensils, Dumbbell, Shirt, Map, Timer, Gift, Crown,
-  ClipboardList, BookHeart, Target, Sparkles, Moon, FlameKindling, Flower2, Users, Info
+  ClipboardList, BookHeart, Target, Sparkles, Moon, FlameKindling, Flower2, Users, Info,
+  BedDouble, Lightbulb, UserHeart,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -20,6 +21,8 @@ import { useToast } from "@/hooks/use-toast";
 import { scopedStorage } from "@/lib/scoped-storage";
 import { apiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Tutorial } from "@/components/tutorial";
+import { getIsMale } from "@/App";
 
 type PeriodData = { lastPeriodDate?: string; cycleLength?: number };
 
@@ -63,8 +66,15 @@ export default function Home() {
   const [isPartnerLoading, setIsPartnerLoading] = useState(false);
 
   const today = new Date();
-  const isMale = user?.gender?.toLowerCase() === "male" || user?.gender?.toLowerCase() === "man";
+  const isMale = getIsMale(user?.gender);
   const quotes = GET_DAILY_QUOTES(isMale);
+
+  // Show tutorial for new users who haven't seen it yet
+  const [showTutorial, setShowTutorial] = useState(() => {
+    const done = scopedStorage.getItem("rosa_tutorial_done");
+    const joinedRecently = user?.joinedAt && (Date.now() - new Date(user.joinedAt).getTime()) < 1000 * 60 * 60 * 24 * 3; // within 3 days
+    return !done && !!joinedRecently;
+  });
   const quote = quotes[today.getDate() % quotes.length];
   
   const cycleInfo = isMale && partnerData?.partnerData?.cycle?.logs?.[0] 
@@ -87,13 +97,31 @@ export default function Home() {
         if (data.current) setWeather({ temp: Math.round(data.current.temperature_2m), code: data.current.weathercode });
       } catch {}
     };
+    // Timezone-based fallback coordinates instead of hardcoded Toronto
+    const getTimezoneCoords = (): [number, number] => {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz.includes("London") || tz.includes("Dublin")) return [51.5, -0.12];
+        if (tz.includes("New_York") || tz.includes("Toronto")) return [40.71, -74.01];
+        if (tz.includes("Los_Angeles") || tz.includes("Vancouver")) return [34.05, -118.24];
+        if (tz.includes("Chicago")) return [41.88, -87.63];
+        if (tz.includes("Kolkata") || tz.includes("Calcutta")) return [22.57, 88.36];
+        if (tz.includes("Dubai")) return [25.2, 55.27];
+        if (tz.includes("Sydney") || tz.includes("Melbourne")) return [-33.87, 151.21];
+        if (tz.includes("Paris") || tz.includes("Berlin")) return [48.86, 2.35];
+        if (tz.includes("Tokyo")) return [35.68, 139.69];
+        if (tz.includes("Singapore")) return [1.35, 103.82];
+      } catch {}
+      return [51.5, -0.12]; // Default London — more internationally neutral than Toronto
+    };
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude),
-        () => fetchWeather(43.6532, -79.3832) // fallback: Toronto
+        () => { const [lat, lon] = getTimezoneCoords(); fetchWeather(lat, lon); }
       );
     } else {
-      fetchWeather(43.6532, -79.3832); // fallback: Toronto
+      const [lat, lon] = getTimezoneCoords();
+      fetchWeather(lat, lon);
     }
   }, []);
 
@@ -138,10 +166,10 @@ export default function Home() {
     const { newStreak, celebration } = checkIn();
     setCheckedInToday(true);
     if (celebration === "confetti") {
-      confetti({ particleCount: 100, spread: 80, colors: ["#2563eb", "#60a5fa", "#fbbf24"] });
+      confetti({ particleCount: 100, spread: 80, colors: ["#be185d", "#f9a8d4", "#fbbf24"] });
       toast({ title: "7-day streak! 🎉", description: "You're on fire! Keep going." });
     } else if (celebration === "bloom") {
-      confetti({ particleCount: 200, spread: 140, colors: ["#2563eb", "#60a5fa", "#fde68a", "#fbcfe8"] });
+      confetti({ particleCount: 200, spread: 140, colors: ["#be185d", "#f9a8d4", "#fde68a", "#fbcfe8"] });
       toast({ title: "30-day streak! 🌹🌹🌹", description: "A full bloom! You're incredible." });
     } else {
       toast({ title: `Day ${newStreak} streak! 🌹`, description: "Your garden is growing." });
@@ -165,12 +193,13 @@ export default function Home() {
     { href: "/reminders", label: "Reminders", icon: CalendarDays, color: "text-violet-400 bg-violet-50" },
     { href: "/partner", label: "Partner", icon: CalendarHeart, color: isMale ? "text-blue-400 bg-blue-50" : "text-rose-400 bg-rose-50" },
     { href: "/surveys", label: "Surveys", icon: ClipboardList, color: "text-blue-500 bg-blue-50" },
-    { href: "/affirmation", label: "Affirmation", icon: Sparkles, color: isMale ? "text-blue-500 bg-blue-50" : "text-rose-500 bg-rose-50" },
-    { href: "/rose-wall", label: "Rose Wall", icon: BookHeart, color: isMale ? "text-blue-400 bg-blue-50" : "text-pink-500 bg-pink-50" },
-    { href: "/rose-quiz", label: "Rose Quiz", icon: Sparkles, color: "text-violet-500 bg-violet-50" },
+    { href: "/affirmation", label: "Affirmation", icon: Flower2, color: isMale ? "text-blue-500 bg-blue-50" : "text-rose-500 bg-rose-50" },
+    { href: "/rose-wall", label: "Rose Wall", icon: Users, color: isMale ? "text-blue-400 bg-blue-50" : "text-pink-500 bg-pink-50" },
+    { href: "/rose-quiz", label: "Rose Quiz", icon: Lightbulb, color: "text-violet-500 bg-violet-50" },
     { href: "/sos", label: "Support", icon: HeartPulse, color: "text-red-500 bg-red-50" },
     { href: "/sanctuary", label: "Sanctuary", icon: Moon, color: "text-indigo-500 bg-indigo-50" },
-    { href: "/wisdom", label: "Wisdom", icon: BookHeart, color: "text-amber-500 bg-amber-50" },
+    { href: "/wisdom", label: "Wisdom", icon: Lightbulb, color: "text-amber-500 bg-amber-50" },
+    { href: "/sleep", label: "Sleep", icon: BedDouble, color: "text-slate-500 bg-slate-50" },
   ];
 
   const weeklyRecap = (() => {
@@ -183,6 +212,10 @@ export default function Home() {
   })();
 
   return (
+    <>
+      {showTutorial && (
+        <Tutorial onComplete={() => setShowTutorial(false)} />
+      )}
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 md:p-10 space-y-7 max-w-4xl mx-auto pb-24">
 
       {/* Header */}
@@ -247,7 +280,14 @@ export default function Home() {
       <FoundersBanner />
 
       {/* Partner Status Card (Male Only) */}
-      {isMale && partnerData?.linked && (
+      {isMale && isPartnerLoading && (
+        <div className="bg-gradient-to-br from-blue-50 to-slate-50 border border-blue-100 rounded-3xl p-5 animate-pulse">
+          <div className="h-4 bg-blue-200/60 rounded w-1/3 mb-3" />
+          <div className="h-6 bg-blue-200/60 rounded w-1/2 mb-2" />
+          <div className="h-3 bg-blue-100/60 rounded w-2/3" />
+        </div>
+      )}
+      {isMale && !isPartnerLoading && partnerData?.linked && (
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
           <Link href="/period">
             <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white p-5 rounded-3xl shadow-lg cursor-pointer group hover:shadow-xl transition-all border border-blue-400/30">
@@ -445,5 +485,6 @@ export default function Home() {
         authorName={user?.name}
       />
     </motion.div>
+    </>
   );
 }
