@@ -105,19 +105,26 @@ export function AppLayout({ children }: { children: ReactNode }) {
   useEffect(() => { setDrawerOpen(false); }, [location]);
 
   // Save scroll position when leaving, restore when returning to a route.
-  // RAF delay ensures Framer Motion's entrance animation (y:10→0) finishes
-  // before we restore scrollTop — otherwise the animation layout pass resets it.
+  // We use a 120ms timeout (longer than a single RAF) because Framer Motion's
+  // entrance animation runs over multiple frames — a single RAF fires too early
+  // and the animation layout pass resets scrollTop immediately after.
   useEffect(() => {
     const el = mainRef.current;
     if (!el) return;
     const saved = scrollPositions.current[location] ?? 0;
-    const raf = requestAnimationFrame(() => {
-      el.scrollTop = saved;
-    });
-    const onScroll = () => { scrollPositions.current[location] = el.scrollTop; };
+    // Only restore if there's actually a saved position to restore
+    let timer: ReturnType<typeof setTimeout>;
+    if (saved > 0) {
+      timer = setTimeout(() => {
+        if (mainRef.current) mainRef.current.scrollTop = saved;
+      }, 120);
+    }
+    const onScroll = () => {
+      scrollPositions.current[location] = el.scrollTop;
+    };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => {
-      cancelAnimationFrame(raf);
+      clearTimeout(timer);
       el.removeEventListener("scroll", onScroll);
     };
   }, [location]);

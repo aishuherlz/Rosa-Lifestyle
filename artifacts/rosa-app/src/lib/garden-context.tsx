@@ -118,12 +118,41 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     const today = format(new Date(), "yyyy-MM-dd");
     const log = garden.wellnessLog[today] || {};
     let score = 0;
-    if (garden.lastCheckIn === today) score += 20;
-    if (log.mood && log.mood >= 6) score += 20;
+    if (garden.lastCheckIn === today) score += 20; // Check-in: 20pts
+
+    // Mood: check rosa_mood_logs in localStorage
+    try {
+      const moodLogs = JSON.parse(localStorage.getItem("rosa_mood_logs") || "[]");
+      const todayMood = moodLogs.find((l: any) => l.date === today);
+      if (todayMood?.moodScore && todayMood.moodScore >= 3) score += 20;
+    } catch {}
+
+    // Water: from wellnessLog
     if (log.water && log.water >= 6) score += 20;
-    if (log.workout) score += 20;
-    if (log.sleep && log.sleep >= 7) score += 20;
-    return score;
+
+    // Workout: from wellnessLog or rosa_health_logs
+    if (log.workout) {
+      score += 20;
+    } else {
+      try {
+        const healthLogs = JSON.parse(localStorage.getItem("rosa_health_logs") || "[]");
+        const todayHealth = healthLogs.find((l: any) => l.date === today);
+        if (todayHealth?.workout || todayHealth?.steps > 5000) score += 20;
+      } catch {}
+    }
+
+    // Sleep: from wellnessLog or rosa_sleep_logs
+    if (log.sleep && log.sleep >= 7) {
+      score += 20;
+    } else {
+      try {
+        const sleepLogs = JSON.parse(localStorage.getItem("rosa_sleep_logs") || "[]");
+        const todaySleep = sleepLogs.find((l: any) => l.date === today);
+        if (todaySleep?.hours && todaySleep.hours >= 7) score += 20;
+      } catch {}
+    }
+
+    return Math.min(score, 100);
   })();
 
   return (
