@@ -111,6 +111,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       achievements: [...prev.achievements, { ...a, earnedAt: new Date().toISOString() }],
     }));
+  const hasAchievement = (id: string) => garden.achievements.some((a) => a.id === id);
   };
 
   const calcWellness = () => {
