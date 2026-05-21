@@ -116,8 +116,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
     let timer: ReturnType<typeof setTimeout>;
     if (saved > 0) {
       timer = setTimeout(() => {
-        if (mainRef.current) mainRef.current.scrollTop = saved;
-      }, 120);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (mainRef.current) mainRef.current.scrollTop = saved;
+          });
+        });
+      }, 50);
     }
     const onScroll = () => {
       scrollPositions.current[location] = el.scrollTop;

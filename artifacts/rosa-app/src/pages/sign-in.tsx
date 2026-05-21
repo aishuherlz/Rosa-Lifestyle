@@ -73,9 +73,19 @@ export default function SignIn() {
           });
           setLocation("/");
         }
-        // If not verified — just show normal sign-in form, no error
+        // Backend didn't confirm trusted — auto-send verification code
+        // so user just needs to enter the code, not re-type their email
+        if (savedEmail && data?.ok === false) {
+          const codeRes = await fetch(apiUrl("/api/auth/send-code"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ destination: savedEmail, name: "" }),
+          });
+          const codeData = await codeRes.json().catch(() => ({}));
+          if (codeData?.ok) setStep("verify");
+        }
       } catch {
-        // Network error — just show normal sign-in form
+        // Network error — show normal sign-in form
       }
     };
     tryBypass();
