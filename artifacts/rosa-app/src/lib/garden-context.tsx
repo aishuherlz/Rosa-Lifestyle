@@ -113,49 +113,25 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  const hasAchievement = (id: string) => garden.achievements.some((a) => a.id === id);
-
-  const wellnessScore = (() => {
+  const calcWellness = () => {
     const today = format(new Date(), "yyyy-MM-dd");
     const log = garden.wellnessLog[today] || {};
     let score = 0;
-    if (garden.lastCheckIn === today) score += 20; // Check-in: 20pts
-
-    // Mood: check scoped rosa_mood_logs
+    if (garden.lastCheckIn === today) score += 20;
     try {
       const moodLogs = JSON.parse(scopedStorage.getItem("rosa_mood_logs") || "[]");
       const todayMood = moodLogs.find((l: any) => l.date === today);
       if (todayMood?.moodScore && todayMood.moodScore >= 3) score += 20;
     } catch {}
-
-    // Water: from wellnessLog
     if (log.water && log.water >= 6) score += 20;
-
-    // Workout: from wellnessLog or scoped health logs
-    if (log.workout) {
-      score += 20;
-    } else {
-      try {
-        const healthLogs = JSON.parse(scopedStorage.getItem("rosa_health_logs") || "[]");
-        const todayHealth = healthLogs.find((l: any) => l.date === today);
-        if (todayHealth?.workout || todayHealth?.steps > 5000) score += 20;
-      } catch {}
-    }
-
-    // Sleep: from wellnessLog or scoped sleep logs
-    if (log.sleep && log.sleep >= 7) {
-      score += 20;
-    } else {
-      try {
-        const sleepLogs = JSON.parse(scopedStorage.getItem("rosa_sleep_logs") || "[]");
-        const todaySleep = sleepLogs.find((l: any) => l.date === today);
-        if (todaySleep?.hours && todaySleep.hours >= 7) score += 20;
-      } catch {}
-    }
-
+    if (log.workout) { score += 20; } else { try { const h = JSON.parse(scopedStorage.getItem("rosa_health_logs") || "[]"); const th = h.find((l: any) => l.date === today); if (th?.workout || th?.steps > 5000) score += 20; } catch {} }
+    if (log.sleep && log.sleep >= 7) { score += 20; } else { try { const s = JSON.parse(scopedStorage.getItem("rosa_sleep_logs") || "[]"); const ts = s.find((l: any) => l.date === today); if (ts?.hours && ts.hours >= 7) score += 20; } catch {} }
     return Math.min(score, 100);
-  })();
+  };
+  const [wellnessScore, setWellnessScore] = useState(() => calcWellness());
+  useEffect(() => { setWellnessScore(calcWellness()); }, [garden]);
 
+  useEffect(() => { const h = () => setWellnessScore(calcWellness()); window.addEventListener("rosa:mood-saved", h); window.addEventListener("storage", h); return () => { window.removeEventListener("rosa:mood-saved", h); window.removeEventListener("storage", h); }; }, []);
   return (
     <GardenContext.Provider value={{ garden, checkIn, logWellness, earnAchievement, hasAchievement, wellnessScore }}>
       {children}

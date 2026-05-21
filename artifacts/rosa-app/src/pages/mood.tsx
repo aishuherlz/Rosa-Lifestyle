@@ -82,6 +82,7 @@ export default function MoodPage() {
     };
     const filtered = moodLogs.filter((l) => l.date !== today);
     setMoodLogs([entry, ...filtered]);
+      window.dispatchEvent(new Event("rosa:mood-saved"));
     setStep("done");
   };
 
