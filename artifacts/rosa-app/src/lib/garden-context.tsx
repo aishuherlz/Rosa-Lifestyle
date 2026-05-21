@@ -1,10 +1,9 @@
 import { scopedStorage } from "./scoped-storage";
 import { createContext, useContext, useEffect, useState } from "react";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 
 export type RoseColor = "red" | "gold" | "purple" | "blue" | "pink";
-
 export type Achievement = {
   id: string;
   title: string;
@@ -12,7 +11,6 @@ export type Achievement = {
   description: string;
   earnedAt?: string;
 };
-
 type GardenData = {
   roses: number;
   streak: number;
@@ -23,7 +21,6 @@ type GardenData = {
   roseColors: RoseColor[];
   wellnessLog: Record<string, { mood?: number; water?: number; workout?: boolean; sleep?: number }>;
 };
-
 const DEFAULT: GardenData = {
   roses: 0,
   streak: 0,
@@ -34,7 +31,6 @@ const DEFAULT: GardenData = {
   roseColors: [],
   wellnessLog: {},
 };
-
 type GardenCtx = {
   garden: GardenData;
   checkIn: () => { newStreak: number; newRoses: number; celebration?: string };
@@ -43,9 +39,7 @@ type GardenCtx = {
   hasAchievement: (id: string) => boolean;
   wellnessScore: number;
 };
-
 const GardenContext = createContext<GardenCtx | null>(null);
-
 const ACHIEVEMENTS: Achievement[] = [
   { id: "mood_7", title: "Mood Master 🌙", emoji: "🌙", description: "Logged mood 7 days in a row" },
   { id: "food_14", title: "Nutrition Queen 🥗", emoji: "🥗", description: "Logged food for 14 days" },
@@ -60,34 +54,23 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
 
   const checkIn = () => {
     const today = format(new Date(), "yyyy-MM-dd");
+    const yesterday = format(subDays(new Date(), 1), "yyyy-MM-dd");
     if (garden.lastCheckIn === today) {
       return { newStreak: garden.streak, newRoses: garden.roses };
     }
-
-    const yesterday = format(new Date(Date.now() - 86400000), "yyyy-MM-dd");
     const newStreak = garden.lastCheckIn === yesterday ? garden.streak + 1 : 1;
-    const newPetals = (garden.petals + 1) % 10;
-    const completedRoses = Math.floor((garden.petals + 1) / 10);
-    const newRoses = garden.roses + completedRoses;
-
-    const newColors = [...garden.roseColors];
-    if (newStreak >= 30 && !newColors.includes("gold")) newColors.push("gold");
-    if (newStreak >= 7 && !newColors.includes("red")) newColors.push("red");
-
+    const newRoses = garden.roses + 1;
     const newTotal = garden.totalCheckIns + 1;
     let celebration: string | undefined;
     if (newStreak === 7) celebration = "confetti";
-    else if (newStreak === 30) celebration = "bloom";
-    else if (newTotal === 100) celebration = "legend";
-
+    if (newStreak === 30) celebration = "bloom";
     const updated: GardenData = {
       ...garden,
+      roses: newRoses,
       streak: newStreak,
       lastCheckIn: today,
       totalCheckIns: newTotal,
-      petals: newPetals,
-      roses: newRoses,
-      roseColors: newColors,
+      petals: garden.petals + 1,
     };
     setGarden(updated);
     return { newStreak, newRoses, celebration };
@@ -98,7 +81,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       wellnessLog: {
         ...prev.wellnessLog,
-        [date]: { ...prev.wellnessLog[date], ...data },
+        [date]: { ...(prev.wellnessLog[date] || {}), ...data },
       },
     }));
   };
@@ -111,8 +94,9 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       achievements: [...prev.achievements, { ...a, earnedAt: new Date().toISOString() }],
     }));
-  const hasAchievement = (id: string) => garden.achievements.some((a) => a.id === id);
   };
+
+  const hasAchievement = (id: string) => garden.achievements.some((a) => a.id === id);
 
   const calcWellness = () => {
     const today = format(new Date(), "yyyy-MM-dd");
@@ -125,14 +109,41 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       if (todayMood?.moodScore && todayMood.moodScore >= 3) score += 20;
     } catch {}
     if (log.water && log.water >= 6) score += 20;
-    if (log.workout) { score += 20; } else { try { const h = JSON.parse(scopedStorage.getItem("rosa_health_logs") || "[]"); const th = h.find((l: any) => l.date === today); if (th?.workout || th?.steps > 5000) score += 20; } catch {} }
-    if (log.sleep && log.sleep >= 7) { score += 20; } else { try { const s = JSON.parse(scopedStorage.getItem("rosa_sleep_logs") || "[]"); const ts = s.find((l: any) => l.date === today); if (ts?.hours && ts.hours >= 7) score += 20; } catch {} }
+    if (log.workout) {
+      score += 20;
+    } else {
+      try {
+        const healthLogs = JSON.parse(scopedStorage.getItem("rosa_health_logs") || "[]");
+        const todayHealth = healthLogs.find((l: any) => l.date === today);
+        if (todayHealth?.workout || todayHealth?.steps > 5000) score += 20;
+      } catch {}
+    }
+    if (log.sleep && log.sleep >= 7) {
+      score += 20;
+    } else {
+      try {
+        const sleepLogs = JSON.parse(scopedStorage.getItem("rosa_sleep_logs") || "[]");
+        const todaySleep = sleepLogs.find((l: any) => l.date === today);
+        if (todaySleep?.hours && todaySleep.hours >= 7) score += 20;
+      } catch {}
+    }
     return Math.min(score, 100);
   };
+
   const [wellnessScore, setWellnessScore] = useState(() => calcWellness());
+
   useEffect(() => { setWellnessScore(calcWellness()); }, [garden]);
 
-  useEffect(() => { const h = () => setWellnessScore(calcWellness()); window.addEventListener("rosa:mood-saved", h); window.addEventListener("storage", h); return () => { window.removeEventListener("rosa:mood-saved", h); window.removeEventListener("storage", h); }; }, []);
+  useEffect(() => {
+    const h = () => setWellnessScore(calcWellness());
+    window.addEventListener("rosa:mood-saved", h);
+    window.addEventListener("storage", h);
+    return () => {
+      window.removeEventListener("rosa:mood-saved", h);
+      window.removeEventListener("storage", h);
+    };
+  }, []);
+
   return (
     <GardenContext.Provider value={{ garden, checkIn, logWellness, earnAchievement, hasAchievement, wellnessScore }}>
       {children}
@@ -145,5 +156,3 @@ export function useGarden() {
   if (!ctx) throw new Error("useGarden must be used within GardenProvider");
   return ctx;
 }
-
-export { ACHIEVEMENTS };
