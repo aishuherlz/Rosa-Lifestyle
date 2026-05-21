@@ -1,3 +1,4 @@
+import { scopedStorage } from "./scoped-storage";
 import { createContext, useContext, useEffect, useState } from "react";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { format } from "date-fns";
@@ -120,9 +121,9 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     let score = 0;
     if (garden.lastCheckIn === today) score += 20; // Check-in: 20pts
 
-    // Mood: check rosa_mood_logs in localStorage
+    // Mood: check scoped rosa_mood_logs
     try {
-      const moodLogs = JSON.parse(localStorage.getItem("rosa_mood_logs") || "[]");
+      const moodLogs = JSON.parse(scopedStorage.getItem("rosa_mood_logs") || "[]");
       const todayMood = moodLogs.find((l: any) => l.date === today);
       if (todayMood?.moodScore && todayMood.moodScore >= 3) score += 20;
     } catch {}
@@ -130,23 +131,23 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     // Water: from wellnessLog
     if (log.water && log.water >= 6) score += 20;
 
-    // Workout: from wellnessLog or rosa_health_logs
+    // Workout: from wellnessLog or scoped health logs
     if (log.workout) {
       score += 20;
     } else {
       try {
-        const healthLogs = JSON.parse(localStorage.getItem("rosa_health_logs") || "[]");
+        const healthLogs = JSON.parse(scopedStorage.getItem("rosa_health_logs") || "[]");
         const todayHealth = healthLogs.find((l: any) => l.date === today);
         if (todayHealth?.workout || todayHealth?.steps > 5000) score += 20;
       } catch {}
     }
 
-    // Sleep: from wellnessLog or rosa_sleep_logs
+    // Sleep: from wellnessLog or scoped sleep logs
     if (log.sleep && log.sleep >= 7) {
       score += 20;
     } else {
       try {
-        const sleepLogs = JSON.parse(localStorage.getItem("rosa_sleep_logs") || "[]");
+        const sleepLogs = JSON.parse(scopedStorage.getItem("rosa_sleep_logs") || "[]");
         const todaySleep = sleepLogs.find((l: any) => l.date === today);
         if (todaySleep?.hours && todaySleep.hours >= 7) score += 20;
       } catch {}

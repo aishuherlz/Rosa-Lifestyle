@@ -472,14 +472,24 @@ export default function PartnerPage() {
                     {shared.map(s => (
                       <div key={s.key} className={`p-3 bg-${s.color}-50 rounded-xl border border-${s.color}-200`}>
                         <p className={`font-medium text-${s.color}-700 text-sm mb-1`}>{s.label}</p>
-                        {Array.isArray(pd[s.key]) ? (
+                        {s.key === "cycle" && pd[s.key] && typeof pd[s.key] === "object" ? (
+                          <div className="text-xs text-[#9E7B8A] space-y-1">
+                            {pd[s.key].currentPhase && <p>📍 Phase: <span className="font-medium">{pd[s.key].currentPhase}</span></p>}
+                            {pd[s.key].nextPeriod && <p>📅 Next period: <span className="font-medium">{pd[s.key].nextPeriod}</span></p>}
+                            {pd[s.key].cycleDay && <p>🔢 Cycle day: <span className="font-medium">{pd[s.key].cycleDay}</span></p>}
+                            {pd[s.key].mood && <p>💗 Mood: <span className="font-medium">{pd[s.key].mood}</span></p>}
+                          </div>
+                        ) : s.key === "mood" && pd[s.key] && typeof pd[s.key] === "object" ? (
+                          <div className="text-xs text-[#9E7B8A] space-y-1">
+                            {pd[s.key].mood && <p>Today: <span className="font-medium">{pd[s.key].mood}</span></p>}
+                            {pd[s.key].note && <p>Note: <span className="font-medium">{pd[s.key].note}</span></p>}
+                          </div>
+                        ) : Array.isArray(pd[s.key]) ? (
                           pd[s.key].slice(0, 5).map((item: any, i: number) => (
-                            <p key={i} className="text-xs text-[#9E7B8A]">• {item.name || item.title || item.text || JSON.stringify(item)}</p>
+                            <p key={i} className="text-xs text-[#9E7B8A]">• {item.name || item.title || item.text || item.label || JSON.stringify(item)}</p>
                           ))
-                        ) : typeof pd[s.key] === "object" ? (
-                          Object.entries(pd[s.key]).slice(0, 4).map(([k, v]) => (
-                            <p key={k} className="text-xs text-[#9E7B8A]">{k}: {String(v)}</p>
-                          ))
+                        ) : typeof pd[s.key] === "object" && pd[s.key] !== null ? (
+                          <p className="text-xs text-[#9E7B8A]">{JSON.stringify(pd[s.key]).slice(0, 100)}</p>
                         ) : (
                           <p className="text-xs text-[#9E7B8A]">{String(pd[s.key])}</p>
                         )}

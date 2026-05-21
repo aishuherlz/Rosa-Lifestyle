@@ -220,6 +220,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try { localStorage.removeItem(PROFILE_KEY); sessionStorage.removeItem(PROFILE_KEY); } catch {}
     // Keep intro seen so returning users don't see splash again — only clear on explicit device forget
     sessionStorage.removeItem("rosa_intro_seen");
+    try { localStorage.removeItem("rosa_last_email"); localStorage.removeItem("rosa_device_id"); } catch {}
     setUserState(null);
   };
 
